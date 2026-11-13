@@ -1,0 +1,109 @@
+/*
+ * Table tiles (shared by the owner and waiter apps): every tile is a white squircle with a hairline edge.
+ * Only the status pill carries the state colour (tint background, coloured dot and text).
+ */
+.table-tile {
+  --tile-radius: 16px;
+  --pill-ink: var(--muted, #6f6b63);
+  --pill-bg: #f2f1ee;
+  --pill-dot: #a8a39a;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+  min-height: 112px;
+  padding: 12px 12px 12px;
+  border: 1px solid var(--line, #e7e5e0);
+  border-radius: var(--tile-radius);
+  background: var(--surface, #fff);
+  color: var(--ink, #111110);
+  text-align: left;
+  font-weight: 400;
+  box-shadow: 0 1px 2px #1111100a;
+  container-type: inline-size;
+  transition: transform 140ms var(--ease, ease-out), box-shadow 180ms var(--ease, ease-out), border-color 180ms var(--ease, ease-out);
+}
+@supports (corner-shape: squircle) {
+  .table-tile { --tile-radius: 26px; corner-shape: squircle; }
+}
+.table-tile.is-ordering { --pill-ink: #2156a5; --pill-bg: #eaf0fa; --pill-dot: #2156a5; }
+.table-tile.is-attention { --pill-ink: #9a6408; --pill-bg: #f8eedb; --pill-dot: #9a6408; }
+.table-tile.is-bill { --pill-ink: #b42318; --pill-bg: #fbeae4; --pill-dot: #b42318; }
+
+button.table-tile { display: flex; align-items: stretch; justify-content: space-between; min-height: 112px; padding: 12px; border: 1px solid var(--line, #e7e5e0); background: var(--surface, #fff); color: var(--ink, #111110); }
+button.table-tile:hover { background: var(--surface, #fff); }
+.table-tile.is-interactive { cursor: pointer; }
+.table-tile.is-interactive:hover { transform: translateY(-1px); border-color: var(--line-strong, #d6d3cc); box-shadow: 0 1px 2px #1111100d, 0 10px 22px -12px #11111033; }
+.table-tile.is-interactive:active { transform: scale(.98); }
+.table-tile:focus-visible { outline: 2px solid var(--ember, #d9431e); outline-offset: 2px; }
+
+.table-tile-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 6px; min-width: 0; }
+.table-tile-heading { display: flex; flex-direction: column; min-width: 0; }
+.table-tile-caption { color: var(--muted, #6f6b63); font-size: 11px; line-height: 1.2; font-weight: 550; letter-spacing: .02em; text-transform: uppercase; }
+.table-tile-number { font-size: 30px; line-height: 1.05; font-weight: 650; letter-spacing: -.035em; font-variant-numeric: tabular-nums; }
+
+.table-tile-badges { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px; flex-shrink: 0; }
+.table-tile-badge { display: inline-flex; align-items: center; gap: 3px; height: 22px; min-width: 22px; padding: 0 6px; border-radius: 999px; background: #f2f1ee; color: var(--ink-2, #45423c); font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; justify-content: center; }
+.table-tile-badge.is-attention { background: #f8eedb; color: #9a6408; padding: 0; }
+.table-tile-badge.is-bill { background: #fbeae4; color: #b42318; padding: 0; }
+
+.table-tile-foot { display: flex; flex-direction: column; align-items: flex-start; gap: 5px; min-width: 0; }
+.table-tile-pill {
+  display: inline-flex; align-items: center; gap: 6px; max-width: 100%; min-height: 22px; padding: 2px 9px 2px 8px;
+  border-radius: 999px; background: var(--pill-bg); color: var(--pill-ink);
+  font-size: 12px; line-height: 1.25; font-weight: 600;
+}
+.table-tile.is-free .table-tile-pill { font-weight: 550; }
+.table-tile-dot { position: relative; flex-shrink: 0; width: 7px; height: 7px; border-radius: 50%; background: var(--pill-dot); }
+.table-tile.is-free .table-tile-dot { background: transparent; box-shadow: inset 0 0 0 1.5px var(--pill-dot); }
+.table-tile-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.table-tile-meta { max-width: 100%; color: var(--ink-2, #45423c); font-size: 12px; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.tile-state-icon { flex-shrink: 0; }
+
+/* Narrow tiles with badges: the badges take the caption's place (the number still reads "Table 4"). */
+.table-tile-caption { overflow: hidden; white-space: nowrap; }
+@container (max-width: 112px) {
+  .table-tile.has-badges .table-tile-caption { visibility: hidden; }
+}
+
+/* States that want someone: the pill's dot pulses (static when motion is reduced). */
+.table-tile.is-attention .table-tile-dot, .table-tile.is-bill .table-tile-dot { animation: tile-pulse 2s var(--ease, ease-out) infinite; }
+@keyframes tile-pulse {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--pill-dot) 50%, transparent); }
+  70%, 100% { box-shadow: 0 0 0 5px transparent; }
+}
+
+.table-tile.size-lg { min-height: 168px; padding: 18px; gap: 14px; }
+@supports (corner-shape: squircle) { .table-tile.size-lg { --tile-radius: 34px; } }
+.table-tile.size-lg .table-tile-caption { font-size: 12px; }
+.table-tile.size-lg .table-tile-number { font-size: 56px; letter-spacing: -.045em; }
+.table-tile.size-lg .table-tile-pill { min-height: 28px; padding: 3px 12px 3px 10px; font-size: 14px; gap: 8px; }
+.table-tile.size-lg .table-tile-dot { width: 8px; height: 8px; }
+.table-tile.size-lg .table-tile-badge { height: 28px; min-width: 28px; font-size: 13px; }
+.table-tile.size-lg .table-tile-meta { font-size: 13px; }
+
+@media (max-width: 480px) {
+  .table-tile { min-height: 100px; padding: 10px; gap: 8px; }
+  .table-tile-number { font-size: 26px; }
+  .table-tile-pill { padding: 2px 7px 2px 6px; gap: 5px; font-size: 11.5px; }
+  .table-tile-badge { height: 20px; min-width: 20px; padding: 0 5px; font-size: 11px; }
+  .table-tile.size-lg .table-tile-number { font-size: 48px; }
+}
+@media (max-width: 600px) {
+  /* Narrow tiles: let a long state ("Wants the bill") wrap inside its pill instead of clipping. */
+  .table-tile-pill { align-items: flex-start; border-radius: 11px; }
+  .table-tile-dot { margin-top: 4px; }
+  .table-tile-label, .table-tile-meta { white-space: normal; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .table-tile-meta { font-size: 11px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .table-tile { transition: none; }
+  .table-tile.is-attention .table-tile-dot, .table-tile.is-bill .table-tile-dot { animation: none; box-shadow: 0 0 0 2px color-mix(in srgb, var(--pill-dot) 25%, transparent); }
+  .table-tile.is-interactive:hover, .table-tile.is-interactive:active { transform: none; }
+}
+@media (forced-colors: active) {
+  .table-tile, .table-tile-pill { border: 1px solid CanvasText; }
+  .table-tile-dot { forced-color-adjust: none; background: CanvasText; }
+}

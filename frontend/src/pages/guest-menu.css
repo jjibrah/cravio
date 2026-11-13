@@ -1,0 +1,17 @@
+/* Guest menu page: the menu fills the screen; MenuView centres its own content (max 1180px) on wide screens. */
+.gm-page { position: relative; min-height: 100vh; min-height: 100svh; background: var(--paper); }
+.gm-page > .mx, .gm-page > .mv-shell { min-height: 100vh; min-height: 100svh; }
+
+/* No restaurant chosen, unavailable, or offline: one calm centred card in Cravio's quiet neutral. */
+.gm-plain { display: flex; flex-direction: column; background: radial-gradient(80% 50% at 50% 0%, #ffffff 0%, transparent 70%), var(--paper); }
+.gm-notice { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 24px; padding: 48px 16px max(24px, env(safe-area-inset-bottom)); }
+.gm-notice-card { display: flex; flex-direction: column; align-items: center; width: min(100%, 400px); margin-top: auto; padding: 36px 28px 32px; border-radius: 24px; background: var(--surface); box-shadow: 0 0 0 1px var(--line), 0 24px 48px -32px #11111040; text-align: center; }
+.gm-notice-icon { display: grid; place-items: center; width: 60px; height: 60px; margin-bottom: 20px; border-radius: 18px; background: var(--paper); box-shadow: inset 0 0 0 1px var(--line); color: var(--ink); }
+.gm-notice-card h1 { max-width: 22ch; margin-bottom: 8px; font-size: 22px; font-weight: 600; line-height: 1.25; letter-spacing: -.02em; }
+.gm-notice-card p { max-width: 32ch; margin: 0; color: var(--muted); font-size: 15px; line-height: 1.5; }
+.gm-notice-card .gm-hint { display: flex; align-items: center; gap: 10px; max-width: none; text-align: left; margin-top: 18px; padding: 10px 14px; border-radius: 12px; background: var(--paper); color: var(--ink-2); font-size: 13px; }
+.gm-retry { margin-top: 22px; min-width: 160px; border-radius: 999px; }
+.gm-notice-footer { display: flex; align-items: baseline; gap: 3px; margin-top: auto; color: var(--muted); font-size: 12px; }
+.gm-notice-card .gm-hint svg { flex-shrink: 0; color: var(--ink-2); }
+.gm-brand { display: flex; align-items: baseline; gap: 2px; margin: 0 0 auto; font-size: 20px; color: var(--ink); }
+.gm-brand + .gm-notice-card { margin-top: 0; margin-bottom: auto; }

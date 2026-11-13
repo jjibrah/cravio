@@ -1,0 +1,6 @@
+.icon-button.refresh-button { width: 40px; min-height: 40px; flex-shrink: 0; color: var(--ink-2); }
+.refresh-button[aria-disabled="true"] { opacity: .5; cursor: progress; }
+.refresh-button[aria-busy="true"] > svg { animation: refresh-spin 800ms linear infinite; }
+.waiter-header-actions .refresh-button { width: 44px; min-height: 44px; }
+@keyframes refresh-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .refresh-button[aria-busy="true"] > svg { animation: none; } }

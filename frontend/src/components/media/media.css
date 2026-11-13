@@ -1,0 +1,56 @@
+/* Dish media editor (photo + short video). Scoped under .dme. */
+.dme { --dme-tile: 168px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.dme.is-compact { --dme-tile: 96px; }
+.dme-slots { display: grid; grid-template-columns: repeat(2, minmax(0, var(--dme-tile))); gap: 16px; }
+.dme-slot { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.dme-label { color: var(--ink-2); font-size: 13px; font-weight: 600; }
+.dme-label-meta { color: var(--muted); font-weight: 450; }
+.dme-tile {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  aspect-ratio: 1;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: 16px;
+  corner-shape: squircle;
+  background: var(--paper);
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+  color: var(--ink-2);
+  font-weight: 550;
+  cursor: pointer;
+  transition: background-color 150ms var(--ease), box-shadow 150ms var(--ease);
+}
+@supports (corner-shape: squircle) { .dme-tile { border-radius: 24px; } }
+.dme-tile:hover { background: var(--hover); box-shadow: inset 0 0 0 1px var(--field); color: var(--ink); }
+.dme-tile.has-media { background: #1b1a18; box-shadow: inset 0 0 0 1px #1111100f; }
+.dme-tile img, .dme-tile video { width: 100%; height: 100%; max-width: none; object-fit: cover; }
+.dme-tile.is-busy img { opacity: .45; }
+.visually-hidden:focus-visible + .dme-tile { outline: 2px solid var(--ember); outline-offset: 3px; }
+.dme-empty { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px; text-align: center; }
+.dme-empty strong { font-size: 13px; font-weight: 600; color: var(--ink); }
+.dme-empty span { color: var(--muted); font-size: 11.5px; line-height: 1.35; font-weight: 450; }
+.dme-video-blank { width: 100%; height: 100%; background: linear-gradient(150deg, #2a2926, #111110); }
+.dme-play { position: absolute; left: 50%; top: 50%; display: grid; place-items: center; width: 40px; height: 40px; margin: -20px 0 0 -20px; padding-left: 2px; border-radius: 50%; background: #ffffffe6; color: #111110; box-shadow: 0 6px 16px -6px #00000080; }
+.is-compact .dme-play { width: 32px; height: 32px; margin: -16px 0 0 -16px; }
+.dme-duration { position: absolute; right: 8px; bottom: 8px; padding: 2px 7px; border-radius: 999px; background: #000000a6; color: #fff; font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.dme-actions { display: flex; gap: 4px; margin: -4px 0 0 -8px; }
+.dme-link { min-height: 36px; padding: 6px 8px; border-radius: var(--r-control); background: transparent; color: var(--ink); font-size: 13px; font-weight: 600; text-decoration: underline; text-decoration-color: var(--line-strong); text-underline-offset: 3px; }
+.dme-link:hover { background: var(--hover); text-decoration-color: var(--ink); }
+.dme-hint { color: var(--muted); font-size: 11.5px; }
+.dme-progress { display: flex; flex-direction: column; gap: 6px; }
+.dme-progress-text { color: var(--ink-2); font-size: 12px; font-weight: 550; font-variant-numeric: tabular-nums; }
+.dme-bar { position: relative; display: block; height: 4px; overflow: hidden; border-radius: 999px; background: var(--selected); }
+.dme-bar > span { display: block; height: 100%; border-radius: inherit; background: var(--ink); transition: width 200ms var(--ease); }
+.dme-bar.is-indeterminate > span { width: 36%; animation: dme-slide 1.1s var(--ease) infinite; }
+@keyframes dme-slide { from { transform: translateX(-100%); } to { transform: translateX(280%); } }
+.dme-error { display: flex; align-items: flex-start; gap: 6px; margin: 0; color: var(--danger); font-size: 12.5px; line-height: 1.4; }
+.dme-error svg { flex-shrink: 0; margin-top: 1px; }
+.dme-status { display: flex; align-items: center; gap: 6px; min-height: 18px; margin: 0; color: var(--success); font-size: 12.5px; font-weight: 550; }
+.dme-status:empty { min-height: 0; }
+@media (max-width: 360px) { .dme { --dme-tile: 136px; } .dme-slots { gap: 12px; } }
+@media (prefers-reduced-motion: reduce) { .dme-bar.is-indeterminate > span { animation: none; width: 100%; opacity: .5; } }

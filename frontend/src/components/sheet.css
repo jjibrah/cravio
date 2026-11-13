@@ -1,0 +1,26 @@
+.sheet {
+  position: fixed;
+  inset: auto 0 0;
+  width: 100%;
+  max-width: 480px;
+  max-height: calc(100dvh - 24px);
+  margin: 0 auto;
+  padding: 0;
+  border: 0;
+  border-radius: 16px 16px 0 0;
+  background: var(--surface);
+  color: var(--ink);
+  overflow: hidden;
+  box-shadow: 0 -12px 40px -16px #12121140;
+}
+.sheet[open] { display: flex; animation: sheet-in 240ms var(--ease) both; }
+.sheet::backdrop { background: #12121166; }
+.sheet-panel { display: flex; flex-direction: column; width: 100%; min-height: 0; max-height: calc(100dvh - 24px); }
+.sheet-handle { flex-shrink: 0; width: 36px; height: 4px; margin: 10px auto 2px; border-radius: 999px; background: var(--line-strong); }
+.sheet-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-shrink: 0; padding: 4px 12px 8px 24px; }
+.sheet-header h2 { margin: 0; font-size: 18px; line-height: 1.3; font-weight: 600; letter-spacing: -.015em; }
+.sheet-header .icon-button { width: 44px; min-height: 44px; }
+.sheet-content { padding: 8px 24px max(24px, env(safe-area-inset-bottom)); overflow-y: auto; overscroll-behavior: contain; }
+.sheet button, .sheet a { touch-action: manipulation; }
+@keyframes sheet-in { from { transform: translateY(40px); opacity: .4; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .sheet[open] { animation: none; } }

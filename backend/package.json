@@ -1,0 +1,19 @@
+{
+  "name": "cravio-backend",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "node --env-file-if-exists=.env --watch src/server.js",
+    "start": "node --env-file-if-exists=.env src/server.js",
+    "db:setup": "node scripts/setup-db.js",
+    "db:seed": "node scripts/seed-users.js",
+    "db:migrate": "node scripts/migrate.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "2.119.0"
+  },
+  "devDependencies": {
+    "pg": "8.23.1"
+  }
+}

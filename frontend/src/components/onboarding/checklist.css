@@ -1,0 +1,63 @@
+/*
+ * "Finish setting up" on the owner Overview: one next step and a pipeline. Sits inside the dashboard
+ * shell and uses its .panel. Layout follows the card's own width (container queries), not the viewport:
+ * narrow = button on top and a vertical pipeline; medium = horizontal pipeline below; wide = side by side.
+ */
+.setup-card { container-type: inline-size; margin-bottom: 16px; }
+.setup-layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; padding: 20px; }
+
+.setup-next { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; }
+.setup-eyebrow { margin: 0 0 8px; color: var(--muted); font-size: 13px; font-weight: 550; font-variant-numeric: tabular-nums; }
+.setup-title { font-size: 20px; line-height: 1.25; font-weight: 650; letter-spacing: -.02em; }
+.setup-why { max-width: 46ch; margin: 6px 0 18px; color: var(--ink-2); font-size: 14px; line-height: 1.5; }
+.setup-hint { color: var(--muted); font-variant-numeric: tabular-nums; }
+.setup-cta { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 0 20px; border-radius: var(--r-tab, 10px); background: var(--ink); color: #fff; font-size: 15px; font-weight: 600; white-space: nowrap; transition: background-color 150ms var(--ease), transform 120ms var(--ease); }
+.setup-cta:hover { background: #2b2a27; }
+.setup-cta:active { transform: scale(.98); }
+
+/* Pipeline: small nodes on a thin line. Vertical by default. */
+.setup-pipeline { --node: 24px; display: flex; flex-direction: column; margin: 0; padding: 16px 0 0; border-top: 1px solid var(--line); list-style: none; }
+.setup-step { position: relative; display: flex; min-height: 36px; }
+.setup-step:not(:first-child)::before { content: ''; position: absolute; top: -6px; left: calc(var(--node) / 2 - .75px); width: 1.5px; height: 12px; border-radius: 1px; background: var(--line-strong); }
+.setup-step.is-linked::before { background: var(--ink); }
+.setup-step-inner { display: flex; align-items: center; justify-content: flex-start; gap: 12px; width: 100%; min-height: 36px; padding: 0; border-radius: 8px; background: transparent; color: var(--ink-2); font-size: 13px; font-weight: 500; text-align: left; }
+button.setup-step-inner:hover { background: transparent; }
+a.setup-step-inner:hover .setup-label, button.setup-step-inner:hover .setup-label { color: var(--ink); text-decoration: underline; text-decoration-color: var(--line-strong); text-underline-offset: 3px; }
+.setup-node { display: grid; place-items: center; flex-shrink: 0; width: var(--node); height: var(--node); border-radius: 50%; background: var(--surface); box-shadow: inset 0 0 0 1.5px var(--line-strong); color: var(--muted); font-size: 11.5px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.setup-label { min-width: 0; line-height: 1.3; }
+.setup-step.is-done .setup-node { background: var(--ink); box-shadow: none; color: #fff; }
+.setup-step.is-done .setup-label { color: var(--muted); }
+.setup-step.is-current .setup-node { box-shadow: inset 0 0 0 2px var(--ink); color: var(--ink); }
+.setup-step.is-current .setup-label { color: var(--ink); font-weight: 650; }
+
+/* Medium cards: horizontal pipeline under the call to action. */
+@container (min-width: 600px) {
+  .setup-layout { padding: 24px; }
+  .setup-pipeline { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); padding-top: 20px; }
+  .setup-step { justify-content: center; min-height: 0; }
+  .setup-step:not(:first-child)::before { top: calc(var(--node) / 2 - .75px); left: calc(-50% + var(--node) / 2 + 6px); right: calc(50% + var(--node) / 2 + 6px); width: auto; height: 1.5px; }
+  .setup-step-inner { flex-direction: column; justify-content: flex-start; gap: 8px; width: auto; min-height: 0; padding: 0 2px 2px; text-align: center; font-size: 12.5px; }
+}
+/* Wide cards: the next step on the left, the pipeline beside it. */
+@container (min-width: 960px) {
+  .setup-layout { grid-template-columns: minmax(300px, 400px) minmax(0, 1fr); align-items: center; gap: 40px; }
+  .setup-pipeline { padding: 0 0 0 40px; border-top: 0; border-left: 1px solid var(--line); min-height: 132px; align-content: center; }
+}
+/* Phones: one full-width button. */
+@container (max-width: 459px) {
+  .setup-layout { padding: 18px 16px 12px; }
+  .setup-next { align-items: stretch; }
+  .setup-cta { width: 100%; }
+}
+
+/* All done: a quiet one-line success note. */
+.setup-card.is-complete { display: flex; align-items: center; gap: 14px; padding: 14px 12px 14px 18px; }
+.setup-complete-badge { display: grid; place-items: center; flex-shrink: 0; width: 32px; height: 32px; border-radius: 50%; background: var(--success-soft); color: var(--success); }
+.setup-complete-text { flex: 1; min-width: 0; }
+.setup-complete-text h2 { font-size: 15px; line-height: 1.3; font-weight: 650; letter-spacing: -.01em; }
+.setup-complete-text p { margin: 1px 0 0; color: var(--muted); font-size: 13px; }
+.setup-dismiss { display: grid; place-items: center; flex-shrink: 0; width: 40px; min-height: 40px; padding: 0; border-radius: var(--r-tab, 10px); background: transparent; color: var(--muted); }
+.setup-dismiss:hover { background: var(--hover); color: var(--ink); }
+
+@supports (corner-shape: squircle) { .setup-cta, .setup-dismiss, .setup-step-inner { corner-shape: squircle; } }
+@media (prefers-reduced-motion: reduce) { .setup-cta:active { transform: none; } }
