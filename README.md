@@ -214,6 +214,22 @@ Before inviting real people:
 3. Configure **custom SMTP**. Supabase's default sender only delivers to your project team and rejects addresses such as `example.com`.
 4. To test real invites, run the suite with `CRAVIO_TEST_INVITE_DOMAIN=<your domain>`. Without it, the invite-sending test is skipped.
 
+## Owner settings
+
+`/owner/settings` is where an owner changes anything after setup. Each section has its own URL
+(`?tab=restaurant|hours|floor|team|account`), so links and refresh work:
+
+- **Restaurant:** name, kind, phone, area and street (saved together), plus the logo and cover photo (saved as soon as they upload).
+- **Opening hours:** every day, weekdays or custom per day.
+- **Tables & QR codes:** table count, sections, the guest-menu link (copy or open) and the printable QR pack.
+- **Team:** invite waiters and managers (sent immediately once the restaurant is live), resend or remove
+  undelivered invites, change a member's role, or remove their access. Only the owner changes the team; managers can see it.
+- **Your account:** your name, password, and signing out of other devices. Admins see only this section.
+
+Every form shows a save bar only when something has changed. Successes and failures use the notification pills.
+
+The **Finish setting up** card on the owner Overview disappears as soon as all seven steps are done.
+
 ## Migrations
 
 ```sh
@@ -229,6 +245,14 @@ dish video. After applying it, `npm run db:seed` also gives the Demo Restaurant 
 of activity, including live orders and open guest requests. It replaces that activity on every run. The API contract
 for these features is in [docs/API.md](docs/API.md).
 The onboarding test resets it on every run.
+
+Migration `006_support_requests.sql` adds `support_requests`: what owners send from **Contact Cravio**
+(`/owner/contact-cravio`), and what the Cravio team works through in **Leads & requests** and **Complaints**
+under `/admin`. Owners and managers can create and read their own restaurant's requests (RLS); only the admin
+API (service client) can change status or reply. Until it is applied, Contact Cravio shows only the call,
+WhatsApp and email options. The support phone, WhatsApp number and email are placeholders in `CRAVIO_SUPPORT`
+at the top of `frontend/src/pages/owner/ContactPage.jsx`. The admin Overview, Restaurants, Performance and
+Money pages read live data (see [docs/API.md §17](docs/API.md#17-contact-cravio-and-the-cravio-admin-platform)).
 
 ## Database setup
 

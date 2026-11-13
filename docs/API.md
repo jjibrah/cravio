@@ -15,6 +15,8 @@ It is written for the frontend. Everything here matches `backend/src/routes/oper
 > - `POST /api/public/events` still answers 202, but nothing is stored.
 > - Analytics returns `busyHours: null`, `dishPerformance: null` and `kpis.dishViews.value: null` (and `viewsPerScan`, `videoPlays`); everything else works.
 
+> **Needs migration 006 for support requests.** Until `backend/db/migrations/006_support_requests.sql` is applied, `GET /api/restaurant/support` returns `{ "available": false, "requests": [] }`, `POST` returns `503`, and the admin requests endpoints return `available: false`. See [§17](#17-contact-cravio-and-the-cravio-admin-platform).
+
 > **Needs migration 005 for the agreed order flow** ([ORDER-FLOW.md](ORDER-FLOW.md)). Until `backend/db/migrations/005_order_confirmation.sql` is applied (and for up to a minute after, while the server notices):
 > - The flow works: guests tap "Ready to order", staff see it on `/api/ops/live`, waiters confirm orders, and orders go `taken → served → paid`.
 > - `order.confirmation` is always `null` (nothing is stored), so owners can't tell scanned, typed and manual orders apart.
@@ -39,6 +41,7 @@ It is written for the frontend. Everything here matches `backend/src/routes/oper
 14. [Menu merchandising: pairings, extras, featured, deals (owners and managers)](#14-menu-merchandising-owners-and-managers)
 15. [Menu design ("Studio") and the `menu_design` schema](#15-menu-design-studio)
 16. [Speed: caching, compression and timing](#16-speed-caching-compression-and-timing)
+17. [Contact Cravio and the Cravio admin platform](#17-contact-cravio-and-the-cravio-admin-platform)
 
 ---
 
@@ -1388,3 +1391,95 @@ What's left is Supabase round-trip latency (about 260 ms per query from here; mu
 **Timing log.** Start the backend with `LOG_TIMING=1` to print one line per request: `[timing] GET /api/ops/live 200 262.4ms gzip`.
 
 **Caveat.** The caches live in one process. With more than one backend instance, an invalidation only reaches the instance that handled the write; the others catch up within their TTL (30 s for sign-in contexts, 60 s for menus). Run one instance, or move invalidation to a shared channel, before scaling out.
+
+
+## 17. Settings: your profile and the restaurant team
+
+### `PATCH /api/me` (any signed-in user)
+
+Body `{ "name": "Wanjiru Kamau" }`. Renames the caller (profile and auth metadata). Returns `{ "name" }`.
+
+### `GET /api/restaurant/team` (owners and managers)
+
+Everyone who has joined the caller's restaurant:
+
+```json
+{ "members": [{ "userId": "…", "name": "Amina", "email": "amina@example.com", "role": "waiter",
+  "status": "active | invited | suspended", "joinedAt": "…", "lastSignInAt": "…" }],
+  "canManage": true, "selfId": "…" }
+```
+
+`status` is `invited` until the person first signs in. Invites that have not been sent yet are still listed by
+`GET /api/restaurant/onboarding` (`invites`).
+
+### `PATCH /api/restaurant/team/:userId` (owner only)
+
+Body `{ "role": "waiter" | "manager" }`. Changes the member's role and their sign-in role. Returns `{ "members" }`.
+
+### `DELETE /api/restaurant/team/:userId` (owner only)
+
+Removes the member's access to the restaurant and deletes their invite, so they can be invited again. Someone left with
+no restaurant also loses their staff role. Returns `{ "members" }`. The owner can't change or remove themselves or
+another owner (400).
+
+---
+
+## 18. Contact Cravio and the Cravio admin platform
+
+Owner endpoints live in `routes/support.js`; admin endpoints in `routes/admin-platform.js`. Support requests need **migration 006** (`support_requests`). The admin numbers read the operations tables from migration 003; when a table is missing, its numbers come back as zeros and the response's `available` object says which part is missing, instead of failing.
+
+### The support request object
+
+```json
+{
+  "id": "uuid", "restaurantId": "uuid",
+  "type": "question | problem | billing | feature | complaint | lead",
+  "subject": "Printer won’t print", "message": "Since this morning…",
+  "urgency": "low | normal | urgent",
+  "contactName": "Amina", "contactPhone": "+254712345678", "contactEmail": "amina@example.com",
+  "status": "open | in_progress | resolved | closed",
+  "adminNote": "Cravio’s reply, or null",
+  "createdAt": "…", "updatedAt": "…", "resolvedAt": "… or null"
+}
+```
+
+Admin responses add `restaurant: { id, name, status, area } | null` and `createdByName`.
+
+### `GET /api/restaurant/support` (managers)
+
+Your restaurant's requests, newest first (up to 100): `{ "available": true, "requests": [SupportRequest] }`. Before migration 006: `{ "available": false, "requests": [] }`; show the call, WhatsApp and email options instead.
+
+### `POST /api/restaurant/support` (managers)
+
+```json
+{ "type": "problem", "subject": "optional", "message": "required, up to 4,000 characters", "urgency": "normal",
+  "contactName": "optional", "contactPhone": "+254…", "contactEmail": "…" }
+```
+
+- `type` is one of `question`, `problem`, `billing`, `feature`, `complaint` (`lead` is reserved for the Cravio team).
+- `urgency` defaults to `normal`.
+- `subject` is optional (up to 140 characters); without one, the first line of the message is used.
+- At least one of `contactPhone` (Kenyan numbers are normalised to `+254…`) or `contactEmail` is required.
+
+Returns `{ "request": SupportRequest, "message": "Message sent. We’ll get back to you soon." }`. Errors:
+- `400` with `details.field`.
+- `429` after 6 messages in 10 minutes per person or 30 a day per restaurant (in memory), or when the restaurant already has 20 open or in-progress requests.
+- `503` before migration 006.
+
+Rows are written with the caller's own client: RLS lets owners and managers insert rows for their own restaurant (status, reply and resolved time always start empty) and read their restaurant's rows. They can't update or delete them.
+
+### Admin endpoints (admins only)
+
+Every admin endpoint checks `requireRole('admin')` and then reads with the service client. Anyone else gets `403`.
+
+| Endpoint | Returns |
+| --- | --- |
+| `GET /api/admin/overview` | `available { operations, support }`; `restaurants { total, byStatus { live, onboarding, … } }`; `people { owners, waiters, admins }`; `requests { open, complaints }` (open + in progress); `orders { today, last7d, revenueToday, revenue7d, currency }`; `series` (7 Nairobi days: `{ date, orders, revenue }`); `newestRestaurants` (6); `recentRequests` (6 open, newest first). |
+| `GET /api/admin/restaurants` | `{ restaurants: [...], counts { all, live, onboarding, … }, currency, available { operations } }`, sorted by name. Each row has `id`, `name`, `status`, `kind`, `area`, `address`, `phone`, `created_at`, `went_live_at`, `owner { id, name, email }`, `tables`, `menuItems`, `staff` (non-owner members), `orders30d`, `revenue30d`, `lastOrderAt`. The Users invite dialog still reads `id`, `name` and `status` from it. |
+| `GET /api/admin/performance?range=7d\|30d\|90d` (default `30d`) | `totals { orders, cancelled, scans, guestRequests, activeRestaurants, restaurants, avgServeMinutes, avgAnswerMinutes }`; `series` (`{ date, orders, scans, requests }` per Nairobi day); `restaurants` (per restaurant: `orders`, `cancelled`, `scans`, `guestRequests`, `ordersPerScan`, `avgServeMinutes` (taken → served, under 6 h), `avgAnswerMinutes` (guest request → acknowledged or resolved, under 2 h), `activeDays`, `lastOrderAt`), busiest first. |
+| `GET /api/admin/money?range=month\|30d\|90d` (default `month`, from the 1st in Nairobi) | `totals { revenue, paidOrders, avgTicket, previousRevenue (same length just before), openValue, payingRestaurants }`; `series` (`{ date, revenue, paidOrders }`); `methods` (`[{ method: cash\|mpesa\|card\|other, amount, count }]` from succeeded payments); `restaurants` (`revenue`, `paidOrders`, `avgTicket`, `openOrders`, `openValue`, `cancelledValue`). Revenue is paid order totals by `paid_at`. |
+| `GET /api/admin/requests?type=&status=&q=` | `{ available, requests, counts { all, open, in_progress, resolved, closed } }`, newest 500. `type` is one type, a comma-separated list, or `leads` (lead, question, problem, billing, feature). "Leads & requests" uses `type=lead,question,problem,billing,feature`; "Complaints" uses `type=complaint`. `q` searches subject, message, contact, restaurant and reply. `counts` are after `type` and `q` but before `status`. |
+| `PATCH /api/admin/requests/:id` | Body `{ status?, adminNote? }` (`adminNote` up to 4,000 characters; `null` or empty clears it). `resolved`/`closed` stamp `resolvedAt` (kept if already set); reopening clears it. Returns `{ request, message }`. `404` for an unknown id. |
+
+All admin aggregation happens in the API (paged reads of 1,000 rows, up to 50,000 per table), which is fine for the current platform size. Move it to SQL functions before it isn't.
+

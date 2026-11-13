@@ -194,7 +194,7 @@ test('a new owner onboards, resumes after reload, goes live, and sees the checkl
   await expect(page.getByRole('heading', { name: 'Overview', exact: true })).toBeVisible();
 });
 
-test('when everything is done, the overview shows a dismissible success note that stays dismissed', async ({ page }) => {
+test('when all 7 setup steps are done, the overview hides the Finish setting up card', async ({ page }) => {
   await signIn(page);
   await expect(page).toHaveURL(/\/owner/);
   // Pretend every setup task is done; progress (incl. the dismissal) still comes from the real server.
@@ -210,16 +210,10 @@ test('when everything is done, the overview shows a dismissible success note tha
     await route.fulfill({ response, json: state });
   });
   await page.goto('/owner');
-  const setup = page.getByRole('region', { name: 'Setup complete' });
-  await expect(setup).toBeVisible();
-  await expect(setup).toContainText('7 of 7 done');
-  const saved = page.waitForRequest((request) => request.url().endsWith('/api/restaurant/onboarding/progress') && request.method() === 'PUT');
-  await setup.getByRole('button', { name: 'Dismiss setup complete' }).click();
-  expect((await saved).postDataJSON()).toEqual({ data: { checklistDismissed: true } });
-  await expect(setup).toHaveCount(0);
-  await page.reload();
   await expect(page.getByRole('heading', { name: 'Overview', exact: true })).toBeVisible();
+  await expect(page.getByRole('tab', { name: 'Live' })).toBeVisible();
   await expect(page.locator('#finish-setup')).toHaveCount(0);
+  await expect(page.getByText('Finish setting up')).toHaveCount(0);
   await page.unrouteAll({ behavior: 'wait' });
 });
 

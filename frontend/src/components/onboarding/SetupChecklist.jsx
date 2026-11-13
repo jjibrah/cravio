@@ -7,27 +7,17 @@ const STATUS_TEXT = { done: 'done', current: 'next up', upcoming: 'to do' };
 
 /**
  * "Finish setting up" on the owner Overview: one clear next step with one button, and a calm pipeline of
- * everything else in the recommended order. When all is done it shrinks to a dismissible success note.
+ * everything else in the recommended order. Once every step is done it is hidden.
  */
-export default function SetupChecklist({ state, onStartTour, onDismiss }) {
+export default function SetupChecklist({ state, onStartTour }) {
   const items = checklistFor(state);
   if (!items.length) return null;
   const total = items.length;
   const done = items.filter((item) => item.done).length;
   const next = items.find((item) => !item.done);
 
-  if (!next) {
-    if (state.progress?.data?.checklistDismissed) return null;
-    return <section className="panel setup-card is-complete" id="finish-setup" aria-labelledby="finish-setup-title">
-      <span className="setup-complete-badge" aria-hidden="true"><OnbIcon name="check" size={16} /></span>
-      <div className="setup-complete-text">
-        <h2 id="finish-setup-title">Setup complete</h2>
-        <p>{state.restaurant.name} has everything guests and staff need. {total} of {total} done.</p>
-      </div>
-      <button type="button" className="setup-dismiss" onClick={onDismiss} aria-label="Dismiss setup complete">
-        <OnbIcon name="close" size={16} /></button>
-    </section>;
-  }
+  // Every step done: the card has nothing left to say, so it disappears.
+  if (!next) return null;
 
   const open = (item, className, children, extra = {}) => (item.step
     ? <Link className={className} to={`/onboarding/${item.step}`} {...extra}>{children}</Link>

@@ -45,6 +45,13 @@ const ProductsPage = page(chunks.products);
 const MenuConfigPage = page(chunks.menuConfig);
 const InsightsPage = page(chunks.insights);
 const UsersPage = page(chunks.users);
+const SettingsPage = page(chunks.settings);
+const ContactPage = page(chunks.contact);
+const AdminOverviewPage = page(chunks.adminOverview);
+const RestaurantsPage = page(chunks.adminRestaurants);
+const PerformancePage = page(chunks.adminPerformance);
+const MoneyPage = page(chunks.adminMoney);
+const RequestsPage = page(chunks.adminRequests);
 const WaiterLayout = page(chunks.waiter);
 const WaiterTablesPage = page(chunks.waiterTables);
 const WaiterServicesPage = page(chunks.waiterServices);
@@ -57,18 +64,23 @@ const OnboardingPage = page(chunks.onboarding);
 const configured = Boolean(import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY);
 const waiterPages = { '': WaiterTablesPage, services: WaiterServicesPage, menu: WaiterMenuPage };
 
-/** Picks the page for a dashboard section (owner pages are real; everything else is a page frame). */
+/** Picks the page for a dashboard section; anything without a real page yet falls back to a page frame. */
+const ADMIN_PAGES = { '': AdminOverviewPage, restaurants: RestaurantsPage, performance: PerformancePage, money: MoneyPage, 'leads-requests': RequestsPage, complaints: RequestsPage };
 function DashboardPage({ section }) {
   const { account } = useOutletContext() || {};
   const owner = account?.role === 'owner';
+  const admin = account?.role === 'admin';
   let Page = PageFrame;
-  if (section.kind === 'products' && owner) Page = ProductsPage;
+  if (section.kind === 'settings') Page = SettingsPage;
+  else if (section.kind === 'products' && owner) Page = ProductsPage;
   else if (section.kind === 'users') Page = UsersPage;
+  else if (admin && ADMIN_PAGES[section.path]) Page = ADMIN_PAGES[section.path];
   else if (owner && section.kind === 'overview') Page = OverviewPage;
   else if (owner && section.path === 'orders') Page = OrdersPage;
   else if (owner && section.path === 'tables') Page = TablesPage;
   else if (owner && section.path === 'menu') Page = MenuConfigPage;
   else if (owner && section.path === 'insights') Page = InsightsPage;
+  else if (owner && section.kind === 'support') Page = ContactPage;
   return <Page section={section} />;
 }
 
