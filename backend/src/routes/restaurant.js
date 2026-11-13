@@ -77,7 +77,7 @@ function check(error, messages = {}) {
  * Owner (or manager, whose profile role is also 'owner') and the restaurant they manage.
  * With `create`, an owner without a restaurant gets one, created with the service client.
  */
-async function ownerContext(request, { create = false } = {}) {
+export async function ownerContext(request, { create = false } = {}) {
   const context = await requireRole(request, 'owner');
   let membership;
   try {

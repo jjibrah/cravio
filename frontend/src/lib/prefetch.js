@@ -27,6 +27,13 @@ export const chunks = {
   menuConfig: once(() => import('../pages/owner/MenuConfigPage')),
   insights: once(() => import('../pages/owner/InsightsPage')),
   users: once(() => import('../pages/admin/UsersPage')),
+  settings: once(() => import('../pages/settings/SettingsPage')),
+  contact: once(() => import('../pages/owner/ContactPage')),
+  adminOverview: once(() => import('../pages/admin/AdminOverviewPage')),
+  adminRestaurants: once(() => import('../pages/admin/RestaurantsPage')),
+  adminPerformance: once(() => import('../pages/admin/PerformancePage')),
+  adminMoney: once(() => import('../pages/admin/MoneyPage')),
+  adminRequests: once(() => import('../pages/admin/RequestsPage')),
   waiter: once(() => import('../components/waiter/WaiterLayout')),
   waiterTables: once(() => import('../pages/waiter/WaiterTablesPage')),
   waiterServices: once(() => import('../pages/waiter/WaiterServicesPage')),
@@ -41,7 +48,8 @@ export const chunks = {
 /** The GETs the owner Overview reads through the cache (OverviewPage uses the same keys). */
 export const OVERVIEW_GETS = ['/api/ops/live', '/api/ops/analytics?range=today', '/api/ops/health', '/api/restaurant/onboarding'];
 
-const OWNER_PAGES = { '': 'overview', orders: 'orders', tables: 'tables', products: 'products', menu: 'menuConfig', insights: 'insights' };
+const OWNER_PAGES = { '': 'overview', orders: 'orders', tables: 'tables', products: 'products', menu: 'menuConfig', insights: 'insights', settings: 'settings', 'contact-cravio': 'contact' };
+const ADMIN_PAGES = { '': 'adminOverview', restaurants: 'adminRestaurants', performance: 'adminPerformance', money: 'adminMoney', 'leads-requests': 'adminRequests', complaints: 'adminRequests', users: 'users', settings: 'settings' };
 const WAITER_PAGES = { '': 'waiterTables', services: 'waiterServices', menu: 'waiterMenu', order: 'newOrder', cart: 'cartImport' };
 
 /** Which chunks a pathname needs, or null for a path outside the app. */
@@ -60,7 +68,7 @@ export function chunksFor(pathname) {
       const key = page === 'tables' && detail ? 'tableDetail' : OWNER_PAGES[page] || 'pageFrame';
       return [...signedIn, 'dashboard', key];
     }
-    case 'admin': return [...signedIn, 'dashboard', page === 'users' ? 'users' : 'pageFrame'];
+    case 'admin': return [...signedIn, 'dashboard', ADMIN_PAGES[page] || 'pageFrame'];
     case 'waiter': return [...signedIn, 'waiter', WAITER_PAGES[page] || 'waiterTables'];
     default: return null;
   }

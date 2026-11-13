@@ -57,19 +57,7 @@ export const routes = [
       return { users, counts: countRows(searched), total: all.length };
     },
   },
-  {
-    method: 'GET',
-    path: '/api/admin/restaurants',
-    async handler({ request }) {
-      const { service } = await adminContext(request);
-      const { data, error } = await service.from('restaurants').select('id, name, status').order('name');
-      if (error) {
-        if (isMissingTable(error)) return { restaurants: [] };
-        fail('list restaurants', error, 'Could not load restaurants. Please try again.');
-      }
-      return { restaurants: data };
-    },
-  },
+  // GET /api/admin/restaurants lives in routes/admin-platform.js (richer rows; still { restaurants: [{ id, name, status }] }).
   {
     method: 'POST',
     path: '/api/admin/users/invite',

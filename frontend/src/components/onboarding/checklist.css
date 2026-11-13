@@ -56,8 +56,6 @@ a.setup-step-inner:hover .setup-label, button.setup-step-inner:hover .setup-labe
 .setup-complete-text { flex: 1; min-width: 0; }
 .setup-complete-text h2 { font-size: 15px; line-height: 1.3; font-weight: 650; letter-spacing: -.01em; }
 .setup-complete-text p { margin: 1px 0 0; color: var(--muted); font-size: 13px; }
-.setup-dismiss { display: grid; place-items: center; flex-shrink: 0; width: 40px; min-height: 40px; padding: 0; border-radius: var(--r-tab, 10px); background: transparent; color: var(--muted); }
-.setup-dismiss:hover { background: var(--hover); color: var(--ink); }
 
-@supports (corner-shape: squircle) { .setup-cta, .setup-dismiss, .setup-step-inner { corner-shape: squircle; } }
+@supports (corner-shape: squircle) { .setup-cta, .setup-step-inner { corner-shape: squircle; } }
 @media (prefers-reduced-motion: reduce) { .setup-cta:active { transform: none; } }

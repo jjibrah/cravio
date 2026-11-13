@@ -1,4 +1,4 @@
-// Owner overview: the control room. "Finish setting up" (while incomplete), then Live and Analytics.
+// Owner overview: the control room. "Finish setting up" (only while a step is left), then Live and Analytics.
 // Reads go through the API cache (lib/cache.js), so coming back to the Overview renders at once from the
 // last answers while they revalidate; prefetchRoute('/owner') warms the same keys on hover.
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -97,15 +97,9 @@ export default function OverviewPage({ section }) {
     return next;
   }, { replace: true });
 
-  // The card shows the next setup step while something is left, then a dismissible "Setup complete" note.
-  const dismissSetup = useCallback(async () => {
-    setState((current) => current && { ...current, progress: { ...current.progress, data: { ...current.progress?.data, checklistDismissed: true } } });
-    try { await saveProgressData({ checklistDismissed: true }); } catch { /* it comes back on reload; nothing is lost */ }
-  }, [saveProgressData, setState]);
-
   return <>
     <PageHeader title={section.label} description={section.description} />
-    {state && <SetupChecklist state={state} onStartTour={() => setParams({ tour: '1' })} onDismiss={dismissSetup} />}
+    {state && <SetupChecklist state={state} onStartTour={() => setParams({ tour: '1' })} />}
 
     <div className="o-overview-tabs">
       <Segmented mode="tabs" label="Overview views" idBase="overview" options={VIEWS} value={view} onChange={(value) => setParam('view', value, 'live')} size="lg" />
