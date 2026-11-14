@@ -19,7 +19,8 @@
     "db:migrate": "npm run db:migrate --workspace backend",
     "compare": "node scripts/compare.js --shared-db",
     "test:inventory": "node backend/tests/inventory.js",
-    "test:inventory-ui": "node backend/tests/inventory-ui.js"
+    "test:inventory-ui": "node backend/tests/inventory-ui.js",
+    "test:workspace-ui": "node backend/tests/workspace-layout.js"
   },
   "type": "module"
 }

@@ -55,3 +55,13 @@ All writes and their audit entries run inside a database transaction. Owner-leve
 - `npm run build`: production build.
 
 The broad existing mutation suites are not run against the shared database. Before multi-user pilot testing and schema expansion, resolve the isolated environment requirement and the outstanding discovery questions in the plan.
+
+## Page structure and first use
+
+The workspace is visible before business setup. Inventory opens with an overview, four setup steps, stock attention items, the daily workflow, location positions and recent activity. Stock has product/SKU search, location filtering and a low-stock filter. Management has dated task counts, location/date/status filters, a checklist and a separate task-entry section. The assistant has an evidence-based owner briefing, curated factual questions with source links, and an honest description of the planned menu-import flow.
+
+Use **Explore example** on any of these pages to inspect fictional populated records without creating a workspace. This sets `example=1` in the URL. All posting buttons and submission handlers are disabled in example mode; no example record is sent to the API. **Use my workspace** returns to the real account data.
+
+Direct example links: http://localhost:5174/owner/inventory?example=1, http://localhost:5174/owner/management?example=1 and http://localhost:5174/owner/assistant?example=1.
+
+`npm run test:workspace-ui` verifies first-use structure and input dimensions, example-mode isolation, stock search/location filters, management filters, factual question selection and mobile overflow on all three pages. Tests intercept inventory responses and perform no inventory database writes.
