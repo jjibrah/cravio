@@ -14,6 +14,7 @@ const once = (load) => {
 };
 
 export const chunks = {
+  inventory: once(() => import('../pages/inventory/InventoryPage')),
   auth: once(() => import('./auth')),
   authPages: once(() => import('../pages/AuthPages')),
   account: once(() => import('../pages/AccountPage')),
@@ -48,7 +49,7 @@ export const chunks = {
 /** The GETs the owner Overview reads through the cache (OverviewPage uses the same keys). */
 export const OVERVIEW_GETS = ['/api/ops/live', '/api/ops/analytics?range=today', '/api/ops/health', '/api/restaurant/onboarding'];
 
-const OWNER_PAGES = { '': 'overview', orders: 'orders', tables: 'tables', products: 'products', menu: 'menuConfig', insights: 'insights', settings: 'settings', 'contact-cravio': 'contact' };
+const OWNER_PAGES = { inventory: 'inventory', management: 'inventory', assistant: 'inventory', '': 'overview', orders: 'orders', tables: 'tables', products: 'products', menu: 'menuConfig', insights: 'insights', settings: 'settings', 'contact-cravio': 'contact' };
 const ADMIN_PAGES = { '': 'adminOverview', restaurants: 'adminRestaurants', performance: 'adminPerformance', money: 'adminMoney', 'leads-requests': 'adminRequests', complaints: 'adminRequests', users: 'users', settings: 'settings' };
 const WAITER_PAGES = { '': 'waiterTables', services: 'waiterServices', menu: 'waiterMenu', order: 'newOrder', cart: 'cartImport' };
 

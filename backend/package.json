@@ -11,9 +11,7 @@
     "db:migrate": "node scripts/migrate.js"
   },
   "dependencies": {
-    "@supabase/supabase-js": "2.119.0"
-  },
-  "devDependencies": {
+    "@supabase/supabase-js": "2.119.0",
     "pg": "8.23.1"
   }
 }

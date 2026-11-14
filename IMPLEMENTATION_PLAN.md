@@ -1,6 +1,6 @@
 # Cravio: inventory, management and AI implementation plan
 
-Status: proposal for review; feature implementation has not started.
+Status: implementation in progress. A first owner-scoped inventory/management preview is available on dev; the full roadmap is not complete. See [preview scope and verification](docs/INVENTORY-PREVIEW.md).
 
 Prepared 14 November 2026. Read alongside [question.md](question.md), the Fayaz discovery questionnaire.
 
@@ -102,7 +102,7 @@ Confirmed current environment decision: shared existing database, separate code/
 - Keep secrets in ignored files. Do not put service credentials into Vite variables, source files, logs or this plan.
 - Auth recovery/invite callbacks must target the matching frontend. Existing hosted redirect settings were not modified by this setup; verify that the dev origin is allowed before testing those flows. No invitations or recovery emails are sent during this task.
 - Existing baseline and dev use the same design. New features later reuse current sidebar, sheets, tables, notifications, forms and mobile patterns. No new visual identity.
-- Since features are not implemented in this task, both applications initially have the same capabilities. Documents/setup on dev do not constitute an inventory or AI release.
+- The original planning task started both apps with identical capabilities. Dev now includes the first inventory/management preview described in `docs/INVENTORY-PREVIEW.md`; main retains its previous feature set.
 
 ### Approval and promotion workflow
 
@@ -376,3 +376,9 @@ Verification completed on 14 November 2026:
 - SIGTERM to the comparison parent stopped all four listeners; the launcher was then restarted.
 - Local Markdown links, question IDs Q01–Q63 and Git whitespace checks passed.
 - Authenticated mutation tests, seeds, migrations, user invitations and provider API calls were intentionally not run against the shared database. Login/recovery and full end-to-end regression coverage are not claimed by these startup checks.
+
+## 12. First implementation milestone
+
+The user authorized implementation after the planning delivery. Dev now has an account-owned finished-goods workspace, locations, products, transactional postings, partial receiving, transit-loss accounting, counts, history, dated checklists and a factual AI placeholder. Migration 007 is additive and private. No existing restaurant data is backfilled or restructured in this milestone.
+
+This is a subset of P1–P5, not their completion. Business/location staff grants, service-location integration, module entitlements, conversions, batch depletion, returns/reversals, POS integration, kitchen/menu enhancements and real AI remain open. The earlier environment gate remains necessary for broad mutation tests and pilot deployment; transaction-rollback rehearsals and intercepted UI fixtures were used for the initial shared-database preview. See the linked preview document for exact capabilities and limitations.

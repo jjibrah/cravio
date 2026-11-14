@@ -17,7 +17,9 @@
     "db:seed": "npm run db:seed --workspace backend",
     "test": "npm run test --workspace frontend",
     "db:migrate": "npm run db:migrate --workspace backend",
-    "compare": "node scripts/compare.js --shared-db"
+    "compare": "node scripts/compare.js --shared-db",
+    "test:inventory": "node backend/tests/inventory.js",
+    "test:inventory-ui": "node backend/tests/inventory-ui.js"
   },
   "type": "module"
 }

@@ -28,6 +28,7 @@ function page(loader, name = 'default') {
   Page.displayName = `Page(${name})`;
   return Page;
 }
+const InventoryPage = page(chunks.inventory);
 const GuestMenuPage = page(chunks.guestMenu);
 const AuthProvider = page(chunks.auth, 'AuthProvider');
 const LoginPage = page(chunks.authPages, 'LoginPage');
@@ -71,7 +72,8 @@ function DashboardPage({ section }) {
   const owner = account?.role === 'owner';
   const admin = account?.role === 'admin';
   let Page = PageFrame;
-  if (section.kind === 'settings') Page = SettingsPage;
+  if (owner && ['inventory','management','assistant'].includes(section.path)) Page = InventoryPage;
+  else if (section.kind === 'settings') Page = SettingsPage;
   else if (section.kind === 'products' && owner) Page = ProductsPage;
   else if (section.kind === 'users') Page = UsersPage;
   else if (admin && ADMIN_PAGES[section.path]) Page = ADMIN_PAGES[section.path];

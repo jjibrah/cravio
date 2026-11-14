@@ -1,0 +1,56 @@
+// Exercises real authentication and rendered forms; inventory writes use an intercepted test fixture.
+import {chromium,expect} from '@playwright/test';
+import {env} from '../scripts/clients.js';
+import {createClient} from '@supabase/supabase-js';
+import {randomUUID} from 'node:crypto';
+const auth=createClient(env.SUPABASE_URL,env.SUPABASE_ANON_KEY||env.SUPABASE_PUBLISHABLE_KEY,{auth:{persistSession:false}});
+const {data,error}=await auth.auth.signInWithPassword({email:'owner@gmail.com',password:'12344321'});
+if(error)throw error;
+const browser=await chromium.launch({headless:true});
+try{
+ const context=await browser.newContext();
+ const key=`sb-${new URL(env.SUPABASE_URL).hostname.split('.')[0]}-auth-token`;
+ await context.addInitScript(({key,session})=>localStorage.setItem(key,JSON.stringify(session)),{key,session:data.session});
+ const [a,b,p,t]=Array.from({length:4},()=>randomUUID());
+ const fixture={business:{id:randomUUID(),name:'UI test bakery'},locations:[{id:a,name:'Bakery',kind:'bakery'},{id:b,name:'Outlet',kind:'outlet'}],products:[{id:p,name:'Cake',sku:'CAKE',unit:'piece',low_stock:'2'}],balances:[{location_id:a,product_id:p,quantity:'10'}],transfers:[{id:t,source_id:a,destination_id:b,product_id:p,quantity:'5',received:'3',lost:'0',remaining:'2',created_at:new Date().toISOString()}],movements:[],tasks:[],asOf:new Date().toISOString()};
+ const writes=[];
+ await context.route('**/api/inventory',async route=>{
+  if(route.request().method()==='POST')writes.push(route.request().postDataJSON());
+  await route.fulfill({json:fixture});
+ });
+ const page=await context.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
+ await page.goto('http://localhost:5174/owner/inventory');
+ await expect(page.getByRole('heading',{name:'Inventory',exact:true})).toBeVisible();
+ await expect(page.getByText('UI test bakery')).toBeVisible();
+ await page.getByRole('button',{name:'Record',exact:true}).click();
+ await page.getByLabel('Location',{exact:true}).selectOption(a);
+ await page.getByLabel('Product',{exact:true}).selectOption(p);
+ await page.getByLabel('Quantity in product base units').fill('1');
+ await page.getByLabel('Reference / reason').fill('Test output');
+ await page.getByRole('button',{name:'Post movement'}).click();
+ await expect.poll(()=>writes.length).toBe(1);expect(writes[0].action).toBe('output');expect(writes[0].commandId).toMatch(/^[a-f0-9-]{36}$/);
+ await page.getByRole('button',{name:'Transfers',exact:true}).click();
+ await page.getByLabel('Action',{exact:true}).selectOption('receive');
+ await page.getByLabel('Outstanding transfer').selectOption(t);
+ await page.getByLabel('Quantity to receive / record as lost').fill('2');
+ await page.getByLabel('Receipt reference / loss reason').fill('Test receipt');
+ await page.getByRole('button',{name:'Confirm',exact:true}).click();
+ await expect.poll(()=>writes.length).toBe(2);expect(writes[1].action).toBe('receive');
+ await page.getByRole('button',{name:'Record',exact:true}).click();
+ await page.getByLabel('Movement',{exact:true}).selectOption('count');
+ await page.getByLabel('Location',{exact:true}).selectOption(a);
+ await page.getByLabel('Product',{exact:true}).selectOption(p);
+ await page.getByLabel('Physical quantity counted').fill('9');
+ await page.getByLabel('Reference / reason').fill('Test count');
+ await page.getByRole('checkbox').check();
+ await page.getByRole('button',{name:'Post movement'}).click();
+ await expect.poll(()=>writes.length).toBe(3);expect(writes[2].expectedBalance).toBe('10');
+ await page.goto('http://localhost:5174/owner/management');
+ await expect(page.getByRole('heading',{name:'Daily checklist'})).toBeVisible();
+ await page.goto('http://localhost:5174/owner/assistant');
+ await expect(page.getByText('AI placeholder · OpenRouter not connected')).toBeVisible();
+ await page.setViewportSize({width:390,height:844});
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+ expect(errors).toEqual([]);
+ console.log('UI passed: owner navigation, stock posting form, transfer receiving, management, AI placeholder and mobile overflow. No inventory writes sent to the database.');
+}finally{await browser.close();await auth.auth.signOut({scope:'local'});}

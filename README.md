@@ -44,7 +44,7 @@ seed it. Set up isolated development data before implementing inventory migratio
 or running mutation tests. Hosted Auth redirects for port 5174 must be allowed
 before testing invitation/password recovery links there.
 
-New inventory, management and AI features have not been implemented yet. Review
+Dev now includes an initial owner-scoped inventory and management preview, with a clearly labelled AI placeholder. Read the [preview scope](docs/INVENTORY-PREVIEW.md). Review
 the [implementation plan](IMPLEMENTATION_PLAN.md) and take the
 [Fayaz questionnaire](question.md) to the discovery meeting. Future features stay
 on `dev` for review at port 5174; merge/restart main only after approval.

@@ -21,7 +21,7 @@ export default function DashboardLayout({ role }) {
   if (!account && accountError) return <AccountPage />;
   if (account.role !== role) return <Navigate to={homeFor(account)} replace />;
   // Contract with /api/me: owners whose restaurant isn't set up yet go through onboarding first.
-  if (role === 'owner' && account.onboardingRequired) return <Navigate to="/onboarding" replace />;
+  if (role === 'owner' && account.onboardingRequired && !['/owner/inventory', '/owner/management', '/owner/assistant'].includes(pathname)) return <Navigate to="/onboarding" replace />;
   const section = sectionForPath(role, pathname);
 
   return <div className={`page page-${role} dashboard${role === 'admin' ? ' has-strip' : ''}`}>
