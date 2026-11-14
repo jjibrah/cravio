@@ -20,6 +20,35 @@ npm run dev
 Open http://localhost:5173. The backend runs on http://localhost:3002.
 `npm run dev` starts and stops both apps together.
 
+### Compare main and dev
+
+The comparison launcher lives on `dev`. It serves the unchanged `main` checkout at
+http://localhost:5173 and the `dev` checkout at http://localhost:5174, with backends
+on ports 3003 and 3004 respectively. Both retain the existing Cravio design.
+
+From the `dev` checkout:
+
+```sh
+npm run compare
+```
+
+It expects a sibling `cravio-main-baseline` worktree on `main`, with dependencies
+installed and both its `frontend/.env` and `backend/.env` configured. Set
+`CRAVIO_MAIN_DIR` to use another main checkout. The current local worktree has
+already been prepared. The launcher checks branch names and ports, overrides each
+app's backend/proxy ports and stops all four app processes together with Ctrl+C.
+
+By explicit choice, this baseline comparison uses the **same database**. Changes
+made through either app affect the same records. The launcher does not migrate or
+seed it. Set up isolated development data before implementing inventory migrations
+or running mutation tests. Hosted Auth redirects for port 5174 must be allowed
+before testing invitation/password recovery links there.
+
+New inventory, management and AI features have not been implemented yet. Review
+the [implementation plan](IMPLEMENTATION_PLAN.md) and take the
+[Fayaz questionnaire](question.md) to the discovery meeting. Future features stay
+on `dev` for review at port 5174; merge/restart main only after approval.
+
 The visual system ("Service-grade Swiss": Geist, warm paper, a dark navigation
 rail, and one ember accent) is documented in [DESIGN.md](DESIGN.md), including
 tokens, type scale, and the research behind it.
