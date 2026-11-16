@@ -2,6 +2,22 @@ import { requireUser } from '../lib/auth.js';
 import { HttpError } from '../lib/http.js';
 import { MANAGER_ROLES, branchRole, homePath, requestedBranch, selectMembership } from '../lib/access.js';
 import { placeFor } from '../lib/restaurants.js';
+import { withDb } from '../lib/db.js';
+import { legalAvailable, status as termsStatus } from '../lib/legal.js';
+
+/** Whether this account must accept the current terms (migration 010). Never blocks /api/me: null when unknown. */
+async function termsFor(user, role) {
+  try {
+    return await withDb(async (db) => {
+      if (!(await legalAvailable(db))) return null;
+      const { rows } = await db.query('select created_at from auth.users where id = $1', [user.id]);
+      return termsStatus(db, user.id, { role, createdAt: rows[0]?.created_at });
+    });
+  } catch (error) {
+    console.error('[me] terms status failed:', error.code || error.message);
+    return null;
+  }
+}
 
 /** The branch /api/me describes as "place": the requested one, else the only one; never a guess between several. */
 function currentPlace(memberships, request) {
@@ -32,6 +48,7 @@ export const routes = [
         ...placeFor(row.restaurant), role: branchRole(row.role), membershipRole: row.role,
       })).sort((a, b) => a.name.localeCompare(b.name));
       const businesses = (grants || []).map((grant) => ({ id: grant.businessId, name: grant.name, role: grant.role, branchIds: grant.branchIds }));
+      const terms = await termsFor(user, profile.role);
       return {
         id: user.id, email: user.email, name: profile.name, role: profile.role,
         place: placeFor(restaurant || null),
@@ -40,6 +57,8 @@ export const routes = [
         businesses,
         // false before migration 008: no owner/operations interface yet.
         businessAccessAvailable: grants !== undefined,
+        // { required, accepted, version, title } or null (no terms published / update 010 not applied).
+        terms,
         home: homePath({ profileRole: profile.role, memberships: rows, grants, onboardingRequired }),
       };
     },

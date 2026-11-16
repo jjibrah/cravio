@@ -44,6 +44,7 @@ export default function DashboardLayout({ role: area }) {
   if (!session) return <Navigate to="/login" replace />;
   if (!account && (accountLoading || !accountError)) return <Loading />;
   if (!account && accountError) return <AccountPage />;
+  if (account?.terms?.required) return <Navigate to="/terms/accept" replace />;
   if (!allowed(area, account, branchId)) return <Navigate to={area === 'branch' && (account.branches || []).length ? '/branch' : homeFor(account)} replace />;
 
   const branch = area === 'branch' ? findBranch(account, branchId) : null;

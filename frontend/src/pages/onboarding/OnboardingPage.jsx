@@ -63,6 +63,7 @@ export default function OnboardingPage() {
   if (!session) return <Navigate to="/login" replace />;
   if (!account && (accountLoading || !accountError)) return <Loading />;
   if (!account && accountError) return <AccountPage />;
+  if (account?.terms?.required) return <Navigate to="/terms/accept" replace />;
   if (account.role !== 'owner') return <Navigate to={homeFor(account)} replace />;
   return <OnboardingFlow />;
 }

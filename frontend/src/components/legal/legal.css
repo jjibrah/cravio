@@ -1,0 +1,21 @@
+.legal-text { color: var(--ink-2); font-size: 15px; line-height: 1.6; }
+.legal-text h2 { margin: 28px 0 8px; color: var(--ink); font-size: 19px; font-weight: 650; letter-spacing: -.012em; }
+.legal-text h3 { margin: 20px 0 6px; color: var(--ink); font-size: 16px; font-weight: 650; }
+.legal-text > :first-child { margin-top: 0; }
+.legal-text p { margin: 0 0 12px; }
+.legal-text ul { margin: 0 0 12px; padding-left: 20px; }
+.legal-text li { margin: 4px 0; }
+
+/* Public /terms page */
+.legal-page { min-height: 100dvh; background: var(--paper); }
+.legal-top { display: flex; align-items: center; justify-content: space-between; max-width: 760px; margin: 0 auto; padding: 20px 16px; }
+.legal-doc { max-width: 760px; margin: 0 auto 64px; padding: 32px 36px; border-radius: 16px; background: var(--surface); box-shadow: 0 0 0 1px var(--line), var(--shadow-card); }
+.legal-doc h1 { margin: 0 0 4px; font-size: 28px; font-weight: 650; letter-spacing: -.02em; }
+.legal-meta { margin: 0 0 24px; padding-bottom: 16px; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 13px; }
+@media (max-width: 640px) { .legal-doc { margin: 0 12px 40px; padding: 20px 18px; } .legal-doc h1 { font-size: 22px; } }
+
+/* "I agree" row (welcome page and the accept screen) */
+.legal-agree { display: flex; align-items: flex-start; gap: 10px; margin: 4px 0 16px; color: var(--ink-2); font-size: 14px; line-height: 1.45; font-weight: 450; cursor: pointer; }
+.legal-agree input { flex: none; width: 18px; height: 18px; min-height: 0; margin: 1px 0 0; accent-color: var(--ink); }
+.legal-agree a { color: var(--ink); font-weight: 600; }
+.legal-scroll { max-height: 320px; overflow: auto; margin: 0 0 16px; padding: 16px; border-radius: 12px; background: var(--paper); box-shadow: inset 0 0 0 1px var(--line); }

@@ -3,7 +3,7 @@
 import { HttpError } from './http.js';
 import { database } from '../inventory/database.js';
 
-const SCHEMA = { business: 'database update 008', stock: 'database update 009 (inventory)' };
+const SCHEMA = { business: 'database update 008', stock: 'database update 009 (inventory)', legal: 'database update 010 (terms and conditions)' };
 
 /** Runs fn(client) on one pooled connection, optionally in a transaction; maps database errors to HTTP errors. */
 export async function withDb(fn, { transaction = false, feature = 'business' } = {}) {

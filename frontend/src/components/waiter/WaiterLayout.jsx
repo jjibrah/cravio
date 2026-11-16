@@ -60,6 +60,7 @@ export default function WaiterLayout() {
   }
   if (!account && (accountLoading || !accountError)) return <Loading />;
   if (!account && accountError) return <AccountPage />;
+  if (account?.terms?.required) return <Navigate to="/terms/accept" replace />;
   if (!isWaiter) return <Navigate to={homeFor(account)} replace />;
   if (!current) return <div className="page page-waiter waiter-app"><main className="waiter-content waiter-choose">
     <h1>Where are you working today?</h1>

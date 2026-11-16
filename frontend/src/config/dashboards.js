@@ -8,6 +8,7 @@ export const dashboards = {
       { path: 'businesses', group: 'Platform', label: 'Businesses', icon: 'restaurants', kind: 'table', columns: ['Business', 'Owner', 'Branches', 'Status'], description: 'Every customer business, its branches, owners and health.' },
       { path: 'performance', group: 'Platform', label: 'Performance', icon: 'performance', kind: 'insights', description: 'Usage and service performance across the platform.' },
       { path: 'money', group: 'Platform', label: 'Money', icon: 'money', kind: 'insights', description: 'Billing and revenue across customer restaurants.' },
+      { path: 'terms', group: 'Platform', label: 'Terms & conditions', icon: 'complaints', kind: 'table', description: 'Write and publish the terms people accept when they create an account.' },
       { path: 'leads-requests', group: 'Support', label: 'Leads & requests', icon: 'leads', kind: 'table', columns: ['Name', 'Restaurant', 'Type', 'Received', 'Status'], description: 'Restaurants asking to join, and requests from existing customers.' },
       { path: 'complaints', group: 'Support', label: 'Complaints', icon: 'complaints', kind: 'table', columns: ['Case', 'Restaurant', 'Raised by', 'Opened', 'Status'], description: 'Issues raised by restaurants and guests, and where each one stands.' },
       { path: 'users', group: 'Access', label: 'Users', icon: 'team', kind: 'users', description: 'Everyone with a Cravio account: invite people, change roles and suspend access.' },

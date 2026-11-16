@@ -70,12 +70,15 @@ const BranchChooserPage = page(chunks.branchChooser);
 const BranchInventoryPage = page(chunks.branchInventory);
 const OwnerInventoryPage = page(chunks.ownerInventory);
 const ReceiveCodePage = page(chunks.receiveCode);
+const TermsPage = page(chunks.terms);
+const TermsAcceptPage = page(chunks.termsAccept);
+const AdminTermsPage = page(chunks.adminTerms);
 
 const configured = Boolean(import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY);
 const waiterPages = { '': WaiterTablesPage, services: WaiterServicesPage, menu: WaiterMenuPage };
 
 /** Picks the page for a dashboard section; anything without a real page yet falls back to a page frame. */
-const ADMIN_PAGES = { '': AdminOverviewPage, businesses: BusinessesPage, activity: ActivityPage, performance: PerformancePage, money: MoneyPage, 'leads-requests': RequestsPage, complaints: RequestsPage };
+const ADMIN_PAGES = { '': AdminOverviewPage, businesses: BusinessesPage, activity: ActivityPage, terms: AdminTermsPage, performance: PerformancePage, money: MoneyPage, 'leads-requests': RequestsPage, complaints: RequestsPage };
 const BRANCH_PAGES = { '': OverviewPage, orders: OrdersPage, tables: TablesPage, products: ProductsPage, menu: MenuConfigPage, insights: InsightsPage, 'contact-cravio': ContactPage, settings: SettingsPage, inventory: BranchInventoryPage };
 const OWNER_PAGES = { '': OwnerOverviewPage, locations: LocationsPage, people: PeoplePage, inventory: OwnerInventoryPage };
 function DashboardPage({ section, area }) {
@@ -111,6 +114,7 @@ function SignedInApp() {
     </Route>
     <Route path="/branch" element={<BranchChooserPage />} />
     <Route path="/receive/:code" element={<ReceiveCodePage />} />
+    <Route path="/terms/accept" element={<TermsAcceptPage />} />
     {/* Legacy owner links (/owner/orders, /owner/tables/12, …) now belong to the branch workspace. */}
     {LEGACY_BRANCH_PAGES.map((path) => <Route key={path} path={`/owner/${path}/*`} element={<BranchChooserPage legacyPage={path} />} />)}
     {['admin', 'owner'].map((area) => <Route key={area} path={`/${area}`} element={<DashboardLayout role={area} />}>
@@ -160,6 +164,7 @@ export default function App() {
         {/* There is no public landing page: the app opens on sign-in, which sends signed-in users home. */}
         <Route path="/" element={<Navigate to="/login" replace />} />
         <Route path="/guest-menu" element={<GuestMenuPage />} />
+        <Route path="/terms" element={<TermsPage />} />
         <Route path="*" element={configured ? <SignedInApp /> : <SetupRequired />} />
       </Routes>
     </Suspense>

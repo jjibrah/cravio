@@ -54,6 +54,9 @@ export const chunks = {
   branchInventory: once(() => import('../pages/stock/BranchInventoryPage')),
   ownerInventory: once(() => import('../pages/stock/OwnerInventoryPage')),
   receiveCode: once(() => import('../pages/stock/ReceiveCodePage')),
+  terms: once(() => import('../components/legal/TermsPage')),
+  termsAccept: once(() => import('../components/legal/TermsAcceptPage')),
+  adminTerms: once(() => import('../pages/admin/AdminTermsPage')),
 };
 
 /** The GETs the owner Overview reads through the cache (OverviewPage uses the same keys). */
@@ -61,7 +64,7 @@ export const OVERVIEW_GETS = ['/api/ops/live', '/api/ops/analytics?range=today',
 
 const BRANCH_PAGES = { '': 'overview', orders: 'orders', tables: 'tables', products: 'products', menu: 'menuConfig', insights: 'insights', settings: 'settings', 'contact-cravio': 'contact', inventory: 'branchInventory' };
 const OWNER_PAGES = { '': 'ownerOverview', locations: 'ownerLocations', people: 'ownerPeople', branches: 'ownerBranch', inventory: 'ownerInventory' };
-const ADMIN_PAGES = { '': 'adminOverview', businesses: 'adminBusinesses', activity: 'adminActivity', performance: 'adminPerformance', money: 'adminMoney', 'leads-requests': 'adminRequests', complaints: 'adminRequests', users: 'users', settings: 'settings' };
+const ADMIN_PAGES = { '': 'adminOverview', businesses: 'adminBusinesses', activity: 'adminActivity', terms: 'adminTerms', performance: 'adminPerformance', money: 'adminMoney', 'leads-requests': 'adminRequests', complaints: 'adminRequests', users: 'users', settings: 'settings' };
 const WAITER_PAGES = { '': 'waiterTables', services: 'waiterServices', menu: 'waiterMenu', order: 'newOrder', cart: 'cartImport' };
 
 /** Which chunks a pathname needs, or null for a path outside the app. */
@@ -72,6 +75,7 @@ export function chunksFor(pathname) {
   switch (area) {
     case '': return [...signedIn, 'authPages'];
     case 'guest-menu': return ['guestMenu'];
+    case 'terms': return page === 'accept' ? [...signedIn, 'termsAccept'] : ['terms'];
     case 'login': case 'forgot-password': case 'reset-password': return [...signedIn, 'authPages'];
     case 'account': return [...signedIn, 'account'];
     case 'welcome': return [...signedIn, 'welcome'];
