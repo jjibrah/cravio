@@ -105,9 +105,9 @@
 .st-person-role { width: auto; min-width: 120px; min-height: 36px; }
 
 /* ---------- Confirm ---------- */
-.st-confirm { display: flex; flex-direction: column; gap: 18px; }
-.st-confirm-text p { margin: 0 0 8px; color: var(--ink-2); font-size: 14px; line-height: 1.5; }
-.st-confirm-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.cs-confirm { display: flex; flex-direction: column; gap: 18px; }
+.cs-confirm-text p { margin: 0 0 8px; color: var(--ink-2); font-size: 14px; line-height: 1.5; }
+.cs-confirm-actions { display: flex; justify-content: flex-end; gap: 8px; }
 
 @media (max-width: 640px) {
   .st-grid, .st-roles { grid-template-columns: minmax(0, 1fr); }
@@ -213,3 +213,30 @@
 @media (max-width: 640px) { .cs-content .st-images { grid-template-columns: 96px minmax(0, 1fr); } .cs-content .upload-logo .upload-drop { width: 96px; height: 96px; } }
 .cs-content .st-images .upload-actions { flex-wrap: wrap; gap: 2px 12px; }
 .cs-content .st-images .upload-actions > * { font-size: 13px; }
+
+/* Card header with an action (e.g. "Add person"). */
+.st-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.st-card-titles { min-width: 0; }
+.st-card-actions { flex: none; display: flex; gap: 8px; }
+
+/* Add someone: a compact pop-up form. */
+.st-add { display: flex; flex-direction: column; gap: 12px; width: 100%; }
+/* The pop-up is rendered inside the settings panel: undo the panel's label-left row layout for its fields. */
+.cs-content .st-add .st-field, .st-add .st-field { display: flex; flex-direction: column; padding: 0; border: 0; }
+.cs-content .st-add .st-field > .st-label { margin: 0 0 4px; align-self: auto; font-size: 13px; }
+.cs-content .st-add .st-field .o-input { min-height: 40px; }
+.st-add-intro { margin: -4px 0 4px; color: var(--muted); font-size: 13px; line-height: 1.45; }
+.st-add .st-label { margin-bottom: 4px; }
+.st-add .o-input { min-height: 40px; padding: 8px 12px; font-size: 14px; margin: 0; }
+.st-add .st-error { margin-top: 4px; }
+.st-add-roles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 0; padding: 0; border: 0; min-width: 0; }
+.st-add-roles legend { grid-column: 1 / -1; padding: 0; }
+.st-add-role { display: flex; align-items: flex-start; gap: 8px; margin: 0; padding: 10px 12px; border-radius: var(--r-row); box-shadow: 0 0 0 1px var(--line-strong); cursor: pointer; font-weight: 400; }
+.st-add-role input { flex: none; width: 16px; height: 16px; min-height: 0; margin: 2px 0 0; accent-color: var(--ink); }
+.st-add-role > span { display: flex; flex-direction: column; gap: 1px; }
+.st-add-role strong { color: var(--ink); font-size: 14px; font-weight: 600; }
+.st-add-role > span > span { color: var(--muted); font-size: 12px; line-height: 1.35; }
+.st-add-role.is-selected { box-shadow: 0 0 0 2px var(--ink); }
+.st-add-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
+@media (max-width: 480px) { .st-add-roles { grid-template-columns: minmax(0, 1fr); } }
+.st-add .st-label, .cs-content .st-add .st-field > .st-label { justify-content: flex-start; align-self: stretch; text-align: left; }

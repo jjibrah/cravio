@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import { EmptyState, ErrorState, OIcon, SkeletonRows } from '../../components/owner/ui';
+import { Modal } from '../../components/owner/Drawer';
 import { api, useApi } from '../../lib/api';
 import { phoneError } from '../../lib/onboarding';
 import { Confirm, Field, Note, SettingsCard, initials, useSaver } from './parts';
@@ -15,15 +16,18 @@ export default function TeamTab({ state, actions, isOwner }) {
   const live = state.restaurant.status === 'live';
   const pending = state.invites.filter((invite) => invite.status !== 'sent');
   const canManage = team.data ? team.data.canManage : isOwner;
+  const [adding, setAdding] = useState(false);
 
   return <>
-    {canManage && <AddPerson invites={state.invites} live={live} actions={actions} />}
-    <MembersCard team={team} canManage={canManage} />
+    <MembersCard team={team} canManage={canManage} onAdd={() => setAdding(true)} />
+    {canManage && <Modal open={adding} onClose={() => setAdding(false)} title="Add someone to your team">
+      <AddPerson live={live} actions={actions} onDone={() => setAdding(false)} />
+    </Modal>}
     {pending.length > 0 && <InvitesCard invites={pending} live={live} actions={actions} canManage={canManage} />}
   </>;
 }
 
-function AddPerson({ invites, live, actions }) {
+function AddPerson({ live, actions, onDone }) {
   const [form, setForm] = useState(blank);
   const [errors, setErrors] = useState({});
   const [saving, run] = useSaver();
@@ -48,32 +52,30 @@ function AddPerson({ invites, live, actions }) {
         if (mine?.status === 'failed') throw new Error(`The invite to ${email} couldn’t be sent: ${mine.error}`);
       }
     }, live ? `Invite sent to ${email}` : `${form.name.trim()} will be invited when you go live`);
-    if (ok) { setForm({ ...blank, role: form.role }); nameRef.current?.focus(); }
+    if (ok) onDone();
   }
 
-  return <SettingsCard id="add-person" title="Add someone to your team" description="They get an email to set a password, then sign in to their own Cravio account.">
-    <form className="st-stack" onSubmit={add} noValidate>
-      <div className="st-grid">
-        <Field label="Name" error={errors.name}>{(props) => <input {...props} ref={nameRef} className="o-input" value={form.name} onChange={set('name')} maxLength={120} autoComplete="off" placeholder="e.g. Wanjiru Kamau" />}</Field>
-        <Field label="Email" error={errors.email}>{(props) => <input {...props} className="o-input" type="email" inputMode="email" value={form.email} onChange={set('email')} autoComplete="off" placeholder="name@example.com" />}</Field>
-        <Field label="Phone" optional error={errors.phone}>{(props) => <input {...props} className="o-input" type="tel" inputMode="tel" value={form.phone} onChange={set('phone')} autoComplete="off" placeholder="+254 712 345 678" />}</Field>
-        <fieldset className="st-roles">
-          <legend className="st-label">Role</legend>
-          {['waiter', 'manager'].map((role) => <label key={role} className={`st-role${form.role === role ? ' is-selected' : ''}`}>
-            <input type="radio" name="role" value={role} checked={form.role === role} onChange={() => setForm({ ...form, role })} className="visually-hidden" />
-            <strong>{ROLE_LABEL[role]}</strong><span>{ROLE_HINT[role]}</span>
-          </label>)}
-        </fieldset>
-      </div>
-      <div className="st-actions">
-        <button type="submit" className="o-btn is-primary" disabled={saving}><OIcon name="plus" size={16} />{saving ? 'Adding…' : live ? 'Send invite' : 'Add to the list'}</button>
-        {!live && <span className="st-hint">Invites go out when your restaurant goes live, so nobody joins an empty restaurant.</span>}
-      </div>
-    </form>
-  </SettingsCard>;
+  return <form className="st-add" onSubmit={add} noValidate>
+    <p className="st-add-intro">They get an email to set a password, then sign in to their own Cravio account.</p>
+    <Field label="Name" error={errors.name}>{(props) => <input {...props} ref={nameRef} className="o-input" value={form.name} onChange={set('name')} maxLength={120} autoComplete="off" placeholder="e.g. Wanjiru Kamau" data-autofocus />}</Field>
+    <Field label="Email" error={errors.email}>{(props) => <input {...props} className="o-input" type="email" inputMode="email" value={form.email} onChange={set('email')} autoComplete="off" placeholder="name@example.com" />}</Field>
+    <Field label="Phone" optional error={errors.phone}>{(props) => <input {...props} className="o-input" type="tel" inputMode="tel" value={form.phone} onChange={set('phone')} autoComplete="off" placeholder="+254 712 345 678" />}</Field>
+    <fieldset className="st-add-roles">
+      <legend className="st-label">Role</legend>
+      {['waiter', 'manager'].map((role) => <label key={role} className={`st-add-role${form.role === role ? ' is-selected' : ''}`}>
+        <input type="radio" name="role" value={role} checked={form.role === role} onChange={() => setForm({ ...form, role })} />
+        <span><strong>{ROLE_LABEL[role]}</strong><span>{ROLE_HINT[role]}</span></span>
+      </label>)}
+    </fieldset>
+    {!live && <p className="st-hint">Invites go out when your restaurant goes live, so nobody joins an empty restaurant.</p>}
+    <div className="st-add-actions">
+      <button type="button" className="o-btn" onClick={onDone} disabled={saving}>Cancel</button>
+      <button type="submit" className="o-btn is-primary" disabled={saving}>{saving ? 'Adding…' : live ? 'Send invite' : 'Add to the list'}</button>
+    </div>
+  </form>;
 }
 
-function MembersCard({ team, canManage }) {
+function MembersCard({ team, canManage, onAdd }) {
   const [removing, setRemoving] = useState(null);
   const [saving, run] = useSaver();
   const members = team.data?.members || [];
@@ -92,10 +94,11 @@ function MembersCard({ team, canManage }) {
     if (ok) setRemoving(null);
   }
 
-  return <SettingsCard id="members" title="People on your team" description={canManage ? 'Change someone’s role, or remove their access when they leave.' : 'Only the restaurant owner can change the team.'}>
+  return <SettingsCard id="members" title="People on your team" description={canManage ? 'Change someone’s role, or remove their access when they leave.' : 'Only the restaurant owner can change the team.'}
+    actions={canManage && <button type="button" className="o-btn is-small" onClick={onAdd}><OIcon name="plus" size={15} />Add person</button>}>
     {team.loading ? <SkeletonRows rows={3} label="Loading your team" />
       : team.error ? <ErrorState error={team.error} onRetry={team.refresh} what="your team" compact />
-        : members.length <= 1 ? <EmptyState icon="heart" title="It’s just you for now">Add your waiters and managers above so orders reach the right person.</EmptyState>
+        : members.length <= 1 ? <EmptyState icon="heart" title="It’s just you for now">Add your waiters and managers with “Add person” so orders reach the right person.</EmptyState>
           : <ul className="st-people">
             {members.map((member) => {
               const editable = canManage && member.role !== 'owner' && member.userId !== team.data.selfId;

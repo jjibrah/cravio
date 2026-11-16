@@ -47,6 +47,8 @@ body { margin: 0; background: var(--paper); }
 button, input, select, textarea { font: inherit; letter-spacing: inherit; }
 /* The hidden attribute always wins (the button rule below would otherwise show hidden buttons). */
 [hidden] { display: none !important; }
+/* A closed dialog never shows, whatever display its class sets. */
+dialog:not([open]) { display: none !important; }
 a { color: inherit; text-decoration: none; }
 img { display: block; max-width: 100%; }
 :focus-visible { outline: 2px solid var(--ember); outline-offset: 2px; }
