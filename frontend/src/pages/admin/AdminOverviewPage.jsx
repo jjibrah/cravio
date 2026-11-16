@@ -18,7 +18,7 @@ export default function AdminOverviewPage({ section }) {
 
   const tiles = data && [
     {
-      key: 'restaurants', label: 'Restaurants', value: formatWhole(data.restaurants.total),
+      key: 'restaurants', label: 'Branches', value: formatWhole(data.restaurants.total),
       sub: `${formatWhole(data.restaurants.byStatus.live || 0)} live · ${formatWhole(data.restaurants.byStatus.onboarding || 0)} onboarding${data.restaurants.byStatus.suspended ? ` · ${data.restaurants.byStatus.suspended} suspended` : ''}`,
     },
     { key: 'people', label: 'Owners & waiters', value: formatWhole(data.people.owners + data.people.waiters), sub: `${formatWhole(data.people.owners)} owners · ${formatWhole(data.people.waiters)} waiters` },
@@ -59,13 +59,13 @@ export default function AdminOverviewPage({ section }) {
                 </ul>}
         </Panel>
 
-        <Panel title="Newest restaurants" sub="Most recently added"
-          actions={<Link className="o-btn is-quiet is-small" to="/admin/restaurants">All restaurants<OIcon name="arrowRight" size={15} /></Link>}>
+        <Panel title="Newest branches" sub="Most recently added"
+          actions={<Link className="o-btn is-quiet is-small" to="/admin/businesses">All businesses<OIcon name="arrowRight" size={15} /></Link>}>
           {!data ? <SkeletonRows rows={4} thumb={false} label="Loading restaurants" />
             : !data.newestRestaurants.length ? <EmptyState icon="utensils" title="No restaurants yet">Invite an owner from Users to add the first one.</EmptyState>
               : <ul className="pl-list">
                 {data.newestRestaurants.map((restaurant) => <li key={restaurant.id}>
-                  <Link className="pl-row" to={`/admin/restaurants?open=${restaurant.id}`}>
+                  <Link className="pl-row" to={`/admin/businesses?q=${encodeURIComponent(restaurant.name)}`}>
                     <span className="pl-avatar" aria-hidden="true">{restaurant.name.slice(0, 1).toUpperCase()}</span>
                     <span className="pl-row-main">
                       <strong>{restaurant.name}</strong>

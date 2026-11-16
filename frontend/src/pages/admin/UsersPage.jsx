@@ -78,7 +78,8 @@ export default function UsersPage({ section }) {
   const [attempt, setAttempt] = useState(0);
   const [sort, setSort] = useState('recent');
   const [selected, setSelected] = useState({ id: null, open: false, intent: null });
-  const [inviteOpen, setInviteOpen] = useState(false);
+  // /admin/users?invite=owner (from Businesses) opens the invite straight away.
+  const [inviteOpen, setInviteOpen] = useState(() => new URLSearchParams(window.location.search).has('invite'));
   const [highlightId, setHighlightId] = useState(null);
   const usersRef = useRef(users);
   const searchRef = useRef(null);

@@ -17,6 +17,7 @@ create table if not exists auth.users (
   raw_app_meta_data jsonb not null default '{}',
   raw_user_meta_data jsonb not null default '{}',
   banned_until timestamptz,
+  last_sign_in_at timestamptz,
   created_at timestamptz not null default now()
 );
 create or replace function auth.uid() returns uuid language sql stable as $$

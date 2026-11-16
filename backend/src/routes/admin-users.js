@@ -40,6 +40,22 @@ async function loadCreateRestaurant() {
   }
 }
 
+/**
+ * v2: an owner invited by Cravio owns the business their first restaurant belongs to, so they land in the owner
+ * platform (and the restaurant's branch workspace through their owner membership). No-op before migration 008.
+ */
+async function grantBusinessOwner(service, { restaurantId, userId, adminId }) {
+  const { data: restaurant, error } = await service.from('restaurants').select('business_id').eq('id', restaurantId).maybeSingle();
+  if (error) { if (['42703', 'PGRST204'].includes(error.code)) return; throw error; }
+  if (!restaurant?.business_id) return;
+  const { error: grantError } = await service.from('business_members')
+    .upsert({ business_id: restaurant.business_id, user_id: userId, role: 'owner', granted_by: adminId }, { onConflict: 'business_id,user_id' });
+  if (grantError) throw grantError;
+  const { error: auditError } = await service.from('access_events').insert({ business_id: restaurant.business_id, restaurant_id: restaurantId,
+    actor_id: adminId, subject_id: userId, action: 'business_grant', detail: { role: 'owner', by: 'platform_admin', via: 'invite' } });
+  if (auditError) console.error('[admin-users] access event failed:', auditError.message);
+}
+
 export const routes = [
   {
     method: 'GET',
@@ -94,7 +110,10 @@ export const routes = [
       const id = data.user.id;
       try {
         await applyRole(service, id, role, name);
-        if (role === 'owner') await createRestaurantForOwner(service, { ownerId: id, name: restaurantName });
+        if (role === 'owner') {
+          const created = await createRestaurantForOwner(service, { ownerId: id, name: restaurantName });
+          await grantBusinessOwner(service, { restaurantId: created.id, userId: id, adminId: caller.id });
+        }
         if (role === 'waiter') {
           const { error: memberError } = await service.from('restaurant_members').insert({ restaurant_id: restaurantId, user_id: id, role: 'waiter' });
           if (memberError) throw memberError;

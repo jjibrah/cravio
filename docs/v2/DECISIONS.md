@@ -59,6 +59,7 @@ Added 16 Nov 2026 with the first implementation slice (V2-02/03/04). Each is rev
 | D06 | At zero: **show sold out**; branch manager can override. | Product owner, 16 Nov 2026 | INVENTORY.md | V2-06 |
 | D07 | Requests go to the **owner**, who can approve partly or reject; follow common practice; receipt verified with a **dispatch number / QR**. | Product owner, 16 Nov 2026 | INVENTORY.md | V2-07 |
 | UX | Owner sidebar: Overview (Briefing, Branches), Locations, Inventory, People & access. Assistant = a PA-style daily briefing with questions, not a separate page. No live AI yet; it answers from records and says so. | Product owner, 16 Nov 2026 | Apple HIG review (generative-ai.md › Transparency) | V2-04 |
+| Admin | Platform admin revamp (product owner asked for it, 16 Nov 2026): admins see businesses → branches → staff, give or remove business-owner access, add branches and rename businesses, all audited in access_events (shown on Activity). Inviting an owner from the admin now makes them owner of the new business. Admins see counts only for inventory and no order/stock records. Recommendation to confirm: admins may grant owner access. | Product owner request; powers to confirm | INVENTORY / HANDOFF | V2-08 |
 | D08 | Shared-table multi-device ordering **on hold**. | Product owner, 16 Nov 2026 | — | — |
 | D01, D09–D13 | Open | | | |
 

@@ -10,6 +10,7 @@ import { routes as publicGuest } from './public-guest.js';
 import { routes as operations } from './operations.js';
 import { routes as support } from './support.js';
 import { routes as adminPlatform } from './admin-platform.js';
+import { routes as adminBusiness } from './admin-business.js';
 import { routes as settings } from './settings.js';
 
-export const routes = [...inventory, ...me, ...owner, ...stock, ...settings, ...menuMerch, ...restaurant, ...adminPlatform, ...adminUsers, ...publicMenu, ...publicGuest, ...operations, ...support];
+export const routes = [...inventory, ...me, ...owner, ...stock, ...settings, ...menuMerch, ...restaurant, ...adminBusiness, ...adminPlatform, ...adminUsers, ...publicMenu, ...publicGuest, ...operations, ...support];

@@ -109,6 +109,29 @@ async function loadRestaurantLinks(service) {
   return byUser;
 }
 
+/** Business grants per user (migration 008): [{ id, name, role: 'owner'|'operations' }]. Empty before 008. */
+async function loadBusinessLinks(service) {
+  const byUser = new Map();
+  const { data, error } = await service.from('business_members').select('user_id, role, business:businesses (id, name)');
+  if (error) {
+    if (!isMissingTable(error) && !['PGRST200', 'PGRST205', '42P01'].includes(error.code)) console.error('[admin-users] business_members failed:', error.code, error.message);
+    return byUser;
+  }
+  for (const row of data) {
+    if (!row.business) continue;
+    byUser.set(row.user_id, [...(byUser.get(row.user_id) || []), { id: row.business.id, name: row.business.name, role: row.role }]);
+  }
+  return byUser;
+}
+
+/** What someone can reach, in words: business grants first, then branch roles (a restaurant 'owner' membership is a branch manager). */
+export function accessOf(businesses = [], restaurants = []) {
+  return [
+    ...businesses.map((b) => ({ kind: 'business', id: b.id, name: b.name, label: b.role === 'owner' ? 'Business owner' : 'Operations manager' })),
+    ...restaurants.map((r) => ({ kind: 'branch', id: r.id, name: r.name, label: r.role === 'waiter' ? 'Waiter' : 'Branch manager' })),
+  ];
+}
+
 export function statusOf(user, now = Date.now()) {
   if (user.banned_until && Date.parse(user.banned_until) > now) return 'suspended';
   if (!user.last_sign_in_at && (user.invited_at || !user.email_confirmed_at)) return 'invited';
@@ -116,7 +139,7 @@ export function statusOf(user, now = Date.now()) {
 }
 
 /** The public row shape shared by every endpoint. */
-export function toRow(user, { profile, restaurants = [], primaryEmail, selfId }) {
+export function toRow(user, { profile, restaurants = [], businesses = [], primaryEmail, selfId }) {
   const email = user.email?.toLowerCase() || '';
   const isPrimaryAdmin = Boolean(primaryEmail) && email === primaryEmail;
   const name = profile?.name || user.user_metadata?.name || email.split('@')[0] || 'User';
@@ -128,6 +151,8 @@ export function toRow(user, { profile, restaurants = [], primaryEmail, selfId })
     status: statusOf(user),
     restaurant: restaurants[0] ? { id: restaurants[0].id, name: restaurants[0].name, status: restaurants[0].status } : null,
     restaurants,
+    businesses,
+    access: accessOf(businesses, restaurants),
     created_at: user.created_at || null,
     invited_at: user.invited_at || null,
     last_sign_in_at: user.last_sign_in_at || null,
@@ -139,10 +164,10 @@ export function toRow(user, { profile, restaurants = [], primaryEmail, selfId })
 
 /** Every user, joined with profile and restaurant data. */
 export async function loadDirectory(service, selfId) {
-  const [users, profiles, links, primaryEmail] = await Promise.all([
-    listAuthUsers(service), loadProfiles(service), loadRestaurantLinks(service), primaryAdminEmail(service),
+  const [users, profiles, links, business, primaryEmail] = await Promise.all([
+    listAuthUsers(service), loadProfiles(service), loadRestaurantLinks(service), loadBusinessLinks(service), primaryAdminEmail(service),
   ]);
-  return users.map((user) => toRow(user, { profile: profiles.get(user.id), restaurants: links.get(user.id) || [], primaryEmail, selfId }));
+  return users.map((user) => toRow(user, { profile: profiles.get(user.id), restaurants: links.get(user.id) || [], businesses: business.get(user.id) || [], primaryEmail, selfId }));
 }
 
 /** One user row, or a 404. */
@@ -152,13 +177,14 @@ export async function loadUser(service, id, selfId) {
     if (error && error.status !== 404 && !/not found/i.test(error.message || '')) fail('getUserById', error, 'Could not load this user. Please try again.');
     throw new HttpError(404, 'That user no longer exists.');
   }
-  const [{ data: profile, error: profileError }, links, primaryEmail] = await Promise.all([
+  const [{ data: profile, error: profileError }, links, business, primaryEmail] = await Promise.all([
     service.from('profiles').select('id, name, role').eq('id', id).maybeSingle(),
     loadRestaurantLinks(service),
+    loadBusinessLinks(service),
     primaryAdminEmail(service),
   ]);
   if (profileError) fail('profile', profileError, 'Could not load this user. Please try again.');
-  return toRow(data.user, { profile, restaurants: links.get(id) || [], primaryEmail, selfId });
+  return toRow(data.user, { profile, restaurants: links.get(id) || [], businesses: business.get(id) || [], primaryEmail, selfId });
 }
 
 export function countRows(rows) {

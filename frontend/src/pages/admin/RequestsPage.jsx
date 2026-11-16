@@ -142,7 +142,7 @@ function RequestDetails({ request, onSaved }) {
 
     <h3 className="pl-detail-title">From</h3>
     <dl className="pl-dl">
-      <div><dt>Restaurant</dt><dd>{r.restaurant ? <Link to={`/admin/restaurants?open=${r.restaurant.id}`}>{r.restaurant.name}</Link> : '—'}</dd></div>
+      <div><dt>Restaurant</dt><dd>{r.restaurant ? <Link to={`/admin/businesses?q=${encodeURIComponent(r.restaurant.name)}`}>{r.restaurant.name}</Link> : '—'}</dd></div>
       <div><dt>Person</dt><dd>{r.contactName || r.createdByName || '—'}</dd></div>
       <div><dt>Phone</dt><dd>{r.contactPhone ? <a href={`tel:${r.contactPhone}`}>{r.contactPhone}</a> : '—'}</dd></div>
       <div><dt>Email</dt><dd>{r.contactEmail ? <a href={`mailto:${r.contactEmail}?subject=${encodeURIComponent(`Re: ${r.subject}`)}`}>{r.contactEmail}</a> : '—'}</dd></div>

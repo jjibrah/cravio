@@ -5,12 +5,13 @@ export const dashboards = {
     label: 'Admin',
     sections: [
       { path: '', label: 'Overview', icon: 'overview', kind: 'overview', description: 'The health of every restaurant on Cravio at a glance.' },
-      { path: 'restaurants', group: 'Platform', label: 'Restaurants', icon: 'restaurants', kind: 'table', columns: ['Restaurant', 'Owner', 'Location', 'Status', 'Joined'], description: 'Every customer restaurant, its status and its owner.' },
+      { path: 'businesses', group: 'Platform', label: 'Businesses', icon: 'restaurants', kind: 'table', columns: ['Business', 'Owner', 'Branches', 'Status'], description: 'Every customer business, its branches, owners and health.' },
       { path: 'performance', group: 'Platform', label: 'Performance', icon: 'performance', kind: 'insights', description: 'Usage and service performance across the platform.' },
       { path: 'money', group: 'Platform', label: 'Money', icon: 'money', kind: 'insights', description: 'Billing and revenue across customer restaurants.' },
       { path: 'leads-requests', group: 'Support', label: 'Leads & requests', icon: 'leads', kind: 'table', columns: ['Name', 'Restaurant', 'Type', 'Received', 'Status'], description: 'Restaurants asking to join, and requests from existing customers.' },
       { path: 'complaints', group: 'Support', label: 'Complaints', icon: 'complaints', kind: 'table', columns: ['Case', 'Restaurant', 'Raised by', 'Opened', 'Status'], description: 'Issues raised by restaurants and guests, and where each one stands.' },
       { path: 'users', group: 'Access', label: 'Users', icon: 'team', kind: 'users', description: 'Everyone with a Cravio account: invite people, change roles and suspend access.' },
+      { path: 'activity', group: 'Access', label: 'Activity', icon: 'performance', kind: 'table', description: 'Who gave, changed or removed access, and when.' },
     ],
   },
   // Branch manager: the restaurant's day-to-day operations (the previous owner dashboard), at /branch/:branchId.

@@ -18,7 +18,8 @@ const pageKeywords = {
   insights: 'insights reports analytics sales revenue trends performance',
   settings: 'settings account profile password preferences restaurant team notifications',
   'contact-cravio': 'help support contact cravio team question',
-  restaurants: 'restaurants customers venues accounts owners',
+  businesses: 'businesses restaurants branches customers venues accounts owners',
+  activity: 'activity audit log access history grants',
   performance: 'performance usage uptime analytics platform',
   money: 'money billing invoices revenue payments subscriptions sales',
   'leads-requests': 'leads requests sign ups onboarding prospects',
@@ -30,7 +31,7 @@ const pageKeywords = {
 export const searchableScopes = {
   branch: ['orders', 'tables', 'products'],
   owner: [],
-  admin: ['users', 'restaurants', 'leads-requests', 'complaints'],
+  admin: ['users', 'businesses', 'leads-requests', 'complaints'],
 };
 
 function pageItems(role) {

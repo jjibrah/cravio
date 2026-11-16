@@ -31,7 +31,9 @@ export const chunks = {
   settings: once(() => import('../pages/settings/SettingsPage')),
   contact: once(() => import('../pages/owner/ContactPage')),
   adminOverview: once(() => import('../pages/admin/AdminOverviewPage')),
-  adminRestaurants: once(() => import('../pages/admin/RestaurantsPage')),
+  adminBusinesses: once(() => import('../pages/admin/BusinessesPage')),
+  adminBusiness: once(() => import('../pages/admin/BusinessDetailPage')),
+  adminActivity: once(() => import('../pages/admin/ActivityPage')),
   adminPerformance: once(() => import('../pages/admin/PerformancePage')),
   adminMoney: once(() => import('../pages/admin/MoneyPage')),
   adminRequests: once(() => import('../pages/admin/RequestsPage')),
@@ -59,7 +61,7 @@ export const OVERVIEW_GETS = ['/api/ops/live', '/api/ops/analytics?range=today',
 
 const BRANCH_PAGES = { '': 'overview', orders: 'orders', tables: 'tables', products: 'products', menu: 'menuConfig', insights: 'insights', settings: 'settings', 'contact-cravio': 'contact', inventory: 'branchInventory' };
 const OWNER_PAGES = { '': 'ownerOverview', locations: 'ownerLocations', people: 'ownerPeople', branches: 'ownerBranch', inventory: 'ownerInventory' };
-const ADMIN_PAGES = { '': 'adminOverview', restaurants: 'adminRestaurants', performance: 'adminPerformance', money: 'adminMoney', 'leads-requests': 'adminRequests', complaints: 'adminRequests', users: 'users', settings: 'settings' };
+const ADMIN_PAGES = { '': 'adminOverview', businesses: 'adminBusinesses', activity: 'adminActivity', performance: 'adminPerformance', money: 'adminMoney', 'leads-requests': 'adminRequests', complaints: 'adminRequests', users: 'users', settings: 'settings' };
 const WAITER_PAGES = { '': 'waiterTables', services: 'waiterServices', menu: 'waiterMenu', order: 'newOrder', cart: 'cartImport' };
 
 /** Which chunks a pathname needs, or null for a path outside the app. */
@@ -86,7 +88,7 @@ export function chunksFor(pathname) {
       const key = section === 'tables' && sub ? 'tableDetail' : BRANCH_PAGES[section] || 'pageFrame';
       return [...signedIn, 'dashboard', key];
     }
-    case 'admin': return [...signedIn, 'dashboard', ADMIN_PAGES[page] || 'pageFrame'];
+    case 'admin': return [...signedIn, 'dashboard', page === 'businesses' && detail ? 'adminBusiness' : ADMIN_PAGES[page] || 'pageFrame'];
     case 'waiter': return [...signedIn, 'waiter', WAITER_PAGES[page] || 'waiterTables'];
     default: return null;
   }

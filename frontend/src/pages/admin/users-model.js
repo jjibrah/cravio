@@ -2,19 +2,20 @@
 
 export const ROLE_OPTIONS = [
   { value: 'admin', label: 'Admin', icon: 'internal', hint: 'Cravio team', description: 'Manages restaurants, users and support across Cravio.' },
-  { value: 'owner', label: 'Owner', icon: 'restaurants', hint: 'Runs a restaurant', description: 'Sets up their restaurant, menu, tables and staff.' },
+  { value: 'owner', label: 'Owner / manager', icon: 'restaurants', hint: 'Runs a restaurant', description: 'Runs a restaurant or branch: menu, tables and staff. Business ownership is given on the business’s page.' },
   { value: 'waiter', label: 'Waiter', icon: 'services', hint: 'Takes orders', description: 'Takes orders and serves tables on their phone.' },
 ];
 export const roleLabel = (role) => ROLE_OPTIONS.find((option) => option.value === role)?.label || 'No role';
-export const roleArticle = { admin: 'an admin', owner: 'an owner', waiter: 'a waiter' };
+export const roleArticle = { admin: 'an admin', owner: 'an owner or manager', waiter: 'a waiter' };
 
 export const STATUS_LABEL = { active: 'Active', invited: 'Invited', suspended: 'Suspended' };
 
 export const TABS = [
   { id: 'all', label: 'All', test: () => true },
   { id: 'admin', label: 'Admins', test: (user) => user.role === 'admin' },
-  { id: 'owner', label: 'Owners', test: (user) => user.role === 'owner' },
-  { id: 'waiter', label: 'Waiters', test: (user) => user.role === 'waiter' },
+  { id: 'owner', label: 'Business owners', test: (user) => (user.access || []).some((a) => a.label === 'Business owner') },
+  { id: 'manager', label: 'Branch managers', test: (user) => (user.access || []).some((a) => a.label === 'Branch manager') },
+  { id: 'waiter', label: 'Waiters', test: (user) => (user.access || []).some((a) => a.label === 'Waiter') || (user.role === 'waiter' && !(user.access || []).length) },
   { id: 'invited', label: 'Invited', test: (user) => user.status === 'invited' },
   { id: 'suspended', label: 'Suspended', test: (user) => user.status === 'suspended' },
 ];

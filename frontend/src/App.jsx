@@ -48,7 +48,9 @@ const UsersPage = page(chunks.users);
 const SettingsPage = page(chunks.settings);
 const ContactPage = page(chunks.contact);
 const AdminOverviewPage = page(chunks.adminOverview);
-const RestaurantsPage = page(chunks.adminRestaurants);
+const BusinessesPage = page(chunks.adminBusinesses);
+const BusinessAdminPage = page(chunks.adminBusiness);
+const ActivityPage = page(chunks.adminActivity);
 const PerformancePage = page(chunks.adminPerformance);
 const MoneyPage = page(chunks.adminMoney);
 const RequestsPage = page(chunks.adminRequests);
@@ -73,7 +75,7 @@ const configured = Boolean(import.meta.env.VITE_SUPABASE_URL && import.meta.env.
 const waiterPages = { '': WaiterTablesPage, services: WaiterServicesPage, menu: WaiterMenuPage };
 
 /** Picks the page for a dashboard section; anything without a real page yet falls back to a page frame. */
-const ADMIN_PAGES = { '': AdminOverviewPage, restaurants: RestaurantsPage, performance: PerformancePage, money: MoneyPage, 'leads-requests': RequestsPage, complaints: RequestsPage };
+const ADMIN_PAGES = { '': AdminOverviewPage, businesses: BusinessesPage, activity: ActivityPage, performance: PerformancePage, money: MoneyPage, 'leads-requests': RequestsPage, complaints: RequestsPage };
 const BRANCH_PAGES = { '': OverviewPage, orders: OrdersPage, tables: TablesPage, products: ProductsPage, menu: MenuConfigPage, insights: InsightsPage, 'contact-cravio': ContactPage, settings: SettingsPage, inventory: BranchInventoryPage };
 const OWNER_PAGES = { '': OwnerOverviewPage, locations: LocationsPage, people: PeoplePage, inventory: OwnerInventoryPage };
 function DashboardPage({ section, area }) {
@@ -116,6 +118,8 @@ function SignedInApp() {
         ? <Route key={section.path} path={section.path} element={inShell(<DashboardPage section={section} area={area} />)} />
         : <Route key="overview" index element={inShell(<DashboardPage section={section} area={area} />)} />)}
       {area === 'owner' && <Route path="branches/:id" element={inShell(<BranchDetailPage />)} />}
+      {area === 'admin' && <Route path="businesses/:id" element={inShell(<BusinessAdminPage />)} />}
+      {area === 'admin' && <Route path="restaurants" element={<Navigate to="/admin/businesses" replace />} />}
       <Route path="*" element={<Navigate to={`/${area}`} replace />} />
     </Route>)}
     <Route path="/waiter" element={<WaiterLayout />}>

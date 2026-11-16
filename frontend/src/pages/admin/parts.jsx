@@ -39,7 +39,29 @@ export function TimeAgo({ value, empty = 'Never', prefix = '', label = '', inlin
   </time>;
 }
 
+/** What someone can reach, as one chip: Admin, Business owner, Operations manager, Branch manager or Waiter. */
+export function AccessChip({ user }) {
+  if (user.role === 'admin') return <RoleChip role="admin" />;
+  const first = user.access?.[0];
+  if (!first) return <RoleChip role={user.role} />;
+  const tone = first.kind === 'business' ? 'owner' : first.label === 'Waiter' ? 'waiter' : 'manager';
+  return <span className={`u-role is-${tone}`}>{first.label}</span>;
+}
+
+/** Every business and branch someone can reach, for the detail drawer. */
+export function AccessList({ user }) {
+  if (user.role === 'admin') return <span className="u-muted">Cravio team</span>;
+  if (!user.access?.length) return <span className="u-muted">Not assigned</span>;
+  return <ul className="u-access">{user.access.map((a) => <li key={`${a.kind}:${a.id}`}><strong>{a.label}</strong> · {a.name}</li>)}</ul>;
+}
+
 export function RestaurantName({ user }) {
+  if (user.access?.length) {
+    const names = [...new Set(user.access.map((a) => a.name))];
+    return <span className="u-restaurant" title={user.access.map((a) => `${a.label} · ${a.name}`).join(', ')}>
+      <span className="u-ellipsis">{names[0]}</span>{names.length > 1 && <span className="u-muted"> +{names.length - 1}</span>}
+    </span>;
+  }
   if (!user.restaurant) return <span className="u-muted">{user.role === 'admin' ? 'Cravio team' : 'Not assigned'}</span>;
   const extra = (user.restaurants?.length || 1) - 1;
   return <span className="u-restaurant" title={user.restaurants?.map((item) => item.name).join(', ')}>
