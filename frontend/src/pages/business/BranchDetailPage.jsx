@@ -4,6 +4,7 @@ import { useId, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { PageHeader } from '../../components/dashboard/PageFrame';
 import { EmptyState, OIcon, Panel, SkeletonRows } from '../../components/owner/ui';
+import { Modal } from '../../components/owner/Drawer';
 import '../../components/owner/overview.css';
 import { api, useApi } from '../../lib/api';
 import { useNotifications } from '../../components/notifications/NotificationProvider';
@@ -34,7 +35,7 @@ function AddStaff({ branch, onDone }) {
   return <form className="biz-form" onSubmit={submit} noValidate>
     <div className="o-field">
       <label className="o-label" htmlFor={`${ids}-email`}>Email</label>
-      <input id={`${ids}-email`} type="email" className="o-input" value={values.email} autoComplete="off" required
+      <input id={`${ids}-email`} type="email" className="o-input" value={values.email} autoComplete="off" required data-autofocus
         onChange={(event) => setValues({ ...values, email: event.target.value })} aria-describedby={`${ids}-hint`} />
       <p className="o-field-hint" id={`${ids}-hint`}>Someone without a Cravio account gets an invitation email.</p>
     </div>
@@ -88,13 +89,15 @@ export default function BranchDetailPage() {
         </table>
       </Panel>
       <Panel title="Staff" count={branch.staff.length}
-        actions={branch.businessRole === 'owner' && !adding && <button type="button" className="o-btn is-small" onClick={() => setAdding(true)}><OIcon name="plus" size={15} />Add staff</button>}>
-        {adding && <AddStaff branch={branch} onDone={() => setAdding(false)} />}
+        actions={branch.businessRole === 'owner' && <button type="button" className="o-btn is-small" onClick={() => setAdding(true)}><OIcon name="plus" size={15} />Add staff</button>}>
         {branch.staff.length ? <ul className="biz-people">{branch.staff.map((person) => <li className="biz-person" key={person.userId}>
           <span className="biz-person-main"><strong>{person.name}</strong><span>{roleName[person.role]}</span></span>
         </li>)}</ul> : <EmptyState icon="users" tone="neutral" title="No staff yet">Add a branch manager to run this branch.</EmptyState>}
       </Panel>
     </div>
+    <Modal open={adding} onClose={() => setAdding(false)} title={`Add staff to ${branch.name}`}>
+      {adding && <AddStaff branch={branch} onDone={() => setAdding(false)} />}
+    </Modal>
     <p className="biz-meta">Branch stock and stock requests will appear here once the inventory rules are agreed (decisions D03–D07).</p>
   </div>;
 }

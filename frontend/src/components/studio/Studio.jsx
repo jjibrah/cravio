@@ -77,7 +77,7 @@ export default function Studio({ section }) {
   const [selected, setSelected] = useState(null);
   const [leaveTo, setLeaveTo] = useState(null);
   const [flash, setFlash] = useState('');
-  const { dirty, undo, redo, canUndo, canRedo } = studio;
+  const { dirty, changedThisVisit, undo, redo, canUndo, canRedo } = studio;
 
   // ⌘Z / Ctrl+Z undo, ⇧⌘Z / Ctrl+Y redo (text fields keep their own undo).
   useEffect(() => {
@@ -92,9 +92,10 @@ export default function Studio({ section }) {
     return () => window.removeEventListener('keydown', onKey);
   }, [undo, redo]);
 
-  // Warn before leaving with unpublished changes: closing the tab, and links inside the app.
+  // Warn before leaving with changes made during this visit: closing the tab, and links inside the app.
+  // A draft restored from an earlier visit (and left untouched) stays saved on this device, so leaving is silent.
   useEffect(() => {
-    if (!dirty) return undefined;
+    if (!changedThisVisit) return undefined;
     const onUnload = (event) => { event.preventDefault(); event.returnValue = ''; };
     const onClick = (event) => {
       if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
@@ -108,7 +109,7 @@ export default function Studio({ section }) {
     window.addEventListener('beforeunload', onUnload);
     document.addEventListener('click', onClick, true);
     return () => { window.removeEventListener('beforeunload', onUnload); document.removeEventListener('click', onClick, true); };
-  }, [dirty]);
+  }, [changedThisVisit]);
 
   const pick = useCallback((key) => { setSelected(key); setFocus({ key, n: Date.now() }); }, []);
   async function publish() {

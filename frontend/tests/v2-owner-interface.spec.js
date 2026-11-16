@@ -94,8 +94,12 @@ test('business owner: overview, locations, branch detail, people, and the way in
   await page.getByRole('navigation', { name: 'Owner navigation' }).getByRole('link', { name: 'Locations' }).click();
   await expect(page.getByRole('button', { name: 'Add branch' })).toBeVisible();
   await page.getByRole('button', { name: 'Add branch' }).click();
-  await expect(page.getByLabel('Branch name')).toBeVisible();
-  await page.screenshot({ path: info.outputPath('owner-locations.png'), fullPage: true });
+  const addBranch = page.getByRole('dialog', { name: 'Add a branch' });
+  await expect(addBranch.getByLabel('Branch name')).toBeFocused();
+  await page.waitForTimeout(300);
+  await page.screenshot({ path: info.outputPath('owner-add-branch.png') });
+  await addBranch.getByRole('button', { name: 'Cancel' }).click();
+  await expect(addBranch).toBeHidden();
 
   await page.goto(`/owner/branches/${ABDIS}`);
   await expect(page.getByRole('heading', { name: 'Abdis Test Restaurant', level: 1 })).toBeVisible();
@@ -105,7 +109,13 @@ test('business owner: overview, locations, branch detail, people, and the way in
   await page.getByRole('navigation', { name: 'Owner navigation' }).getByRole('link', { name: 'People & access' }).click();
   await expect(page.getByText('Amina Operations')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Ask Cravio' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Grant operations access' })).toBeVisible();
+  await page.getByRole('button', { name: 'Grant operations access' }).click();
+  const grant = page.getByRole('dialog', { name: 'Grant operations access' });
+  await expect(grant.getByLabel('Email')).toBeFocused();
+  await page.waitForTimeout(300);
+  await page.screenshot({ path: info.outputPath('owner-grant.png') });
+  await grant.getByRole('button', { name: 'Cancel' }).click();
+  await expect(grant).toBeHidden();
   await page.screenshot({ path: info.outputPath('owner-people.png'), fullPage: true });
 
   // Owner → branch workspace via the switcher; legacy branch pages work there.

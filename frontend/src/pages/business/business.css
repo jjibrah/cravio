@@ -77,3 +77,11 @@
 
 @media (max-width: 1000px) { .pa-brief { grid-template-columns: minmax(0, 1fr); gap: 16px; } .pa-brief-side { padding-left: 0; border-left: 0; border-top: 1px solid var(--line); padding-top: 16px; } }
 @media (max-width: 640px) { .pa-brief { padding: 20px 16px 16px; } .pa-headline { font-size: 20px; } }
+
+/* Forms shown in a pop-up (Modal): the modal supplies the padding; checkboxes and radios keep their own size. */
+.o-modal .biz-form { padding: 0; max-width: none; }
+.o-modal .biz-form .o-input { margin: 0; }
+.biz-checks input, .biz-checks-inline input { flex: none; width: 16px; height: 16px; min-height: 0; margin: 0; accent-color: var(--ink); }
+.biz-checks label, .biz-checks-inline { font-weight: 450; margin: 0; }
+.o-modal .biz-checks { gap: 10px; margin-bottom: 8px; }
+.o-modal .biz-form-actions { flex-direction: row-reverse; justify-content: flex-start; }
