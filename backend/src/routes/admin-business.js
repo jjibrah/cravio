@@ -64,6 +64,26 @@ export const routes = [
     const { user } = await admin(request);
     return withDb((db) => addBranch(db, user.id, params.id, body || {}), { transaction: true });
   } },
+  // Platform status for admin Settings: applied database updates and which features they switch on. Read-only.
+  { method: 'GET', path: '/api/admin/system', async handler({ request }) {
+    await admin(request);
+    return withDb(async (db) => {
+      const { rows: migrations } = await db.query('select name, applied_at from private.schema_migrations order by name');
+      const exists = async (name) => (await db.query('select to_regclass($1) is not null as ok', [name])).rows[0].ok;
+      const [business, inventory, support] = await Promise.all([exists('public.business_members'), exists('public.stock_items'), exists('public.support_requests')]);
+      return {
+        migrations: migrations.map((m) => ({ name: m.name, appliedAt: m.applied_at })),
+        features: [
+          { key: 'business', name: 'Businesses, branches and owner platform', on: business, needs: '008' },
+          { key: 'inventory', name: 'Inventory, stock requests and dispatches', on: inventory, needs: '009' },
+          { key: 'support', name: 'Support requests and complaints', on: support, needs: '006' },
+          { key: 'ai', name: 'AI assistant (OpenRouter)', on: false, needs: null, note: 'Not connected. The assistant answers from records only.' },
+        ],
+        server: { node: process.version, timeZone: 'Africa/Nairobi' },
+        checkedAt: new Date().toISOString(),
+      };
+    });
+  } },
   { method: 'GET', path: '/api/admin/activity', async handler({ request, url }) {
     await admin(request);
     const before = url.searchParams.get('before');

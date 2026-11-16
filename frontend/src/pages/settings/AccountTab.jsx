@@ -19,12 +19,12 @@ function accessLabel(account) {
   return ROLE_NAME[account.role] || '';
 }
 
-/** Your name, email, password, and signing out. Works for every role. */
-export default function AccountTab({ account }) {
+/** Your name, email, password, and signing out. Works for every role. `part`: 'all' | 'profile' | 'security'. */
+export default function AccountTab({ account, part = 'all' }) {
   return <>
-    <ProfileCard account={account} />
-    <PasswordCard />
-    <SessionsCard />
+    {part !== 'security' && <ProfileCard account={account} />}
+    {part !== 'profile' && <PasswordCard />}
+    {part !== 'profile' && <SessionsCard />}
   </>;
 }
 
@@ -42,13 +42,14 @@ function ProfileCard({ account }) {
     if (await run(() => api('/api/me', { method: 'PATCH', body: { name: clean } }), 'Your name is updated')) retry();
   }
 
-  return <SettingsCard id="profile" title="Your profile" description="Your name appears on orders you take and in the sidebar."
+  const description = account.role === 'admin' ? 'Your name appears in the activity log and on support replies.' : 'Your name appears on orders you take and in the sidebar.';
+  return <SettingsCard id="profile" title="Your profile" description={description}
     footer={<SaveActions dirty={dirty} saving={saving} onSave={save} onReset={() => { setName(account.name || ''); setError(''); }} />}>
     <form className="st-grid" onSubmit={(event) => { event.preventDefault(); save(); }}>
       <Field label="Your name" error={error}>
         {(props) => <input {...props} className="o-input" value={name} maxLength={120} autoComplete="name" onChange={(event) => { setName(event.target.value); setError(''); }} />}
       </Field>
-      <Field label="Email" hint="You sign in with this. Contact Cravio to change it.">
+      <Field label="Email" hint={account.role === 'admin' ? 'You sign in with this. Another admin can change it in Users.' : 'You sign in with this. Contact Cravio to change it.'}>
         {(props) => <input {...props} className="o-input" value={account.email || ''} readOnly />}
       </Field>
       <Field label="Role">

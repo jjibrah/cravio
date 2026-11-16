@@ -14,6 +14,7 @@ import HoursTab from './HoursTab';
 import FloorTab from './FloorTab';
 import TeamTab from './TeamTab';
 import AccountTab from './AccountTab';
+import { AdminTeamTab, PlatformTab } from './AdminTabs';
 import './settings.css';
 import { branchPath } from '../../lib/branch';
 
@@ -27,6 +28,12 @@ const OWNER_TABS = [
   { key: 'account', label: 'Account', icon: 'user' },
 ];
 const ACCOUNT_ONLY = [OWNER_TABS[4]];
+const ADMIN_TABS = [
+  { key: 'profile', label: 'Profile', icon: 'user' },
+  { key: 'security', label: 'Security', icon: 'alert' },
+  { key: 'team', label: 'Cravio team', icon: 'users' },
+  { key: 'platform', label: 'Platform', icon: 'layers' },
+];
 
 /** Writes that also refresh the cached onboarding state, so every owner page sees the change. */
 function useRestaurantActions(setData) {
@@ -72,7 +79,8 @@ export default function SettingsPage({ section }) {
   const { scope, account } = useOutletContext() || {};
   // Restaurant settings belong to the branch workspace; elsewhere (admin) only the account tab shows.
   const owner = scope?.area === 'branch';
-  const tabs = owner ? OWNER_TABS : ACCOUNT_ONLY;
+  const adminArea = scope?.area === 'admin';
+  const tabs = owner ? OWNER_TABS : adminArea ? ADMIN_TABS : ACCOUNT_ONLY;
   const [params, setParams] = useSearchParams();
   const active = tabs.find((tab) => tab.key === params.get('tab')) || tabs[0];
   const restaurant = useApi(owner ? STATE : null, { ttl: 60000 });
@@ -88,6 +96,10 @@ export default function SettingsPage({ section }) {
 
   let body;
   if (active.key === 'account') body = <AccountTab account={account} />;
+  else if (active.key === 'profile') body = <AccountTab account={account} part="profile" />;
+  else if (active.key === 'security') body = <AccountTab account={account} part="security" />;
+  else if (adminArea && active.key === 'team') body = <AdminTeamTab />;
+  else if (active.key === 'platform') body = <PlatformTab />;
   else if (restaurant.loading) body = <div className="st-card"><SkeletonRows rows={4} thumb={false} label="Loading your settings" /></div>;
   else if (restaurant.error || !state?.restaurant) body = <div className="st-card"><ErrorState error={restaurant.error} onRetry={restaurant.refresh} what="your restaurant settings" /></div>;
   else if (active.key === 'restaurant') body = <RestaurantTab key={state.restaurant.id} restaurant={state.restaurant} patchRestaurant={actions.patchRestaurant} />;
@@ -96,7 +108,7 @@ export default function SettingsPage({ section }) {
   else if (active.key === 'team') body = <TeamTab state={state} actions={actions} isOwner={isOwner} />;
 
   return <>
-    <PageHeader title={section.label} description={owner ? 'Changes reach your guest menu straight away.' : 'Your name, password and sign-in.'} />
+    <PageHeader title={section.label} description={owner ? 'Changes reach your guest menu straight away.' : adminArea ? 'Your account, the Cravio team and the platform.' : 'Your name, password and sign-in.'} />
     <div className={`cs-panel${tabs.length > 1 ? '' : ' is-single'}`}>
       {tabs.length > 1 && <nav className="cs-nav" aria-label="Settings sections">
         <ul>
@@ -106,7 +118,7 @@ export default function SettingsPage({ section }) {
             </button>
           </li>)}
         </ul>
-        <Link className="cs-help" to={branchPath('contact-cravio')}><OIcon name="help" size={16} /><span>Contact Cravio</span></Link>
+        {owner && <Link className="cs-help" to={branchPath('contact-cravio')}><OIcon name="help" size={16} /><span>Contact Cravio</span></Link>}
       </nav>}
       <div className="cs-content" key={active.key}>
         <h2 className="cs-title">{active.label}</h2>
