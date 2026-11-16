@@ -1,0 +1,47 @@
+/* Ask Cravio: floating bubble + non-blocking chat panel (owner pages). Owner design tokens. */
+.ast { position: fixed; right: 24px; bottom: 24px; z-index: 40; display: flex; flex-direction: column; align-items: flex-end; gap: 12px; }
+
+.ast-fab { display: grid; place-items: center; width: 56px; height: 56px; min-height: 0; padding: 0; border: 0; border-radius: 50%;
+  background: var(--ink); color: #fff; cursor: pointer;
+  box-shadow: 0 10px 28px -8px #11111066, 0 2px 6px #1111102e; transition: transform 160ms var(--ease), background-color 160ms var(--ease); }
+.ast-fab:hover { background: #2b2a27; transform: translateY(-1px); }
+.ast-fab:focus-visible { outline: 3px solid var(--ember); outline-offset: 3px; }
+
+.ast-panel { display: flex; flex-direction: column; width: min(380px, calc(100vw - 32px)); height: min(560px, calc(100dvh - 120px));
+  border-radius: 18px; background: var(--surface); color: var(--ink); overflow: hidden;
+  box-shadow: 0 0 0 1px #11111014, 0 32px 80px -24px #1111104d, 0 8px 20px -8px #11111026;
+  transform-origin: bottom right; animation: ast-in 180ms var(--ease) both; }
+@keyframes ast-in { from { opacity: 0; transform: translateY(8px) scale(.98); } }
+
+.ast-head { display: flex; align-items: flex-start; gap: 10px; padding: 16px 12px 12px 16px; border-bottom: 1px solid var(--line); }
+.ast-avatar { flex: none; display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; background: var(--ink); color: #fff; }
+.ast-titles { flex: 1; min-width: 0; }
+.ast-titles h2 { margin: 0; font-size: 16px; font-weight: 650; line-height: 1.3; }
+.ast-titles p { margin: 2px 0 0; color: var(--muted); font-size: 12px; line-height: 1.35; }
+.ast-close { flex: none; display: grid; place-items: center; width: 36px; height: 36px; min-height: 0; padding: 0; border-radius: 50%; background: transparent; color: var(--ink-2); }
+.ast-close:hover { background: var(--hover); }
+
+.ast-messages { flex: 1; overflow-y: auto; overscroll-behavior: contain; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; }
+.ast-bubble { margin: 0; max-width: 88%; padding: 9px 13px; border-radius: 16px; font-size: 14px; line-height: 1.45; }
+.ast-bubble.is-you { align-self: flex-end; background: var(--ink); color: #fff; border-bottom-right-radius: 6px; }
+.ast-bubble.is-cravio { align-self: flex-start; background: var(--hover); color: var(--ink); border-bottom-left-radius: 6px; }
+.ast-link { min-height: 0; padding: 0; background: none; color: inherit; font-weight: 600; text-decoration: underline; }
+.ast-link:hover { background: none; }
+
+.ast-suggestions { display: flex; flex-wrap: wrap; gap: 6px; padding: 2px 16px 10px; }
+.ast-chip { flex: none; min-height: 32px; padding: 4px 12px; border: 1px solid var(--line-strong); border-radius: 999px; background: var(--surface); color: var(--ink); font-size: 13px; font-weight: 500; white-space: nowrap; }
+.ast-chip:hover { background: var(--hover); }
+
+.ast-input { display: flex; flex-direction: row; align-items: center; gap: 8px; padding: 10px 12px 14px; border-top: 1px solid var(--line); }
+.ast-input input { flex: 1; min-width: 0; width: auto; margin: 0; min-height: 40px; border-radius: 999px; padding: 8px 14px; }
+.ast-input button { flex: none; display: grid; place-items: center; width: 40px; height: 40px; min-height: 0; padding: 0; border-radius: 50%; }
+
+@media (max-width: 640px) {
+  .ast { right: 16px; bottom: 16px; }
+  .ast-panel { width: calc(100vw - 32px); height: min(70dvh, 560px); }
+}
+@media (prefers-reduced-motion: reduce) { .ast-panel { animation: none; } .ast-fab { transition: none; } }
+@media print { .ast { display: none; } }
+
+/* Room under the last content so the bubble never covers it. */
+.page:has(.ast) .dashboard-content { padding-bottom: 96px; }

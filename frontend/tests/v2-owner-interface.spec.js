@@ -64,20 +64,24 @@ test('business owner: overview, locations, branch detail, people, and the way in
   await mockOwner(page);
   await signIn(page);
   await expect(page).toHaveURL(/\/owner$/);
-  // Briefing is the default Overview view: the brief, what needs you, and the assistant.
+  // One Overview: today's summary card, then figures and branches.
   await expect(page.getByRole('heading', { level: 1, name: /^Good (morning|afternoon|evening)/ })).toBeVisible();
   await expect(page.getByRole('heading', { name: /taken 14 orders today/ })).toBeVisible();
-  await expect(page.getByText('Answers come from your Cravio records. No AI model is connected yet.')).toBeVisible();
-  await page.getByRole('button', { name: 'What’s selling best?' }).click();
-  await expect(page.getByRole('log').getByText(/best sellers by quantity/)).toBeVisible();
-  await page.getByLabel('Ask a question').fill('anything low on stock?');
-  await page.getByRole('button', { name: 'Ask', exact: true }).click();
-  await expect(page.getByRole('log').getByText(/Out or low: Pilau/)).toBeVisible();
-  await page.waitForTimeout(400);
-  await page.screenshot({ path: info.outputPath('owner-briefing.png'), fullPage: true });
-  await page.getByRole('tab', { name: /Branches/ }).click();
   await expect(page.getByRole('heading', { name: /Abdis Group/ })).toBeVisible();
   await expect(page.getByText('Ksh 23,850').first()).toBeVisible();
+  // Ask Cravio: a bubble on every owner page.
+  await page.getByRole('button', { name: 'Ask Cravio' }).click();
+  const chat = page.getByRole('dialog', { name: 'Ask Cravio' });
+  await expect(chat.getByText('Answers come from your records. No AI model is connected yet.')).toBeVisible();
+  await chat.getByRole('button', { name: 'What’s selling best?' }).click();
+  await expect(chat.getByRole('log').getByText(/best sellers by quantity/)).toBeVisible();
+  await chat.getByLabel('Ask a question').fill('anything low on stock?');
+  await chat.getByRole('button', { name: 'Send' }).click();
+  await expect(chat.getByRole('log').getByText(/Out or low: Pilau/)).toBeVisible();
+  await page.waitForTimeout(300);
+  await page.screenshot({ path: info.outputPath('owner-chat.png') });
+  await page.keyboard.press('Escape');
+  await expect(chat).toBeHidden();
   await page.screenshot({ path: info.outputPath('owner-overview.png'), fullPage: true });
 
   // Only a branch with a manager role offers its workspace.
@@ -98,6 +102,7 @@ test('business owner: overview, locations, branch detail, people, and the way in
 
   await page.getByRole('navigation', { name: 'Owner navigation' }).getByRole('link', { name: 'People & access' }).click();
   await expect(page.getByText('Amina Operations')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Ask Cravio' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Grant operations access' })).toBeVisible();
   await page.screenshot({ path: info.outputPath('owner-people.png'), fullPage: true });
 
@@ -111,7 +116,6 @@ test('operations manager: assigned branch only, no access controls', async ({ pa
   await mockOwner(page, 'operations');
   await signIn(page);
   await expect(page).toHaveURL(/\/owner$/);
-  await page.getByRole('tab', { name: /Branches/ }).click();
   await expect(page.locator('.biz-branch')).toHaveCount(1);
   await page.goto('/owner/people');
   await expect(page.getByText('Only the business owner changes access.')).toBeVisible();

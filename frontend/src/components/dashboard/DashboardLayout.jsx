@@ -8,6 +8,7 @@ import { Loading } from '../../pages/AuthPages';
 import Sidebar from './Sidebar';
 import TopNav from './TopNav';
 import Icon from '../Icon';
+import AssistantBubble from '../assistant/AssistantBubble';
 import './dashboard.css';
 
 /**
@@ -63,5 +64,6 @@ export default function DashboardLayout({ role: area }) {
         <Outlet key={`${branch?.id || area}:${refreshVersion}`} context={{ account, scope }} />
       </div></main>
     </div>
+    {area === 'owner' && <AssistantBubble />}
   </div>;
 }

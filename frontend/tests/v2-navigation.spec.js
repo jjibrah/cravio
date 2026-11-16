@@ -54,10 +54,11 @@ test('business owner (reviewed mapping) lands in the owner interface and can ope
   await signIn(page, 'owner@gmail.com');
   await expect(page).toHaveURL(/\/owner$/);
   await expect(page.getByRole('heading', { level: 1, name: /^Good (morning|afternoon|evening)/ })).toBeVisible();
-  await page.getByRole('tab', { name: /Branches/ }).click();
   await page.getByRole('link', { name: 'Open workspace' }).first().click();
   await expect(page).toHaveURL(/\/branch\/106fe2fb-94bb-4f5d-bd0d-bd694004424c$/);
   await expect(page.getByRole('heading', { name: 'Overview', exact: true })).toBeVisible();
+  // The assistant belongs to the owner interface only.
+  await expect(page.getByRole('button', { name: 'Ask Cravio' })).toHaveCount(0);
 });
 
 test('waiter lands in the waiter app scoped to their branch and cannot open branch or owner areas', async ({ page }) => {
