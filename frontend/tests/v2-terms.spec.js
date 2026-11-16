@@ -1,4 +1,4 @@
-// Terms and conditions. First test real and read-only (before migration 010); the editor test MOCKS the admin legal API
+// Terms and conditions. First test real and read-only (010 applied, nothing published); the editor test MOCKS the admin legal API
 // and aborts writes.
 import { test, expect } from '@playwright/test';
 const password = process.env.V2_TEST_PASSWORD;
@@ -11,13 +11,14 @@ async function signIn(page, email) {
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
 }
 
-test('before migration 010: public page and admin page explain, nobody is blocked (real)', async ({ page }) => {
+test('migration 010 applied, nothing published yet: nobody is blocked (real, read-only)', async ({ page }) => {
   await page.goto('/terms');
   await expect(page.getByText('Cravio hasn’t published terms yet.')).toBeVisible();
   await signIn(page, 'admin@gmail.com');
   await expect(page).toHaveURL(/\/admin$/);
   await page.getByRole('navigation', { name: 'Admin navigation' }).getByRole('link', { name: 'Terms & conditions' }).click();
-  await expect(page.getByText('Terms aren’t switched on yet')).toBeVisible();
+  await expect(page.getByText('Nothing published yet. Until you publish, new accounts aren’t asked to accept any terms.')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Publish', exact: true })).toBeDisabled();
 });
 
 test('admin writes terms with a live preview and a publish confirmation (mocked)', async ({ page }, info) => {

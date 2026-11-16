@@ -4,6 +4,8 @@ import { test, expect } from '@playwright/test';
 
 const password = process.env.V2_TEST_PASSWORD;
 test.skip(!password, 'Set V2_TEST_PASSWORD to the shared test accounts’ password.');
+// Mocked routes may still be passing a real request through when a test ends: let them finish quietly.
+test.afterEach(async ({ page }) => { await page.unrouteAll({ behavior: 'ignoreErrors' }); });
 const ABDIS = '106fe2fb-94bb-4f5d-bd0d-bd694004424c';
 const BUSINESS = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const ITEMS = { fanta: '11111111-1111-4111-8111-111111111111', pilau: '22222222-2222-4222-8222-222222222222' };
