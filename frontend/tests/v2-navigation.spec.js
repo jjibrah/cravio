@@ -24,6 +24,8 @@ test('branch manager lands in the branch workspace, not the owner interface', as
   await expect(page).toHaveURL(/\/branch\/[0-9a-f-]{36}$/);
   await expect(page.getByRole('heading', { name: 'Overview', exact: true })).toBeVisible();
   const branchId = page.url().split('/branch/')[1];
+  // Dish photos are optional: with everything else set up, there is no "Finish setting up" card.
+  await expect(page.getByText('Finish setting up')).toHaveCount(0);
   // Every branch-scoped API call names the branch from the URL.
   expect([...branchHeaders]).toEqual([branchId]);
 
