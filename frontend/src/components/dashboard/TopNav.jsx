@@ -13,15 +13,15 @@ export function PreviewChip() {
   </span>;
 }
 
-export default function TopNav({ account, onOpenSidebar }) {
-  const contact = dashboards[account.role]?.contact;
+export default function TopNav({ account, scope, onOpenSidebar }) {
+  const contact = dashboards[scope.area]?.contact;
   return <header className="dashboard-topnav">
     <button className="icon-button mobile-nav-toggle" onClick={onOpenSidebar} aria-label="Open navigation" aria-controls="mobile-sidebar"><Icon name="bars" /></button>
-    <div className="topnav-search"><GlobalSearch role={account.role} placeId={account.place?.id} /></div>
+    <div className="topnav-search"><GlobalSearch role={scope.area} base={scope.base} placeId={scope.place?.id} /></div>
     <div className="topnav-end">
       <PreviewChip />
       <div className="topnav-actions">
-        {contact && <NavLink to={`/${account.role}/${contact.path}`} aria-label={contact.label} title={contact.label}
+        {contact && <NavLink to={`${scope.base}/${contact.path}`} aria-label={contact.label} title={contact.label}
           className={({ isActive }) => `icon-button topnav-contact${isActive ? ' is-active' : ''}`}><Icon name="complaints" size={18} /></NavLink>}
         <RefreshButton /><NotificationCenter />
       </div>

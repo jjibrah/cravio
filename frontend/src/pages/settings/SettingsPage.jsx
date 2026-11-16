@@ -15,6 +15,7 @@ import FloorTab from './FloorTab';
 import TeamTab from './TeamTab';
 import AccountTab from './AccountTab';
 import './settings.css';
+import { branchPath } from '../../lib/branch';
 
 const STATE = '/api/restaurant/onboarding';
 
@@ -70,8 +71,9 @@ function Summary({ state, onPick }) {
 }
 
 export default function SettingsPage({ section }) {
-  const { account } = useOutletContext() || {};
-  const owner = account?.role === 'owner';
+  const { scope } = useOutletContext() || {};
+  // Restaurant settings belong to the branch workspace; elsewhere (admin) only the account tab shows.
+  const owner = scope?.area === 'branch';
   const tabs = owner ? OWNER_TABS : ACCOUNT_ONLY;
   const [params, setParams] = useSearchParams();
   const active = tabs.find((tab) => tab.key === params.get('tab')) || tabs[0];
@@ -108,7 +110,7 @@ export default function SettingsPage({ section }) {
             </button>
           </li>)}
         </ul>
-        <Link className="st-help" to="/owner/contact-cravio">
+        <Link className="st-help" to={branchPath('contact-cravio')}>
           <OIcon name="help" size={17} /><span><strong>Need a hand?</strong><span>Contact the Cravio team</span></span>
         </Link>
       </nav>}

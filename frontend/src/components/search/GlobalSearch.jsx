@@ -42,7 +42,8 @@ function Highlight({ text, indices }) {
 
 const actionVerb = (item) => item.href ? 'Open in new tab' : item.scope ? 'Search records' : item.action ? (item.destructive ? 'Log out' : 'Run action') : 'Open page';
 
-export default function GlobalSearch({ role, placeId }) {
+/** `base` is where the role's pages live, e.g. '/branch/<id>' for the branch workspace (index paths start with `/${role}`). */
+export default function GlobalSearch({ role, placeId, base = `/${role}` }) {
   const navigate = useNavigate();
   const { retry } = useAuth();
   const { notify } = useNotifications();
@@ -122,7 +123,7 @@ export default function GlobalSearch({ role, placeId }) {
     if (item.destructive && confirming !== item.id) { setConfirming(item.id); return; }
     if (!item.destructive) remember(item);
     hide();
-    if (item.to) navigate(item.to);
+    if (item.to) navigate(item.to.startsWith(`/${role}`) ? base + item.to.slice(role.length + 1) : item.to);
     else if (item.href) {
       // The guest menu opens this restaurant's real menu when we know which restaurant it is.
       const href = item.href === '/guest-menu' && placeId ? `/guest-menu?r=${placeId}` : item.href;

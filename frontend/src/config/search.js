@@ -28,7 +28,8 @@ const pageKeywords = {
 
 // Pages whose records can be searched once data is connected.
 export const searchableScopes = {
-  owner: ['orders', 'tables', 'products'],
+  branch: ['orders', 'tables', 'products'],
+  owner: [],
   admin: ['users', 'restaurants', 'leads-requests', 'complaints'],
 };
 
@@ -45,7 +46,7 @@ function pageItems(role) {
 }
 
 function categoryItems(role) {
-  if (role !== 'owner') return [];
+  if (role !== 'branch') return [];
   return productCategories.filter((category) => category.id !== 'all').map((category) => ({
     id: `category:${category.id}`,
     group: 'Product categories',
@@ -53,13 +54,13 @@ function categoryItems(role) {
     hint: 'Products',
     icon: category.icon,
     keywords: 'category products menu',
-    to: `/owner/products?category=${category.id}`,
+    to: `/branch/products?category=${category.id}`,
   }));
 }
 
 function actionItems(role) {
   return [
-    ...(role === 'owner' ? [{ id: 'action:guest-menu', group: 'Actions', label: 'Open guest menu', hint: 'Opens in a new tab', icon: 'qr', keywords: 'qr guest menu preview public', href: '/guest-menu' }] : []),
+    ...(role === 'branch' ? [{ id: 'action:guest-menu', group: 'Actions', label: 'Open guest menu', hint: 'Opens in a new tab', icon: 'qr', keywords: 'qr guest menu preview public', href: '/guest-menu' }] : []),
     { id: 'action:refresh', group: 'Actions', label: 'Refresh data', hint: 'Reload this page', icon: 'refresh', keywords: 'reload update sync', action: 'refresh' },
     { id: 'action:sign-out', group: 'Actions', label: 'Log out', hint: 'End this session', icon: 'logout', keywords: 'sign out logout exit', action: 'sign-out', destructive: true },
   ];
@@ -136,6 +137,7 @@ export function searchFor(role, rawQuery, perGroup = 5) {
 
 export const searchPlaceholder = {
   owner: 'Search or jump to…',
+  branch: 'Search or jump to…',
   admin: 'Search or jump to…',
 };
 

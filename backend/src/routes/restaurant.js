@@ -10,7 +10,7 @@ import { sendStaffInvites } from '../lib/staff-invites.js';
 import { videoFields, videoOut, withVideoColumns } from '../lib/menu-media.js';
 import { invalidateMenu, invalidateRestaurantMembers } from '../lib/cache.js';
 import { LIMITS, hasMerchSchema, requireMerch } from '../lib/menu-merch.js';
-import { pickMembership } from '../lib/restaurants.js';
+import { MANAGER_ROLES, requestedBranch, selectMembership } from '../lib/access.js';
 
 const UUID = '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}';
 const PLACEHOLDER_NAME = 'New restaurant';
@@ -79,12 +79,12 @@ function check(error, messages = {}) {
  */
 export async function ownerContext(request, { create = false } = {}) {
   const context = await requireRole(request, 'owner');
-  let membership;
-  try {
-    membership = context.memberships ? pickMembership(context.memberships, ['owner', 'manager'])
-      : await findMembership(context.client, context.user.id, ['owner', 'manager']);
-  } catch (error) { check(error); }
-  if (!membership && create) {
+  if (!context.memberships) check({ code: '42P01' });
+  const requested = requestedBranch(request);
+  let membership = selectMembership(context.memberships, requested, MANAGER_ROLES);
+  // Only a legacy owner account with no branch and no business grant gets a restaurant created for it
+  // (the existing invite → onboarding flow). Business users add branches from the owner interface instead.
+  if (!membership && create && !requested && !context.memberships.length && !context.grants?.length) {
     const invitedName = context.user.user_metadata?.restaurant_name;
     const service = serviceClient();
     try {
@@ -93,7 +93,7 @@ export async function ownerContext(request, { create = false } = {}) {
         const { data: own } = await service.from('restaurants').select('id').eq('owner_id', context.user.id).single();
         if (own) await service.from('onboarding_progress').update({ data: { namePlaceholder: true } }).eq('restaurant_id', own.id);
       }
-      membership = await findMembership(context.client, context.user.id, ['owner', 'manager']);
+      membership = await findMembership(context.client, context.user.id, MANAGER_ROLES);
     } catch (error) { check(error); }
   }
   if (!membership) throw new HttpError(404, 'Set up your restaurant first.');

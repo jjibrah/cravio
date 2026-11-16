@@ -2,7 +2,8 @@
 import { createHash, randomInt } from 'node:crypto';
 import { requireRole } from './auth.js';
 import { HttpError } from './http.js';
-import { findMembership, isMissingSchema, pickMembership, text } from './restaurants.js';
+import { isMissingSchema, text } from './restaurants.js';
+import { MANAGER_ROLES, STAFF_ROLES, branchRole, requestedBranch, selectMembership } from './access.js';
 import { hasMerchSchema, parseLine, resolveLines, storedLine } from './menu-merch.js';
 import { nameCache } from './cache.js';
 import { serviceClient } from './supabase.js';
@@ -78,26 +79,25 @@ export function must(result, messages) {
 /* ---------- Who is calling ---------- */
 
 /**
- * Any member of a restaurant: owner, manager (profile role 'owner') or waiter.
- * Returns the caller's RLS client, their membership role and restaurant.
+ * Any member of the branch the request names (X-Cravio-Branch): owner, manager (profile role 'owner') or waiter.
+ * Returns the caller's RLS client, their membership role and restaurant (branch).
  */
-export async function staffContext(request) {
+export async function staffContext(request, roles = STAFF_ROLES) {
   const context = await requireRole(request, 'owner', 'waiter');
-  let membership;
-  try { membership = context.memberships ? pickMembership(context.memberships) : await findMembership(context.client, context.user.id); }
-  catch (error) { check(error); }
+  if (!context.memberships) throw new HttpError(503, NOT_INSTALLED);
+  const membership = selectMembership(context.memberships, requestedBranch(request), roles);
   if (!membership) throw new HttpError(403, 'You aren’t part of a restaurant yet. Ask your manager to add you.');
   const role = membership.role;
   return {
-    ...context, role, isManager: role === 'owner' || role === 'manager',
+    ...context, role, branchRole: branchRole(role), isManager: MANAGER_ROLES.includes(role),
     restaurant: membership.restaurant, restaurantId: membership.restaurant.id,
   };
 }
 
-/** Owners and managers only. */
+/** Branch managers (owner or manager membership at the selected branch) only. */
 export async function managerContext(request) {
   const context = await staffContext(request);
-  if (!context.isManager) throw new HttpError(403, 'Only owners and managers can do this.');
+  if (!context.isManager) throw new HttpError(403, 'Only branch managers can do this.');
   return context;
 }
 

@@ -46,6 +46,6 @@ export default function QrPack({ state }) {
         <span className="qr-card-brand">Cravio<BrandMark /></span>
       </li>)}
     </ol>}
-    <footer className="qr-footer"><Brand to="/owner" label="Cravio dashboard" /></footer>
+    <footer className="qr-footer"><Brand to={`/branch/${state.restaurant.id}`} label="Cravio dashboard" /></footer>
   </div>;
 }

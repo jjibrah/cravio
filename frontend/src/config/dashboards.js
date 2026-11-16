@@ -13,20 +13,30 @@ export const dashboards = {
       { path: 'users', group: 'Access', label: 'Users', icon: 'team', kind: 'users', description: 'Everyone with a Cravio account: invite people, change roles and suspend access.' },
     ],
   },
-  owner: {
-    label: 'Owner',
+  // Branch manager: the restaurant's day-to-day operations (the previous owner dashboard), at /branch/:branchId.
+  branch: {
+    label: 'Branch',
     sections: [
       { path: '', label: 'Overview', icon: 'overview', kind: 'overview', description: 'Today’s service at a glance.' },
       { path: 'orders', label: 'Orders', icon: 'orders', kind: 'table', columns: ['Order', 'Table', 'Items', 'Server', 'Status', 'Total'], description: 'Every order, from the table to the bill.' },
       { path: 'tables', label: 'Tables', icon: 'tables', kind: 'floor', description: 'Your floor, table by table.' },
       { path: 'products', group: 'Menu', label: 'Products', icon: 'products', kind: 'products', description: 'Dishes and drinks, organised by category.' },
       { path: 'menu', group: 'Menu', label: 'Menu configuration', icon: 'menu', kind: 'menu', description: 'What guests see on the menu, and when they see it.' },
-      { path: 'inventory', group: 'Operations', label: 'Inventory', icon: 'products', description: 'Finished goods, locations and stock movements.' },
-      { path: 'management', group: 'Operations', label: 'Management', icon: 'team', description: 'Daily checklists and operational tasks.' },
-      { path: 'assistant', group: 'Analytics', label: 'AI assistant', icon: 'insights', description: 'Recorded facts and a preview of upcoming AI assistance.' },
       { path: 'insights', group: 'Analytics', label: 'Insights', icon: 'insights', kind: 'insights', description: 'Sales and service trends over time.' },
     ],
     contact: { path: 'contact-cravio', label: 'Contact Cravio', icon: 'contact', kind: 'support', description: 'Reach the Cravio team about anything in your restaurant.' },
+  },
+  // Owner / operations manager: oversight of the business's assigned branches, at /owner.
+  owner: {
+    label: 'Owner',
+    sections: [
+      { path: '', label: 'Overview', icon: 'overview', kind: 'business', description: 'Every branch you oversee, today.' },
+      { path: 'locations', group: 'Business', label: 'Locations', icon: 'restaurants', kind: 'business', description: 'Your branches: open one, or add a new location.' },
+      { path: 'people', group: 'Business', label: 'People & access', icon: 'team', kind: 'business', description: 'Who can see and run which branches.' },
+      { path: 'inventory', group: 'Preview', label: 'Inventory preview', icon: 'products', description: 'The earlier inventory preview. Not yet connected to branch orders.' },
+      { path: 'management', group: 'Preview', label: 'Management preview', icon: 'team', description: 'Daily checklists and operational tasks (preview).' },
+      { path: 'assistant', group: 'Preview', label: 'AI assistant (placeholder)', icon: 'insights', description: 'Placeholder only: no AI provider is connected.' },
+    ],
   },
 };
 
@@ -44,12 +54,17 @@ export const productCategories = [
 
 export function sectionsFor(role) {
   const config = dashboards[role];
-  return [...config.sections, ...(config.contact ? [config.contact] : []), settingsSection];
+  // The owner interface has no restaurant settings page: branch settings live in each branch workspace.
+  return [...config.sections, ...(config.contact ? [config.contact] : []), ...(role === 'owner' ? [] : [settingsSection])];
 }
 
-export function sectionForPath(role, pathname) {
-  return sectionsFor(role).find((section) => pathname.replace(/\/$/, '') === `/${role}${section.path ? `/${section.path}` : ''}`) || dashboards[role].sections[0];
+/** The section for a pathname under `base` (e.g. '/admin' or '/branch/<id>'). */
+export function sectionForPath(role, pathname, base = `/${role}`) {
+  return sectionsFor(role).find((section) => pathname.replace(/\/$/, '') === `${base}${section.path ? `/${section.path}` : ''}`) || dashboards[role].sections[0];
 }
+
+/** Legacy /owner/<page> paths that now belong to the branch workspace. */
+export const LEGACY_BRANCH_PAGES = ['orders', 'tables', 'products', 'menu', 'insights', 'settings', 'contact-cravio'];
 
 export function groupSections(sections) {
   return sections.reduce((groups, section) => {

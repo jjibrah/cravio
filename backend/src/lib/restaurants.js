@@ -30,8 +30,9 @@ export async function createRestaurantForOwner(service, { ownerId, name }) {
     .insert({ owner_id: ownerId, name: cleanName, status: 'onboarding' })
     .select('id, name, status').single();
   if (error?.code === '23505') {
+    // The owner's original restaurant (with migration 008 an owner may also have further business branches).
     const { data: existing, error: readError } = await service.from('restaurants')
-      .select('id, name, status').eq('owner_id', ownerId).single();
+      .select('id, name, status').eq('owner_id', ownerId).order('created_at').limit(1).single();
     if (readError) throw readError;
     restaurant = existing;
   } else if (error) {

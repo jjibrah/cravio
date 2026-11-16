@@ -114,7 +114,7 @@ function OnboardingFlow() {
     const preview = { restaurant: state.restaurant, tables: state.tables, sections: state.sections, categories: state.categories, items: state.items };
     return stepKey === 'qr' ? <QrPack state={state} /> : <Finish state={state} preview={preview} actions={actions} />;
   }
-  if (!stepKey) return <Navigate to={live ? '/owner' : `/onboarding/${resumeStep(state)}`} replace />;
+  if (!stepKey) return <Navigate to={live ? `/branch/${state.restaurant.id}` : `/onboarding/${resumeStep(state)}`} replace />;
   if (LEGACY_STEPS[stepKey]) return <Navigate to={`/onboarding/${LEGACY_STEPS[stepKey]}`} replace />;
   if (!STEP_COMPONENTS[stepKey]) return <Navigate to="/onboarding" replace />;
   return <StepScreen key="flow" stepKey={stepKey} state={state} setState={setState} actions={actions} live={live}
@@ -197,7 +197,7 @@ function StepScreen({ stepKey, state, setState, actions, live, onLive, notify, o
           await api('/api/restaurant/onboarding/progress', { method: 'PUT', body: kind === 'skip' ? { skip: stepKey } : { complete: stepKey } });
         }
         notify('Saved');
-        navigate('/owner');
+        navigate(`/branch/${state.restaurant.id}`);
         return;
       }
       if (stepKey === 'preview') {
@@ -227,7 +227,7 @@ function StepScreen({ stepKey, state, setState, actions, live, onLive, notify, o
   }
 
   function goBack() {
-    if (live) { navigate('/owner'); return; }
+    if (live) { navigate(`/branch/${state.restaurant.id}`); return; }
     if (index > 0) navigate(`/onboarding/${STEP_KEYS[index - 1]}`);
   }
 
@@ -243,11 +243,11 @@ function StepScreen({ stepKey, state, setState, actions, live, onLive, notify, o
         <div className="onb-top-row">
           <button type="button" className="onb-back" onClick={goBack} disabled={!live && index === 0} aria-label={live ? 'Back to dashboard' : 'Previous question'}>
             <OnbIcon name="back" size={20} /></button>
-          <Brand to={live ? '/owner' : `/onboarding/${stepKey}`} label={live ? 'Cravio dashboard' : 'Cravio'} className="onb-brand" />
+          <Brand to={live ? `/branch/${state.restaurant.id}` : `/onboarding/${stepKey}`} label={live ? 'Cravio dashboard' : 'Cravio'} className="onb-brand" />
           <span className={`onb-saved${saveStatus ? ' is-visible' : ''}`} role="status" aria-live="polite">
             {saveStatus === 'saving' ? 'Saving…' : saveStatus === 'saved' ? <><OnbIcon name="check" size={14} />Saved</> : ''}</span>
           {live || !onboardingRequired
-            ? <Link className="onb-exit" to="/owner">Save &amp; exit</Link>
+            ? <Link className="onb-exit" to={`/branch/${state.restaurant.id}`}>Save &amp; exit</Link>
             : <button type="button" className="onb-exit" onClick={() => setExitOpen(true)}>Save &amp; exit</button>}
         </div>
         <div className="onb-progress" role="progressbar" aria-label="Setup progress" aria-valuemin={0} aria-valuemax={STEPS.length}

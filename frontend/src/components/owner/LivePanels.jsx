@@ -4,6 +4,7 @@ import { useNotifications } from '../notifications/NotificationProvider';
 import TableTile from '../tables/TableTile';
 import { formatKes, formatNumber, formatRelative, menuApi, plural, tableStateLabel } from '../../lib/ops';
 import { Bar, EmptyState, ErrorState, OIcon, Panel, SkeletonRows, TileSkeletonGrid } from './ui';
+import { branchPath } from '../../lib/branch';
 
 /** All tables as tiles, with live state; each links to its detail page. */
 export function TablesPlan({ live }) {
@@ -16,14 +17,14 @@ export function TablesPlan({ live }) {
     summary.ordering && `${summary.ordering} ordering`,
     `${summary.free} free`,
   ].filter(Boolean).join(' · ') : undefined}
-    actions={<Link className="o-btn is-quiet is-small" to="/owner/tables">All tables<OIcon name="arrowRight" size={15} /></Link>}>
+    actions={<Link className="o-btn is-quiet is-small" to={branchPath('tables')}>All tables<OIcon name="arrowRight" size={15} /></Link>}>
     <div className="o-panel-body">
       {loading && !data && <TileSkeletonGrid count={12} />}
       {error && !data && <ErrorState error={error} onRetry={reload} what="your tables" compact />}
-      {tables && !tables.length && <EmptyState icon="table" title="No tables yet" action={<Link className="o-btn" to="/owner/tables">Add tables</Link>}>Add your tables to see who needs what at a glance.</EmptyState>}
+      {tables && !tables.length && <EmptyState icon="table" title="No tables yet" action={<Link className="o-btn" to={branchPath('tables')}>Add tables</Link>}>Add your tables to see who needs what at a glance.</EmptyState>}
       {tables && tables.length > 0 && <ul className="o-tile-grid o-plain-list" aria-label="Tables">
         {tables.map((table) => <li key={table.id}>
-          <TableTile number={table.number} state={table.state} label={tableStateLabel(table)} href={`/owner/tables/${table.number}`}
+          <TableTile number={table.number} state={table.state} label={tableStateLabel(table)} href={branchPath(`tables/${table.number}`)}
             orders={table.openOrders} request={table.requestTypes?.[0]}
             meta={table.openOrders ? `${formatKes(table.unpaidTotal)} unpaid` : undefined} />
         </li>)}
@@ -75,7 +76,7 @@ export function SoldOut({ analytics }) {
   }
 
   return <Panel title="Sold out" count={list ? list.length : undefined} sub="Hidden from guests until you bring them back"
-    actions={<Link className="o-btn is-quiet is-small" to="/owner/products">Products<OIcon name="arrowRight" size={15} /></Link>}>
+    actions={<Link className="o-btn is-quiet is-small" to={branchPath('products')}>Products<OIcon name="arrowRight" size={15} /></Link>}>
     {loading && !data && <SkeletonRows rows={2} thumb={false} label="Loading sold-out dishes" />}
     {error && !data && <ErrorState error={error} onRetry={reload} what="sold-out dishes" compact />}
     {list && !list.length && <EmptyState title="Everything is available" icon="check">Mark a dish sold out from Products when you run out.</EmptyState>}
@@ -117,7 +118,7 @@ export function MenuToday({ analytics, rangeLabel = 'today' }) {
 
   const both = best?.length > 0 && soldOut?.length > 0;
   return <Panel className="o-menu-today" title="Menu today" sub={`What sold best ${rangeLabel}, and what guests can’t order`}
-    actions={<Link className="o-btn is-quiet is-small" to="/owner/products">Products<OIcon name="arrowRight" size={15} /></Link>}>
+    actions={<Link className="o-btn is-quiet is-small" to={branchPath('products')}>Products<OIcon name="arrowRight" size={15} /></Link>}>
     {loading && !data && <SkeletonRows rows={3} thumb={false} label="Loading the menu summary" />}
     {error && !data && <ErrorState error={error} onRetry={reload} what="the menu summary" compact />}
     {data && <div className={`o-menu-today-body${both ? ' is-split' : ''}`}>

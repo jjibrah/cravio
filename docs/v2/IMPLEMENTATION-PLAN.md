@@ -1,6 +1,6 @@
 # Cravio v2 — five-interface implementation plan
 
-Planning only · 16 November 2026 · branch `v2-dev` · awaiting decisions before affected implementation.
+16 November 2026 · branch `v2-dev` · V2-02/03/04 implemented (migration 008 proposed, not applied); stock packages blocked on D03–D07. Current status: [HANDOFF.md](HANDOFF.md#implementation-status-updated-16-nov-2026).
 
 Read [PRD context](PRD-CONTEXT.md), [decisions](DECISIONS.md) and [device handoff](HANDOFF.md). This is the controlling v2 plan; older root plans and the multi-branch bakery-oriented proposal are historical context. No v2 feature is implemented by this document.
 

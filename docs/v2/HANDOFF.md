@@ -2,6 +2,19 @@
 
 Prepared 16 November 2026. Branch: **v2-dev**. Base code: `e0de46635182613b9536b122d5aa42e3c9228dcc` from dev. This handoff adds planning documents only; the five-interface redesign has not been implemented.
 
+## Implementation status (updated 16 Nov 2026)
+
+| Package | State | Evidence |
+| --- | --- | --- |
+| V2-01 decisions/baseline | Read-only account audit done; D02–D08 still open (see DECISIONS.md, incl. R1–R7 recommendations now in code) | `npm run audit:accounts` |
+| V2-02 membership & scoping | **Implemented.** Every branch API resolves the branch from `X-Cravio-Branch` against the caller's memberships (403 for another restaurant, 409 when several branches and none named). Business grants model + proposed migration 008 (**not applied**) | `npm run test:v2` (access rules, 008 rehearsal incl. rollback, owner data layer, mapping) |
+| V2-03 branch-manager routing | **Implemented.** Former owner screens at `/branch/:branchId/*`; legacy `/owner/<page>` links redirect; branch switcher; per-branch API cache; waiter branch choice | `npm run test:v2-ui` (read-only against the shared DB) |
+| V2-04 owner/operations interface | **Implemented, needs 008 to show data.** `/owner` overview, Locations (+ add branch), Branch detail (+ add staff), People & access (grant/edit/revoke operations). Before 008 it shows “needs database update 008” | Owner UI spec with mocked API; owner data layer tests on PGlite |
+| V2-05…V2-07 stock, order effects, requests | **Not started — blocked on D03–D07.** No stock behaviour has been guessed | — |
+| V2-08 regression | Read-only browser checks for owner→branch, waiter, guest QR. Inherited Playwright suites mutate the shared DB and were **not** run | — |
+
+Migration 008 review pack: [MIGRATION-008.md](MIGRATION-008.md).
+
 ## Start here
 
 1. [Implementation plan](IMPLEMENTATION-PLAN.md): five interfaces, page contents, migration, stock design, work packages and acceptance.
@@ -54,7 +67,11 @@ npm run dev:backend
 npm run dev --workspace frontend -- --port 5174 --strictPort
 ```
 
-Open http://localhost:5174. This runs the inherited preview, not the planned five interfaces. Restart frontend if its backend-port configuration changes. Auth invitation/recovery redirects must include the chosen local URL before those flows are evaluated.
+Open http://localhost:5174. Legacy owner accounts land in `/branch/<id>`, waiters in `/waiter`; `/owner` needs migration 008 plus a reviewed grant.
+
+Checks (read-only; never seeds or writes): `npm run test:v2` (disposable PGlite, no shared DB) and, with both servers running, `V2_BASE_URL=http://localhost:5174 V2_TEST_PASSWORD=… npm run test:v2-ui`. Do **not** run the inherited `npm test` Playwright suites against the shared database: several create orders, change settings or go through onboarding.
+
+If 5173/5174 are taken by another project on this machine, run v2 on spare ports, e.g. `PORT=3014 FRONTEND_URL=http://localhost:5184 npm run start:backend` and `PORT=3014 npm run dev --workspace frontend -- --port 5184 --strictPort` (the Vite proxy reads `PORT`). Restart frontend if its backend-port configuration changes. Auth invitation/recovery redirects must include the chosen local URL before those flows are evaluated.
 
 ## Optional main comparison
 

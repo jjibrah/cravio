@@ -1,9 +1,9 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
-import { BrowserRouter, Navigate, Route, Routes, useLocation, useOutletContext } from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes, useLocation, useParams } from 'react-router-dom';
 import { NotificationProvider } from './components/notifications/NotificationProvider';
 import LoadingScreen from './components/loading/LoadingScreen';
 import PageSkeleton from './components/loading/PageSkeleton';
-import { dashboards, sectionsFor } from './config/dashboards';
+import { LEGACY_BRANCH_PAGES, sectionsFor } from './config/dashboards';
 import { waiterSections } from './config/waiter';
 import { chunks, listenForIntent, prefetchArea } from './lib/prefetch';
 
@@ -61,29 +61,33 @@ const NewOrderPage = page(chunks.newOrder);
 const CartImportPage = page(chunks.cartImport);
 const WelcomePage = page(chunks.welcome);
 const OnboardingPage = page(chunks.onboarding);
+const OwnerOverviewPage = page(chunks.ownerOverview);
+const LocationsPage = page(chunks.ownerLocations);
+const PeoplePage = page(chunks.ownerPeople);
+const BranchDetailPage = page(chunks.ownerBranch);
+const BranchChooserPage = page(chunks.branchChooser);
 
 const configured = Boolean(import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY);
 const waiterPages = { '': WaiterTablesPage, services: WaiterServicesPage, menu: WaiterMenuPage };
 
 /** Picks the page for a dashboard section; anything without a real page yet falls back to a page frame. */
 const ADMIN_PAGES = { '': AdminOverviewPage, restaurants: RestaurantsPage, performance: PerformancePage, money: MoneyPage, 'leads-requests': RequestsPage, complaints: RequestsPage };
-function DashboardPage({ section }) {
-  const { account } = useOutletContext() || {};
-  const owner = account?.role === 'owner';
-  const admin = account?.role === 'admin';
+const BRANCH_PAGES = { '': OverviewPage, orders: OrdersPage, tables: TablesPage, products: ProductsPage, menu: MenuConfigPage, insights: InsightsPage, 'contact-cravio': ContactPage, settings: SettingsPage };
+const OWNER_PAGES = { '': OwnerOverviewPage, locations: LocationsPage, people: PeoplePage, inventory: InventoryPage, management: InventoryPage, assistant: InventoryPage };
+function DashboardPage({ section, area }) {
   let Page = PageFrame;
-  if (owner && ['inventory','management','assistant'].includes(section.path)) Page = InventoryPage;
-  else if (section.kind === 'settings') Page = SettingsPage;
-  else if (section.kind === 'products' && owner) Page = ProductsPage;
+  if (section.kind === 'settings') Page = SettingsPage;
   else if (section.kind === 'users') Page = UsersPage;
-  else if (admin && ADMIN_PAGES[section.path]) Page = ADMIN_PAGES[section.path];
-  else if (owner && section.kind === 'overview') Page = OverviewPage;
-  else if (owner && section.path === 'orders') Page = OrdersPage;
-  else if (owner && section.path === 'tables') Page = TablesPage;
-  else if (owner && section.path === 'menu') Page = MenuConfigPage;
-  else if (owner && section.path === 'insights') Page = InsightsPage;
-  else if (owner && section.kind === 'support') Page = ContactPage;
+  else if (area === 'admin' && ADMIN_PAGES[section.path]) Page = ADMIN_PAGES[section.path];
+  else if (area === 'branch' && BRANCH_PAGES[section.path]) Page = BRANCH_PAGES[section.path];
+  else if (area === 'owner' && OWNER_PAGES[section.path]) Page = OWNER_PAGES[section.path];
   return <Page section={section} />;
+}
+
+/** Unknown page inside a branch workspace: back to that branch's overview. */
+function BranchHome() {
+  const { branchId } = useParams();
+  return <Navigate to={`/branch/${branchId}`} replace />;
 }
 
 const inShell = (element, variant) => <Suspense fallback={<PageSkeleton variant={variant} />}>{element}</Suspense>;
@@ -93,12 +97,23 @@ function SignedInApp() {
     <Route path="/login" element={<LoginPage />} />
     <Route path="/forgot-password" element={<ForgotPasswordPage />} />
     <Route path="/reset-password" element={<ResetPasswordPage />} />
-    {Object.keys(dashboards).map((role) => <Route key={role} path={`/${role}`} element={<DashboardLayout role={role} />}>
-      {sectionsFor(role).map((section) => section.path
-        ? <Route key={section.path} path={section.path} element={inShell(<DashboardPage section={section} />)} />
-        : <Route key="overview" index element={inShell(<DashboardPage section={section} />)} />)}
-      {role === 'owner' && <Route path="tables/:number" element={inShell(<TableDetailPage />)} />}
-      <Route path="*" element={<Navigate to={`/${role}`} replace />} />
+    {/* Branch manager workspace (the former owner dashboard), one per branch. */}
+    <Route path="/branch/:branchId" element={<DashboardLayout role="branch" />}>
+      {sectionsFor('branch').map((section) => section.path
+        ? <Route key={section.path} path={section.path} element={inShell(<DashboardPage section={section} area="branch" />)} />
+        : <Route key="overview" index element={inShell(<DashboardPage section={section} area="branch" />)} />)}
+      <Route path="tables/:number" element={inShell(<TableDetailPage />)} />
+      <Route path="*" element={<BranchHome />} />
+    </Route>
+    <Route path="/branch" element={<BranchChooserPage />} />
+    {/* Legacy owner links (/owner/orders, /owner/tables/12, …) now belong to the branch workspace. */}
+    {LEGACY_BRANCH_PAGES.map((path) => <Route key={path} path={`/owner/${path}/*`} element={<BranchChooserPage legacyPage={path} />} />)}
+    {['admin', 'owner'].map((area) => <Route key={area} path={`/${area}`} element={<DashboardLayout role={area} />}>
+      {sectionsFor(area).map((section) => section.path
+        ? <Route key={section.path} path={section.path} element={inShell(<DashboardPage section={section} area={area} />)} />
+        : <Route key="overview" index element={inShell(<DashboardPage section={section} area={area} />)} />)}
+      {area === 'owner' && <Route path="branches/:id" element={inShell(<BranchDetailPage />)} />}
+      <Route path="*" element={<Navigate to={`/${area}`} replace />} />
     </Route>)}
     <Route path="/waiter" element={<WaiterLayout />}>
       {waiterSections.map((section) => {

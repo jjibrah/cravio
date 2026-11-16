@@ -7,6 +7,7 @@ import { AddTablesButton } from '../../components/owner/TableBits';
 import { Bar, EmptyState, ErrorState, LiveBadge, OIcon, Panel, SkeletonRows, TileSkeletonGrid } from '../../components/owner/ui';
 import '../../components/owner/tables.css';
 import { formatKes, nairobiDate, opsApi, plural, tableStateLabel, useLive, useResource } from '../../lib/ops';
+import { branchPath } from '../../lib/branch';
 
 /** Paid orders taken today, summed per table number. */
 async function todaysRevenue(signal) {
@@ -63,7 +64,7 @@ export default function TablesPage({ section }) {
               const state = liveByNumber.get(table.number) || table;
               const today = revenue.data?.[table.number] || 0;
               return <li key={table.id}>
-                <TableTile number={table.number} state={state.state} label={tableStateLabel(state)} href={`/owner/tables/${table.number}`}
+                <TableTile number={table.number} state={state.state} label={tableStateLabel(state)} href={branchPath(`tables/${table.number}`)}
                   meta={`${plural(table.scans?.last7Days || 0, 'scan')} · ${today ? formatKes(today) : 'Ksh 0'} today`} />
               </li>;
             })}
@@ -98,7 +99,7 @@ function TopList({ title, sub, analytics, list, value, format }) {
     {list && !list.length && <p className="o-muted-line">Nothing yet in the last 7 days.</p>}
     {list && list.length > 0 && <ol className="o-top-list">
       {list.map((row) => <li key={row.tableId || row.number}>
-        <Link to={`/owner/tables/${row.number}`} className="o-top-link">
+        <Link to={branchPath(`tables/${row.number}`)} className="o-top-link">
           <span className="o-top-number">{row.number}</span>
           <span className="o-top-main"><span className="o-top-name">Table {row.number}</span><Bar value={value(row)} max={max} /></span>
           <span className="o-top-value">{format(row)}</span>

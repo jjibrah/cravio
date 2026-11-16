@@ -1,5 +1,6 @@
 import { routes as inventory } from './inventory.js';
 import { routes as me } from './me.js';
+import { routes as owner } from './owner.js';
 import { routes as restaurant } from './restaurant.js';
 import { routes as menuMerch } from './menu-merch.js';
 import { routes as adminUsers } from './admin-users.js';
@@ -10,4 +11,4 @@ import { routes as support } from './support.js';
 import { routes as adminPlatform } from './admin-platform.js';
 import { routes as settings } from './settings.js';
 
-export const routes = [...inventory, ...me, ...settings, ...menuMerch, ...restaurant, ...adminPlatform, ...adminUsers, ...publicMenu, ...publicGuest, ...operations, ...support];
+export const routes = [...inventory, ...me, ...owner, ...settings, ...menuMerch, ...restaurant, ...adminPlatform, ...adminUsers, ...publicMenu, ...publicGuest, ...operations, ...support];

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
+import { getActiveBranch } from '../../lib/branch';
 import { useAuth } from '../../lib/auth';
 
 /*
@@ -62,8 +63,9 @@ async function fetchMenu(restaurantId) {
 }
 
 export default function useStaffMenu() {
-  const { account } = useAuth();
-  const restaurantId = account?.place?.id;
+  // The branch this shift is at (WaiterLayout sets it before any page renders). RLS still checks membership.
+  useAuth();
+  const restaurantId = getActiveBranch();
   const [state, setState] = useState(() => (restaurantId && cache.has(restaurantId) ? { status: 'ready', ...cache.get(restaurantId) } : { status: 'loading' }));
   const [attempt, setAttempt] = useState(0);
   const reload = useCallback(() => setAttempt((n) => n + 1), []);

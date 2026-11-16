@@ -2,6 +2,7 @@ import { HttpError } from './http.js';
 import { AUTH_TTL_MS, authCache, currentAuthVersion, tokenKey } from './cache.js';
 import { RESTAURANT_COLUMNS, isMissingSchema } from './restaurants.js';
 import { configured, serviceClient, userClient, verifierClient } from './supabase.js';
+import { loadBusinessGrants } from './access.js';
 
 /*
  * Who is calling. Resolving a token used to cost three sequential round trips to Supabase on every request
@@ -85,16 +86,20 @@ async function resolve(token) {
   // Start everything at once; the token check gates the result.
   const profilePromise = Promise.resolve(client.from('profiles').select('name, role').eq('id', sub).single());
   const membershipsPromise = loadMemberships(client, sub);
+  const grantsPromise = loadBusinessGrants(client, sub);
   // Don't leave rejections unhandled if verification fails first.
   membershipsPromise.catch(() => {});
+  grantsPromise.catch(() => {});
   const checked = await verify(token, parts.header);
-  const [profileResult, memberships, bannedUntil] = await Promise.all([
+  const unavailable = (what) => (error) => { console.error(`[auth] ${what} failed:`, error.code || error.message); throw new HttpError(503, 'Could not load your account. Please try again.'); };
+  const [profileResult, memberships, grants, bannedUntil] = await Promise.all([
     profilePromise,
-    membershipsPromise.catch((error) => { console.error('[auth] memberships failed:', error.code || error.message); throw new HttpError(503, 'Could not load your account. Please try again.'); }),
+    membershipsPromise.catch(unavailable('memberships')),
+    grantsPromise.catch(unavailable('business grants')),
     checked.checkedBan ? checked.bannedUntil : bannedUntilOf(sub),
   ]);
   if (profileResult.error) throw new HttpError(503, 'Could not load your account. Please try again.');
-  return { user: checked.user, profile: profileResult.data, memberships, bannedUntil, client, exp: parts.payload.exp };
+  return { user: checked.user, profile: profileResult.data, memberships, grants, bannedUntil, client, exp: parts.payload.exp };
 }
 
 /** Validates the bearer token and loads the caller's profile with their own RLS permissions. */
@@ -113,7 +118,7 @@ export async function requireUser(request) {
   }
   // A suspended user's access token stays valid until it expires; refuse it now.
   if (entry.bannedUntil && new Date(entry.bannedUntil) > new Date()) throw new HttpError(403, 'Your access has been suspended. Contact your Cravio administrator.');
-  return { user: entry.user, token, client: entry.client, profile: entry.profile, memberships: entry.memberships };
+  return { user: entry.user, token, client: entry.client, profile: entry.profile, memberships: entry.memberships, grants: entry.grants };
 }
 
 export async function requireRole(request, ...roles) {

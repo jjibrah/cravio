@@ -31,7 +31,7 @@ export default function Finish({ state, preview, actions }) {
 
   return <div className="finish">
     <Confetti />
-    <header className="finish-top"><Brand to="/owner" label="Cravio dashboard" /></header>
+    <header className="finish-top"><Brand to={`/branch/${state.restaurant.id}`} label="Cravio dashboard" /></header>
     <main className="finish-body">
       <section className="finish-intro">
         <p className="finish-eyebrow"><span className="finish-live-dot" aria-hidden="true" />Live now</p>
@@ -67,9 +67,9 @@ export default function Finish({ state, preview, actions }) {
         </div>
 
         <div className="finish-actions">
-          <button type="button" className="onb-primary is-large" onClick={() => open('/owner?tour=1')} disabled={Boolean(waitingFor)}>
+          <button type="button" className="onb-primary is-large" onClick={() => open(`/branch/${state.restaurant.id}?tour=1`)} disabled={Boolean(waitingFor)}>
             {waitingFor ? 'Opening your dashboard…' : 'Take a quick tour'}<OnbIcon name="arrow" size={18} /></button>
-          <button type="button" className="onb-secondary is-large" onClick={() => open('/owner')} disabled={Boolean(waitingFor)}>Skip to dashboard</button>
+          <button type="button" className="onb-secondary is-large" onClick={() => open(`/branch/${state.restaurant.id}`)} disabled={Boolean(waitingFor)}>Skip to dashboard</button>
         </div>
       </section>
       <aside className="finish-phone" aria-label="Your live menu"><PhonePreview {...preview} size="large" focus="done" label="Your live guest menu" /></aside>

@@ -50,7 +50,7 @@ const server = createServer(async (request, response) => {
   if (request.headers.origin === frontendUrl) {
     response.setHeader('Access-Control-Allow-Origin', frontendUrl);
     response.setHeader('Vary', 'Origin');
-    response.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type, X-Cravio-Visitor, If-None-Match');
+    response.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type, X-Cravio-Visitor, X-Cravio-Branch, If-None-Match');
     response.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, PUT, DELETE, OPTIONS');
     response.setHeader('Access-Control-Expose-Headers', 'ETag');
   }

@@ -34,6 +34,20 @@ D02–D06 are the most immediate design inputs. The existing app's behavior is e
 
 Commercial U-07 and scheduling U-08 remain open. This branch does not infer prices/currency, enterprise tier boundaries, calendar deadlines or support commitments from the draft PRD.
 
+## Recommendations implemented on v2-dev (NOT confirmed decisions)
+
+Added 16 Nov 2026 with the first implementation slice (V2-02/03/04). Each is reversible and marked in code; confirm or correct under D02.
+
+| Ref | Recommendation in code | Where |
+| --- | --- | --- |
+| R1 | Branch access comes only from `restaurant_members`; a legacy `owner` membership means branch manager. Profile role `owner` never implies business access. | `backend/src/lib/access.js` |
+| R2 | Business access comes only from explicit `business_members` grants (owner = all branches, operations = assigned branches). Migration 008 grants nobody. | `db/proposed/008_business_branches.sql` |
+| R3 | Business owners create branches, grant/revoke operations access, assign branches and add branch staff. Operations managers only view assigned branches (overview, branch detail, staff); they cannot grant anything. Nobody changes their own access. Owner grants come only from the reviewed mapping (or a future platform-admin action). | `backend/src/lib/business.js` |
+| R4 | Business owners/operations open a branch's workspace only with a branch manager role there (no impersonation). | `WorkspaceLink`, `DashboardLayout` |
+| R5 | A request with several eligible branches must name one (`X-Cravio-Branch`); the server never guesses. | `selectMembership` |
+| R6 | Admin “invite owner” keeps today's behaviour (creates one restaurant, owner membership → branch manager); it does not create a business-owner grant. | unchanged `admin-users.js` |
+| R7 | Inherited inventory/management/AI preview pages stay reachable only under the owner interface's “Preview” group; their data and API are untouched. | `config/dashboards.js` |
+
 ## Answer log
 
 | Decision | Answer | Approved by/date | Evidence or example | Affected work packages |
