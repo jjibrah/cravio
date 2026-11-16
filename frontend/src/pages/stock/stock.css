@@ -41,10 +41,14 @@
 /* Needs you */
 .st-needs { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
 .st-need { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 16px; border-radius: var(--r-card);
-  background: var(--surface); box-shadow: 0 0 0 1px var(--line), var(--shadow-card); border-left: 4px solid var(--line-strong); }
-.st-need.is-urgent { border-left-color: var(--danger); }
-.st-need.is-action { border-left-color: var(--ember); }
-.st-need.is-info { border-left-color: #2156a5; }
+  background: var(--surface); box-shadow: 0 0 0 1px var(--line), var(--shadow-card); }
+/* Tone is a small dot before the title (urgent / action / info), not a coloured card edge. */
+.st-need-text strong { display: flex; align-items: center; gap: 8px; }
+.st-need-text strong::before { content: ''; flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--line-strong); }
+.st-need.is-urgent .st-need-text strong::before { background: var(--danger); }
+.st-need.is-action .st-need-text strong::before { background: var(--ember); }
+.st-need.is-info .st-need-text strong::before { background: #2156a5; }
+.st-need-text > span { padding-left: 16px; }
 .st-need-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; font-size: 14px; }
 .st-need-text span { color: var(--muted); font-size: 13px; }
 /* Forms inside the side sheet have no divider or width cap. */
