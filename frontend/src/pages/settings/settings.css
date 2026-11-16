@@ -1,43 +1,12 @@
 /*
- * Settings: a section list on the left, plain cards on the right. Phones get a scrolling row of sections
- * above the cards. Uses the owner kit (o-btn, o-input, o-select, o-tag) for controls.
+ * Settings: one compact panel (like a desktop app's settings window). Its own section list on the left,
+ * the section on the right as groups of rows: label and hint on the leading side, the control on the
+ * trailing side, hairlines between rows. Phones: sections become a scrolling row; rows stack.
+ * Uses the owner kit (o-btn, o-input, o-select) for controls.
  */
 @supports (corner-shape: squircle) {
-  .st-card, .st-summary-card, .st-nav-item, .st-help, .st-role, .st-tag, .st-avatar, .st-summary-logo { corner-shape: squircle; }
+  .cs-panel, .st-role, .st-tag, .cs-identity-logo, .cs-nav-item { corner-shape: squircle; }
 }
-
-/* ---------- Summary ---------- */
-.st-summary-card { display: flex; align-items: center; gap: 14px; margin-bottom: 20px; padding: 14px 16px; border-radius: var(--r-card); background: var(--surface); box-shadow: 0 0 0 1px var(--line), var(--shadow-card); }
-.st-summary-logo { flex-shrink: 0; width: 48px; height: 48px; border-radius: 12px; object-fit: cover; box-shadow: 0 0 0 1px var(--line); }
-.st-summary-logo.is-empty { display: grid; place-items: center; background: var(--ink); color: #fff; font-size: 20px; font-weight: 650; }
-.st-summary-text { flex: 1; min-width: 0; }
-.st-summary-name { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin: 0; font-size: 16px; font-weight: 650; letter-spacing: -.012em; }
-.st-summary-facts { display: flex; flex-wrap: wrap; gap: 0 4px; margin: 2px 0 0; }
-.st-fact { padding: 2px 0; border: 0; background: none; color: var(--muted); font-size: 13px; cursor: pointer; text-align: left; }
-.st-fact:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
-.st-fact + .st-fact::before { content: '·'; margin-right: 4px; color: var(--line-strong); }
-.st-status { display: inline-flex; align-items: center; gap: 6px; padding: 2px 8px; border-radius: 999px; background: var(--warning-soft); color: var(--warning); font-size: 12px; font-weight: 600; }
-.st-status.is-live { background: var(--success-soft); color: var(--success); }
-.st-status-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
-
-/* ---------- Layout and section nav ---------- */
-.st-layout { display: grid; grid-template-columns: 248px minmax(0, 1fr); gap: 24px; align-items: start; }
-.st-layout.is-single { grid-template-columns: minmax(0, 720px); }
-.st-nav { position: sticky; top: 16px; display: flex; flex-direction: column; gap: 16px; }
-.st-nav ul { display: flex; flex-direction: column; gap: 2px; margin: 0; padding: 0; list-style: none; }
-.st-nav-item { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 52px; padding: 8px 10px; border: 0; border-radius: var(--r-row); background: transparent; color: var(--ink-2); text-align: left; cursor: pointer; transition: background-color 150ms var(--ease); }
-.st-nav-item:hover { background: var(--hover); color: var(--ink); }
-.st-nav-item.is-active { background: var(--surface); color: var(--ink); box-shadow: 0 0 0 1px var(--line), var(--shadow-card); }
-.st-nav-icon { display: grid; place-items: center; flex-shrink: 0; width: 32px; height: 32px; border-radius: 8px; background: var(--selected); color: var(--ink-2); }
-.st-nav-item.is-active .st-nav-icon { background: var(--ink); color: #fff; }
-.st-nav-text { display: flex; flex-direction: column; min-width: 0; }
-.st-nav-text strong { font-size: 14px; font-weight: 600; }
-.st-nav-text span { overflow: hidden; color: var(--muted); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
-.st-help { display: flex; align-items: flex-start; gap: 10px; padding: 12px; border-radius: var(--r-row); background: #fafaf8; box-shadow: inset 0 0 0 1px var(--line); color: var(--ink-2); text-decoration: none; }
-.st-help:hover { background: var(--hover); }
-.st-help > span { display: flex; flex-direction: column; font-size: 12px; color: var(--muted); }
-.st-help strong { color: var(--ink); font-size: 13px; font-weight: 600; }
-.st-content { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
 
 /* ---------- Cards ---------- */
 .st-card { min-width: 0; border-radius: var(--r-card); background: var(--surface); box-shadow: 0 0 0 1px var(--line), var(--shadow-card); scroll-margin-top: 16px; }
@@ -140,19 +109,6 @@
 .st-confirm-text p { margin: 0 0 8px; color: var(--ink-2); font-size: 14px; line-height: 1.5; }
 .st-confirm-actions { display: flex; justify-content: flex-end; gap: 8px; }
 
-/* ---------- Phones and tablets ---------- */
-@media (max-width: 900px) {
-  .st-layout { grid-template-columns: minmax(0, 1fr); gap: 16px; }
-  .st-nav { position: static; }
-  .st-nav ul { flex-direction: row; gap: 6px; margin: 0 -16px; padding: 0 16px 2px; overflow-x: auto; scrollbar-width: none; }
-  .st-nav li { flex-shrink: 0; }
-  .st-nav-item { min-height: 40px; padding: 6px 12px 6px 6px; border-radius: 999px; box-shadow: 0 0 0 1px var(--line); background: var(--surface); }
-  .st-nav-item.is-active { background: var(--ink); color: #fff; box-shadow: none; }
-  .st-nav-icon { width: 28px; height: 28px; border-radius: 50%; }
-  .st-nav-item.is-active .st-nav-icon { background: #ffffff26; }
-  .st-nav-text span { display: none; }
-  .st-help { display: none; }
-}
 @media (max-width: 640px) {
   .st-grid, .st-roles { grid-template-columns: minmax(0, 1fr); }
   .st-images { grid-template-columns: minmax(0, 1fr); }
@@ -163,10 +119,97 @@
   .st-save { flex-wrap: wrap; }
   .st-save-status { flex-basis: 100%; }
   .st-save .o-btn.is-primary { flex: 1; }
-  .st-summary-card { flex-wrap: wrap; }
   .st-day { padding-left: 2px; }
   .st-times .o-input { width: 112px; }
   .st-person { flex-wrap: wrap; }
   .st-person-text { flex-basis: calc(100% - 52px); }
   .st-person-role { margin-left: 50px; flex: 1; }
 }
+
+/* ================= Compact settings panel ================= */
+.st-status { display: inline-flex; align-items: center; gap: 6px; padding: 2px 8px; border-radius: 999px; background: var(--warning-soft); color: #7d5106; font-size: 12px; font-weight: 600; }
+.st-status.is-live { background: var(--success-soft); color: var(--success); }
+.st-status-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+.cs-panel { display: grid; grid-template-columns: 216px minmax(0, 1fr); max-width: 980px; min-height: 560px; border-radius: 16px;
+  background: var(--surface); box-shadow: 0 0 0 1px var(--line), var(--shadow-card); overflow: hidden; }
+.cs-panel.is-single { grid-template-columns: minmax(0, 1fr); max-width: 720px; }
+
+.cs-nav { display: flex; flex-direction: column; justify-content: space-between; gap: 12px; padding: 12px 10px; background: #fafaf8; border-right: 1px solid var(--line); }
+.cs-nav ul { display: flex; flex-direction: column; gap: 2px; margin: 0; padding: 0; list-style: none; }
+.cs-nav-item { display: flex; align-items: center; justify-content: flex-start; gap: 10px; width: 100%; min-height: 36px; padding: 6px 10px;
+  border: 0; border-radius: 8px; background: transparent; color: var(--ink-2); font-size: 14px; font-weight: 500; text-align: left; cursor: pointer; }
+.cs-nav-item:hover { background: var(--hover); color: var(--ink); }
+.cs-nav-item.is-active { background: var(--selected); color: var(--ink); font-weight: 600; }
+.cs-nav-item:focus-visible { outline: 2px solid var(--ember); outline-offset: -2px; }
+.cs-help { display: flex; align-items: center; gap: 8px; min-height: 36px; padding: 6px 10px; border-radius: 8px; color: var(--muted); font-size: 13px; text-decoration: none; }
+.cs-help:hover { background: var(--hover); color: var(--ink); }
+
+.cs-content { min-width: 0; padding: 20px 28px 28px; display: flex; flex-direction: column; }
+.cs-title { margin: 0 0 4px; padding-bottom: 14px; border-bottom: 1px solid var(--line); font-size: 18px; font-weight: 650; letter-spacing: -.015em; }
+
+.cs-identity { display: flex; align-items: center; gap: 12px; padding: 14px 0; border-bottom: 1px solid var(--line); }
+.cs-identity-logo { flex: none; width: 40px; height: 40px; border-radius: 10px; object-fit: cover; box-shadow: 0 0 0 1px var(--line); }
+.cs-identity-logo.is-empty { display: grid; place-items: center; background: var(--ink); color: #fff; font-weight: 650; }
+.cs-identity-text { flex: 1; min-width: 0; }
+.cs-identity-name { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin: 0; font-size: 15px; font-weight: 650; }
+.cs-identity-facts { margin: 2px 0 0; color: var(--muted); font-size: 13px; }
+
+/* Cards inside the panel are flat groups: a small heading, then rows. */
+.cs-content .st-content, .cs-content > .st-card + .st-card { margin-top: 0; }
+.cs-content .st-card { border-radius: 0; box-shadow: none; background: transparent; padding-top: 18px; }
+.cs-content .st-card + .st-card { border-top: 1px solid var(--line); margin-top: 18px; }
+.cs-content .st-card-head { padding: 0 0 2px; }
+.cs-content .st-card-title { font-size: 14px; font-weight: 650; }
+.cs-content .st-card-desc { font-size: 13px; margin-top: 2px; }
+.cs-content .st-card-body { padding: 4px 0 0; }
+.cs-content .st-card-foot { padding: 12px 0 0; border-top: 0; background: transparent; }
+.cs-content .st-save .o-btn { min-height: 34px; padding: 6px 14px; font-size: 13px; }
+
+/* Rows: label + hint leading, control trailing. */
+.cs-content .st-grid { display: flex; flex-direction: column; gap: 0; }
+.cs-content .st-stack { gap: 0; }
+.cs-content .st-field { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 320px); grid-template-areas: "label control" "hint control" "hint error";
+  column-gap: 24px; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.cs-content .st-field:last-of-type { border-bottom: 0; }
+.cs-content .st-field > .st-label { grid-area: label; margin: 0; align-self: end; color: var(--ink); font-size: 14px; font-weight: 550; }
+.cs-content .st-field > .st-hint { grid-area: hint; margin: 2px 0 0; align-self: start; }
+.cs-content .st-field > .st-error { grid-area: error; margin: 6px 0 0; }
+.cs-content .st-field > :not(.st-label):not(.st-hint):not(.st-error) { grid-area: control; }
+.cs-content .st-field .o-input, .cs-content .st-field .o-select { min-height: 38px; padding: 7px 11px; font-size: 14px; margin: 0; }
+
+/* Images: compact side by side. */
+.cs-content .st-images { grid-template-columns: 112px minmax(0, 360px); gap: 20px; padding-top: 8px; }
+/* Hours, people: denser rows. */
+.cs-content .st-days { box-shadow: none; border-radius: 0; }
+.cs-content .st-day { min-height: 48px; padding: 4px 0; }
+.cs-content .st-times .o-input { min-height: 36px; padding: 6px 10px; }
+.cs-content .st-person { min-height: 52px; padding: 6px 0; }
+.cs-content .st-avatar { width: 32px; height: 32px; font-size: 12px; }
+.cs-content .st-switch { min-height: 36px; }
+
+@media (max-width: 900px) {
+  .cs-panel { grid-template-columns: minmax(0, 1fr); border-radius: 14px; }
+  .cs-nav { flex-direction: row; padding: 8px; border-right: 0; border-bottom: 1px solid var(--line); overflow-x: auto; scrollbar-width: none; }
+  .cs-nav ul { flex-direction: row; }
+  .cs-nav li { flex: none; }
+  .cs-nav-item { white-space: nowrap; }
+  .cs-help { display: none; }
+  .cs-content { padding: 16px 16px 20px; }
+}
+@media (max-width: 640px) {
+  .cs-content .st-field { grid-template-columns: minmax(0, 1fr); grid-template-areas: "label" "hint" "control" "error"; row-gap: 6px; }
+  .cs-content .st-field > .st-hint { margin: 0; }
+  .cs-content .st-images { grid-template-columns: 96px minmax(0, 1fr); }
+}
+/* Logo and cover sized to their columns (onboarding draws a 176px logo). */
+.cs-content .st-images { grid-template-columns: 120px minmax(0, 360px); }
+.cs-content .upload-logo .upload-drop { width: 120px; height: 120px; }
+.cs-content .upload-cover .upload-drop { aspect-ratio: 16 / 9; }
+.cs-content .st-images .upload-actions { gap: 10px; }
+/* Checkboxes: index.css gives every input a field's width, height and margin. */
+.cs-content .st-check input { width: 16px; height: 16px; min-height: 0; margin: 0; }
+.cs-content .st-check { min-height: 36px; }
+@media (max-width: 640px) { .cs-content .st-images { grid-template-columns: 96px minmax(0, 1fr); } .cs-content .upload-logo .upload-drop { width: 96px; height: 96px; } }
+.cs-content .st-images .upload-actions { flex-wrap: wrap; gap: 2px 12px; }
+.cs-content .st-images .upload-actions > * { font-size: 13px; }

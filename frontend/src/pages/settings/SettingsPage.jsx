@@ -20,11 +20,11 @@ import { branchPath } from '../../lib/branch';
 const STATE = '/api/restaurant/onboarding';
 
 const OWNER_TABS = [
-  { key: 'restaurant', label: 'Restaurant', icon: 'store', hint: 'Name, contact, logo' },
-  { key: 'hours', label: 'Opening hours', icon: 'clock', hint: 'When you’re open' },
-  { key: 'floor', label: 'Tables & QR codes', icon: 'qr', hint: 'Tables, sections, menu link' },
-  { key: 'team', label: 'Team', icon: 'users', hint: 'Waiters and managers' },
-  { key: 'account', label: 'Your account', icon: 'user', hint: 'Name, password, sign out' },
+  { key: 'restaurant', label: 'Restaurant', icon: 'store' },
+  { key: 'hours', label: 'Opening hours', icon: 'clock' },
+  { key: 'floor', label: 'Tables & QR codes', icon: 'qr' },
+  { key: 'team', label: 'Team', icon: 'users' },
+  { key: 'account', label: 'Account', icon: 'user' },
 ];
 const ACCOUNT_ONLY = [OWNER_TABS[4]];
 
@@ -52,26 +52,24 @@ function useRestaurantActions(setData) {
   }), [merge, retry]);
 }
 
-function Summary({ state, onPick }) {
+/** The restaurant in one line at the top of the Restaurant section: logo, name, status and the facts. */
+function Identity({ state }) {
   const r = state.restaurant;
   const live = r.status === 'live';
-  const facts = [
-    { tab: 'restaurant', label: [kindLabel(r.kind), r.area].filter(Boolean).join(' · ') || 'Add your area' },
-    { tab: 'hours', label: hoursSummary(r.openingHours) || 'Add opening hours' },
-    { tab: 'floor', label: `${state.tables.length} table${state.tables.length === 1 ? '' : 's'}${state.sections.length ? ` in ${state.sections.length} section${state.sections.length === 1 ? '' : 's'}` : ''}` },
-  ];
-  return <section className="st-summary-card" aria-label="Your restaurant">
-    {r.logoUrl ? <img className="st-summary-logo" src={r.logoUrl} alt="" /> : <span className="st-summary-logo is-empty" aria-hidden="true">{(r.name || '?')[0].toUpperCase()}</span>}
-    <div className="st-summary-text">
-      <p className="st-summary-name">{r.name}<span className={`st-status${live ? ' is-live' : ''}`}><span className="st-status-dot" aria-hidden="true" />{live ? 'Live' : 'Setting up'}</span></p>
-      <p className="st-summary-facts">{facts.map((fact) => <button key={fact.tab} type="button" className="st-fact" onClick={() => onPick(fact.tab)}>{fact.label}</button>)}</p>
+  const facts = [[kindLabel(r.kind), r.area].filter(Boolean).join(' · '), hoursSummary(r.openingHours),
+    `${state.tables.length} table${state.tables.length === 1 ? '' : 's'}`].filter(Boolean);
+  return <div className="cs-identity">
+    {r.logoUrl ? <img className="cs-identity-logo" src={r.logoUrl} alt="" /> : <span className="cs-identity-logo is-empty" aria-hidden="true">{(r.name || '?')[0].toUpperCase()}</span>}
+    <div className="cs-identity-text">
+      <p className="cs-identity-name">{r.name}<span className={`st-status${live ? ' is-live' : ''}`}><span className="st-status-dot" aria-hidden="true" />{live ? 'Live' : 'Setting up'}</span></p>
+      <p className="cs-identity-facts">{facts.join(' · ')}</p>
     </div>
     {!live && <Link className="o-btn is-primary is-small" to="/onboarding">Finish setup</Link>}
-  </section>;
+  </div>;
 }
 
 export default function SettingsPage({ section }) {
-  const { scope } = useOutletContext() || {};
+  const { scope, account } = useOutletContext() || {};
   // Restaurant settings belong to the branch workspace; elsewhere (admin) only the account tab shows.
   const owner = scope?.area === 'branch';
   const tabs = owner ? OWNER_TABS : ACCOUNT_ONLY;
@@ -98,23 +96,23 @@ export default function SettingsPage({ section }) {
   else if (active.key === 'team') body = <TeamTab state={state} actions={actions} isOwner={isOwner} />;
 
   return <>
-    <PageHeader title={section.label} description={owner ? 'Change your restaurant’s details, hours, tables and team. Changes reach your guest menu straight away.' : 'Your name, password and sign-in.'} />
-    {owner && state?.restaurant && <Summary state={state} onPick={pick} />}
-    <div className={`st-layout${tabs.length > 1 ? '' : ' is-single'}`}>
-      {tabs.length > 1 && <nav className="st-nav" aria-label="Settings sections">
+    <PageHeader title={section.label} description={owner ? 'Changes reach your guest menu straight away.' : 'Your name, password and sign-in.'} />
+    <div className={`cs-panel${tabs.length > 1 ? '' : ' is-single'}`}>
+      {tabs.length > 1 && <nav className="cs-nav" aria-label="Settings sections">
         <ul>
           {tabs.map((tab) => <li key={tab.key}>
-            <button type="button" className={`st-nav-item${tab === active ? ' is-active' : ''}`} aria-current={tab === active ? 'page' : undefined} onClick={() => pick(tab.key)}>
-              <span className="st-nav-icon"><OIcon name={tab.icon} size={17} /></span>
-              <span className="st-nav-text"><strong>{tab.label}</strong><span>{tab.hint}</span></span>
+            <button type="button" className={`cs-nav-item${tab === active ? ' is-active' : ''}`} aria-current={tab === active ? 'page' : undefined} onClick={() => pick(tab.key)}>
+              <OIcon name={tab.icon} size={17} /><span>{tab.label}</span>
             </button>
           </li>)}
         </ul>
-        <Link className="st-help" to={branchPath('contact-cravio')}>
-          <OIcon name="help" size={17} /><span><strong>Need a hand?</strong><span>Contact the Cravio team</span></span>
-        </Link>
+        <Link className="cs-help" to={branchPath('contact-cravio')}><OIcon name="help" size={16} /><span>Contact Cravio</span></Link>
       </nav>}
-      <div className="st-content" key={active.key}>{body}</div>
+      <div className="cs-content" key={active.key}>
+        <h2 className="cs-title">{active.label}</h2>
+        {active.key === 'restaurant' && state?.restaurant && <Identity state={state} />}
+        {body}
+      </div>
     </div>
   </>;
 }
