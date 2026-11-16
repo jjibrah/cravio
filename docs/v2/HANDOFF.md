@@ -13,7 +13,7 @@ Prepared 16 November 2026. Branch: **v2-dev**. Base code: `e0de46635182613b9536b
 | V2-05…07 inventory | **Live: migration 009 applied 16 Nov 2026.** Servings, dish links, count/add/waste, deduct on serving, sold out + override, order corrections, requests → approval → dispatch (QR) → receipt | [INVENTORY.md](INVENTORY.md); 58 PGlite checks; UI checks with mocked data |
 | V2-08 regression | Read-only browser checks (11). Inherited Playwright suites write to the shared DB and were not run | — |
 
-Test accounts (shared dev DB): owner@gmail.com (business owner → `/owner`), manager@gmail.com (branch manager → `/branch/106fe2fb…`), waiter@gmail.com (`/waiter`). admin@gmail.com does not exist in this database.
+Test accounts (shared dev DB): owner@gmail.com (business owner → `/owner`), manager@gmail.com (branch manager → `/branch/106fe2fb…`), waiter@gmail.com (`/waiter`), admin@gmail.com (platform admin → `/admin`; created 16 Nov 2026 at the product owner's request).
 
 ## Start here
 
