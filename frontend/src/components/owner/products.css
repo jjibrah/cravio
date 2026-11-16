@@ -44,7 +44,7 @@
 @media (hover: none) { .pc-grip { display: none; } }
 .pc-body { display: flex; flex: 1; flex-direction: column; gap: 2px; padding: 12px 14px 10px; min-width: 0; }
 .pc-title-row { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
-.pc-open { position: static; min-width: 0; padding: 0; border: 0; background: none; color: var(--ink); text-align: left; cursor: pointer; }
+.pc-open { position: static; min-width: 0; min-height: 0; padding: 0; border: 0; background: none; color: var(--ink); text-align: left; cursor: pointer; }
 .pc-open::after { content: ''; position: absolute; inset: 0; z-index: 1; border-radius: inherit; }
 .pc-open:focus-visible { outline: none; }
 .pc-open:focus-visible::after { outline: 2px solid var(--ember); outline-offset: -2px; }

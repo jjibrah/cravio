@@ -124,7 +124,9 @@ button {
   cursor: pointer;
   transition: background-color 150ms var(--ease), color 150ms var(--ease), border-color 150ms var(--ease);
 }
-button:hover { background: #2b2a27; }
+/* Zero-specificity hover: plain buttons darken, but any button with its own class keeps its own look
+   (a transparent text button no longer turns into a dark box on hover). */
+button:where(:hover) { background: #2b2a27; }
 button:disabled { opacity: .55; cursor: wait; }
 .button-block { width: 100%; }
 .button-link { display: flex; align-items: center; justify-content: center; width: 100%; min-height: 44px; padding: 10px 18px; border-radius: var(--r-control); background: var(--ink); color: #fff; font-size: 14px; font-weight: 550; transition: background-color 150ms var(--ease); }
