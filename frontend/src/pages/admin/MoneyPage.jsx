@@ -88,7 +88,7 @@ export default function MoneyPage({ section }) {
                       <SortHeader label="Cancelled" column="cancelledValue" sort={sort} onSort={setSort} numeric />
                     </tr></thead>
                     <tbody>{rows.map((row) => <tr key={row.id}>
-                      <th scope="row"><Link className="pl-cell-link" to={`/admin/restaurants?open=${row.id}`}><strong>{row.name}</strong>
+                      <th scope="row"><Link className="pl-cell-link" to={`/admin/businesses?q=${encodeURIComponent(row.name)}`}><strong>{row.name}</strong>
                         <small><RestaurantStatus status={row.status} />{row.area ? ` ${row.area}` : ''}</small></Link></th>
                       <td className="is-num"><strong>{formatKsh(row.revenue)}</strong></td>
                       <td className="pl-share-col"><Bar value={row.revenue} max={maxRevenue} /></td>
@@ -101,7 +101,7 @@ export default function MoneyPage({ section }) {
                 </div>
                 <ul className="pl-cards">
                   {rows.map((row) => <li key={row.id}>
-                    <Link className="pl-card" to={`/admin/restaurants?open=${row.id}`}>
+                    <Link className="pl-card" to={`/admin/businesses?q=${encodeURIComponent(row.name)}`}>
                       <span className="pl-card-head"><strong>{row.name}</strong><span className="pl-card-amount">{formatKsh(row.revenue)}</span></span>
                       <Bar value={row.revenue} max={maxRevenue} />
                       <dl>

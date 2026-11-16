@@ -65,3 +65,12 @@
 .waiter-logout:hover { background: var(--hover); }
 @media (min-width: 721px) { .waiter-app { border-inline: 1px solid var(--line); } }
 @media (min-width: 560px) { .w-table-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+
+/* v2: waiters assigned to several branches choose one per shift. */
+.waiter-choose { padding: 24px 16px; max-width: 480px; margin: 0 auto; }
+.waiter-choose h1 { font-size: 22px; margin: 0 0 16px; }
+.waiter-choose-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.waiter-choose-button { width: 100%; min-height: 56px; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 12px 16px;
+  border: 0; border-radius: var(--r-card); background: var(--surface); box-shadow: 0 0 0 1px var(--line); color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
+.waiter-choose-button span { color: var(--muted); font-size: 13px; }
+.waiter-switch { padding: 0; border: 0; background: none; color: inherit; font: inherit; text-decoration: underline; cursor: pointer; }

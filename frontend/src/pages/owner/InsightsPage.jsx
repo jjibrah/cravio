@@ -8,6 +8,7 @@ import KpiCards from '../../components/insights/KpiCards';
 import '../../components/insights/insights.css';
 import { ErrorState, OIcon, Segmented } from '../../components/owner/ui';
 import { useApi } from '../../lib/api';
+import { branchPath } from '../../lib/branch';
 
 /*
  * Insights (/owner/insights): the one-line summary, a 7/30/90-day range (in ?range=), five KPI cards with the
@@ -64,7 +65,7 @@ export default function InsightsPage({ section }) {
         <span className="in-empty-art" aria-hidden="true"><OIcon name="qr" size={26} /></span>
         <h2>Insights fill in as guests scan your menu</h2>
         <p>Put a table QR code on every table. Scans, dish views and orders show up here within a minute.</p>
-        <Link to="/owner/tables" className="o-btn is-primary">Get table QR codes</Link>
+        <Link to={branchPath('tables')} className="o-btn is-primary">Get table QR codes</Link>
       </div> : <>
         <div className="in-charts">
           {data && sameRange ? <>

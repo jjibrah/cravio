@@ -346,3 +346,9 @@
 .settings-value { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); font-size: 14px; }
 .settings-value.is-empty { color: var(--muted); }
 .topnav-contact.is-active { background: var(--selected); color: var(--ink); }
+
+/* v2: switching between the owner overview, branch workspaces and the waiter app. */
+.branch-switcher { margin: 4px 0 8px; }
+.branch-switch-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.2; }
+.branch-switch-text > span, .branch-switch-text > small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.branch-switch-text > small { color: var(--muted, currentColor); opacity: .75; font-size: .75rem; }

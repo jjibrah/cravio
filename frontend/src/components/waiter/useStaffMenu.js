@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
+import { getActiveBranch } from '../../lib/branch';
+import { api } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 
 /*
@@ -42,19 +44,22 @@ function toDeal(row, parts, itemsById, now = Date.now()) {
 }
 
 async function fetchMenu(restaurantId) {
-  const [categories, itemsWithVideo, extras, deals, dealItems] = await Promise.all([
+  const [categories, itemsWithVideo, extras, deals, dealItems, stockOut] = await Promise.all([
     supabase.from('menu_categories').select('id, name, position').eq('restaurant_id', restaurantId).order('position'),
     supabase.from('menu_items').select(`${BASE}, video_poster_url`).eq('restaurant_id', restaurantId).order('position'),
     optional(supabase.from('menu_item_extras').select('id, item_id, name, price, position, available').eq('restaurant_id', restaurantId).order('position')),
     optional(supabase.from('menu_deals').select('id, name, description, price, currency, active, starts_at, ends_at, position').eq('restaurant_id', restaurantId).order('position')),
     optional(supabase.from('menu_deal_items').select('deal_id, item_id, quantity, position').eq('restaurant_id', restaurantId)),
+    // Dishes out of stock (inventory, migration 009). Before it is applied, or on failure, nothing is marked:
+    // the server still refuses an order the stock can't cover.
+    api('/api/stock/availability').then((result) => new Set(result.items.filter((row) => row.soldOut).map((row) => row.menuItemId)), () => new Set()),
   ]);
   if (categories.error) throw new Error('We couldn’t load the menu. Pull to refresh or try again.');
   let items = itemsWithVideo;
   if (items.error) items = await supabase.from('menu_items').select(BASE).eq('restaurant_id', restaurantId).order('position');
   if (items.error) throw new Error('We couldn’t load the menu. Try again.');
   const list = items.data.map((row) => ({
-    ...toItem(row),
+    ...toItem(stockOut.has(row.id) ? { ...row, available: false } : row),
     extras: extras.filter((extra) => extra.item_id === row.id).map((extra) => ({ id: extra.id, name: extra.name, price: Number(extra.price), available: extra.available !== false })),
   }));
   const byId = new Map(list.map((item) => [item.id, item]));
@@ -62,8 +67,9 @@ async function fetchMenu(restaurantId) {
 }
 
 export default function useStaffMenu() {
-  const { account } = useAuth();
-  const restaurantId = account?.place?.id;
+  // The branch this shift is at (WaiterLayout sets it before any page renders). RLS still checks membership.
+  useAuth();
+  const restaurantId = getActiveBranch();
   const [state, setState] = useState(() => (restaurantId && cache.has(restaurantId) ? { status: 'ready', ...cache.get(restaurantId) } : { status: 'loading' }));
   const [attempt, setAttempt] = useState(0);
   const reload = useCallback(() => setAttempt((n) => n + 1), []);

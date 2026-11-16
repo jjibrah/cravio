@@ -8,6 +8,7 @@ import useOrderParam from '../../components/owner/useOrderParam';
 import { EmptyState, ErrorState, LiveBadge, OIcon, Segmented, SkeletonRows } from '../../components/owner/ui';
 import '../../components/owner/orders.css';
 import { formatKes, nairobiDate, opsApi, plural, useLive, useNewArrivals, useNow } from '../../lib/ops';
+import { branchPath } from '../../lib/branch';
 
 const VIEWS = [{ value: 'tables', label: 'By table' }, { value: 'all', label: 'All orders' }];
 const STATUSES = [
@@ -160,7 +161,7 @@ export default function OrdersPage({ section }) {
                 <h2 id={`orders-table-${key}`}>{key === 'takeaway' ? 'Takeaway' : `Table ${key}`}</h2>
                 <p>{plural(orders.length, 'order')}{unpaid.length ? ` · ${formatKes(unpaid.reduce((sum, order) => sum + order.total, 0))} not paid yet` : ' · all settled'}</p>
               </div>
-              {key !== 'takeaway' && <Link className="o-btn is-quiet is-small" to={`/owner/tables/${key}`} aria-label={`Table ${key} details`}>Table<OIcon name="arrowRight" size={14} /></Link>}
+              {key !== 'takeaway' && <Link className="o-btn is-quiet is-small" to={branchPath(`tables/${key}`)} aria-label={`Table ${key} details`}>Table<OIcon name="arrowRight" size={14} /></Link>}
             </header>
             <ul className="o-order-list">
               {orders.map((order) => <OrderRow key={order.id} order={order} now={now} onOpen={openOrder} showTable={false} isNew={fresh.has(order.id)} />)}

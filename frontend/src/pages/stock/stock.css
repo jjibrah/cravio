@@ -1,0 +1,64 @@
+/* Inventory pages. Owner tokens and components (owner.css, business.css). */
+.st-table-wrap { overflow-x: auto; }
+.st-table { width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; }
+.st-table th, .st-table td { padding: 10px 16px; text-align: left; border-top: 1px solid var(--line); vertical-align: top; }
+.st-table thead th { color: var(--muted); font-weight: 550; font-size: 12px; border-top: 0; white-space: nowrap; }
+.st-table tbody th { font-weight: 600; }
+.st-table small { color: var(--muted); font-weight: 450; font-size: 12px; }
+.st-table .is-minus { color: var(--danger); }
+.st-table .is-plus { color: var(--success); }
+.st-actions { text-align: right; white-space: nowrap; }
+
+.st-form { padding: 16px; display: flex; flex-direction: column; gap: 4px; border-bottom: 1px solid var(--line); }
+.st-form > * { max-width: 640px; }
+.st-qty { max-width: 140px; }
+.st-kinds { flex-direction: row; flex-wrap: wrap; gap: 6px 16px; margin-bottom: 8px; }
+.st-kinds label { white-space: nowrap; }
+.st-kinds input, .biz-checks input, .biz-checks-inline input { flex: none; width: auto; }
+.st-lines { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; align-items: flex-start; }
+.st-line { display: flex; gap: 8px; align-items: center; width: 100%; }
+.st-line .o-select { flex: 1; min-width: 0; }
+.st-attention { margin: 0; }
+
+.st-matrix th:not(:first-child), .st-matrix td:not(:first-child) { text-align: right; }
+
+/* Dispatch note: printable, with the QR code the branch scans on arrival. */
+.st-note { display: grid; grid-template-columns: minmax(0, 1fr) 168px; gap: 16px; padding: 16px; align-items: start; }
+.st-note-qr svg { width: 168px; height: 168px; display: block; }
+.st-note-code { font: 600 18px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .12em; }
+@media (max-width: 640px) { .st-note { grid-template-columns: minmax(0, 1fr); } .st-line { flex-wrap: wrap; } }
+@media print {
+  body * { visibility: hidden; }
+  .st-note, .st-note * { visibility: visible; }
+  .st-note { position: absolute; inset: 0; }
+  .st-note .biz-form-actions { display: none; }
+}
+.st-short { color: var(--warning); }
+
+/* Toolbar: views on the leading side, actions on the trailing side. */
+.st-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.st-toolbar-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+/* Needs you */
+.st-needs { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+.st-need { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 16px; border-radius: var(--r-card);
+  background: var(--surface); box-shadow: 0 0 0 1px var(--line), var(--shadow-card); }
+/* Tone is a small dot before the title (urgent / action / info), not a coloured card edge. */
+.st-need-text strong { display: flex; align-items: center; gap: 8px; }
+.st-need-text strong::before { content: ''; flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--line-strong); }
+.st-need.is-urgent .st-need-text strong::before { background: var(--danger); }
+.st-need.is-action .st-need-text strong::before { background: var(--ember); }
+.st-need.is-info .st-need-text strong::before { background: #2156a5; }
+.st-need-text > span { padding-left: 16px; }
+.st-need-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; font-size: 14px; }
+.st-need-text span { color: var(--muted); font-size: 13px; }
+/* Forms inside the side sheet have no divider or width cap. */
+.st-drawer .st-form { padding: 0; border-bottom: 0; }
+.st-drawer .st-form > * { max-width: none; }
+.st-row-button { padding: 0; border: 0; background: none; font: inherit; font-weight: 600; color: var(--ink); text-align: left; cursor: pointer; text-decoration: underline; text-decoration-color: transparent; text-underline-offset: 3px; }
+.st-row-button:hover, .st-row-button:focus-visible { text-decoration-color: var(--line-strong); }
+.st-table .is-low { color: #7d5106; }
+/* index.css styles every input/button as a full-width field / dark 44px button; these controls opt out. */
+.st-row-button { display: inline; min-height: 0; padding: 0; background: none; color: var(--ink); border-radius: 0; }
+.st-row-button:hover { background: none; }
+.st-table th small, .st-table td small { display: block; margin-top: 2px; }
+.st-form input[type="radio"], .st-form input[type="checkbox"], .biz-checks input, .biz-checks-inline input { width: auto; min-height: 0; margin: 0; }

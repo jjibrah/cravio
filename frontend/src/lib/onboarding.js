@@ -127,22 +127,15 @@ export async function uploadImage(restaurantId, kind, file) {
 export const guestMenuUrl = (restaurantId, table) => `${window.location.origin}/guest-menu?r=${encodeURIComponent(restaurantId)}${table ? `&t=${encodeURIComponent(table)}` : ''}`;
 
 /**
- * What's left to set up after go-live, in the recommended order: photos first, because the guest menu is
- * photo-led. Each entry links back to the onboarding step that does it (`step: null` is the dashboard tour).
+ * What's left to set up after go-live, in the recommended order. Dish photos are optional and not part of it
+ * (the Products page nudges for missing photos instead). Each entry links back to the onboarding step that does it (`step: null` is the dashboard tour).
  * The Overview shows the first unfinished one as its single call to action, and the rest as a pipeline.
  */
 export function checklistFor(state) {
   if (!state?.restaurant) return [];
-  const { restaurant, sections, items, invites, progress } = state;
+  const { restaurant, sections, invites, progress } = state;
   const failed = invites.filter((invite) => invite.status === 'failed').length;
-  const withPhotos = items.filter((item) => item.photoUrl || item.videoUrl).length;
   return [
-    {
-      key: 'photos', step: 'photos', short: 'Dish photos', label: 'Add photos of your dishes', action: 'Add dish photos',
-      why: 'Your menu is built around photos: each dish shows one right beside its price.',
-      hint: items.length ? `${withPhotos} of ${items.length} dish${items.length === 1 ? ' has' : 'es have'} a photo.` : '',
-      done: items.length > 0 && withPhotos === items.length,
-    },
     {
       key: 'cover', step: 'photos', short: 'Cover photo', label: 'Add a cover photo', action: 'Add a cover photo',
       why: 'It’s the first thing guests see when they scan your QR code.', done: Boolean(restaurant.coverUrl),

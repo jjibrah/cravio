@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useNotifications } from '../notifications/NotificationProvider';
 import { REQUEST_TYPES, confirmationOf, formatAge, formatKes, formatRelative, itemsSummary, opsApi, plural, shortId, useNewArrivals } from '../../lib/ops';
 import { ErrorState, LiveBadge, OIcon, Panel, SkeletonRows } from './ui';
+import { branchPath } from '../../lib/branch';
 
 const ICON = { call_waiter: 'bell', bill: 'bill', payment: 'cash' };
 const VISIBLE = 6;
@@ -128,7 +129,7 @@ function ReadyItem({ cart, now, isNew }) {
       </span>
     </div>
     {cart.tableNumber && <div className="o-attn-actions">
-      <Link className="o-btn is-quiet" to={`/owner/tables/${cart.tableNumber}`} aria-label={`Open table ${cart.tableNumber}`}>Open table</Link>
+      <Link className="o-btn is-quiet" to={branchPath(`tables/${cart.tableNumber}`)} aria-label={`Open table ${cart.tableNumber}`}>Open table</Link>
     </div>}
   </li>;
 }

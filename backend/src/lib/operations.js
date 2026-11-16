@@ -2,7 +2,8 @@
 import { createHash, randomInt } from 'node:crypto';
 import { requireRole } from './auth.js';
 import { HttpError } from './http.js';
-import { findMembership, isMissingSchema, pickMembership, text } from './restaurants.js';
+import { isMissingSchema, text } from './restaurants.js';
+import { MANAGER_ROLES, STAFF_ROLES, branchRole, requestedBranch, selectMembership } from './access.js';
 import { hasMerchSchema, parseLine, resolveLines, storedLine } from './menu-merch.js';
 import { nameCache } from './cache.js';
 import { serviceClient } from './supabase.js';
@@ -64,6 +65,7 @@ export function check(error, messages = {}) {
   if (!error) return;
   if (error instanceof HttpError) throw error;
   if (isMissingSchema(error) || ['42703', '42883', 'PGRST202', 'PGRST204'].includes(error.code)) throw new HttpError(503, NOT_INSTALLED);
+  if (error.code === 'P0001' && error.hint === 'stock_sold_out') throw new HttpError(409, error.message, { code: 'sold_out' });
   if (error.code === '23505') throw new HttpError(409, messages.duplicate || 'That already exists.');
   if (error.code === '23514' || error.code === '22P02') throw new HttpError(400, messages.invalid || 'Some details are invalid. Check them and try again.');
   if (error.code === '42501') throw new HttpError(403, 'You do not have access to this.');
@@ -78,26 +80,25 @@ export function must(result, messages) {
 /* ---------- Who is calling ---------- */
 
 /**
- * Any member of a restaurant: owner, manager (profile role 'owner') or waiter.
- * Returns the caller's RLS client, their membership role and restaurant.
+ * Any member of the branch the request names (X-Cravio-Branch): owner, manager (profile role 'owner') or waiter.
+ * Returns the caller's RLS client, their membership role and restaurant (branch).
  */
-export async function staffContext(request) {
+export async function staffContext(request, roles = STAFF_ROLES) {
   const context = await requireRole(request, 'owner', 'waiter');
-  let membership;
-  try { membership = context.memberships ? pickMembership(context.memberships) : await findMembership(context.client, context.user.id); }
-  catch (error) { check(error); }
+  if (!context.memberships) throw new HttpError(503, NOT_INSTALLED);
+  const membership = selectMembership(context.memberships, requestedBranch(request), roles);
   if (!membership) throw new HttpError(403, 'You aren’t part of a restaurant yet. Ask your manager to add you.');
   const role = membership.role;
   return {
-    ...context, role, isManager: role === 'owner' || role === 'manager',
+    ...context, role, branchRole: branchRole(role), isManager: MANAGER_ROLES.includes(role),
     restaurant: membership.restaurant, restaurantId: membership.restaurant.id,
   };
 }
 
-/** Owners and managers only. */
+/** Branch managers (owner or manager membership at the selected branch) only. */
 export async function managerContext(request) {
   const context = await staffContext(request);
-  if (!context.isManager) throw new HttpError(403, 'Only owners and managers can do this.');
+  if (!context.isManager) throw new HttpError(403, 'Only branch managers can do this.');
   return context;
 }
 

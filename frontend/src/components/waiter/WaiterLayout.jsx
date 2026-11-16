@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useId, useState } from 'react';
+import { useCallback, useEffect, useId, useLayoutEffect, useState } from 'react';
 import { Navigate, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { homeFor, useAuth } from '../../lib/auth';
+import { branchesWithRole, getActiveBranch, setActiveBranch } from '../../lib/branch';
 import { waiterSections } from '../../config/waiter';
 import { Loading } from '../../pages/AuthPages';
 import AccountPage from '../../pages/AccountPage';
@@ -38,7 +39,15 @@ export default function WaiterLayout() {
   const closeProfile = useCallback(() => setProfileOpen(false), []);
   useEffect(() => setProfileOpen(false), [pathname]);
   // A signed-out waiter who scanned a guest's QR comes back to that cart after signing in.
-  const isWaiter = account?.role === 'waiter';
+  const waiterBranches = branchesWithRole(account, 'waiter');
+  const isWaiter = waiterBranches.length > 0;
+  // The branch this shift is at: the only one, or the one chosen (kept per tab). Every request names it.
+  const [activeId, setActiveId] = useState(getActiveBranch);
+  const current = waiterBranches.find((branch) => branch.id === activeId) || (waiterBranches.length === 1 ? waiterBranches[0] : null);
+  useLayoutEffect(() => {
+    if (current && current.id !== getActiveBranch()) { setActiveBranch(current.id); setActiveId(current.id); }
+  }, [current]);
+  const choose = (id) => { setActiveBranch(id); setActiveId(id); };
   useEffect(() => {
     if (!session || !isWaiter) return;
     const back = recall();
@@ -51,13 +60,21 @@ export default function WaiterLayout() {
   }
   if (!account && (accountLoading || !accountError)) return <Loading />;
   if (!account && accountError) return <AccountPage />;
-  if (account.role !== 'waiter') return <Navigate to={homeFor(account)} replace />;
-  const restaurantName = account.place?.name?.trim() || import.meta.env.VITE_RESTAURANT_NAME?.trim() || 'Your restaurant';
+  if (account?.terms?.required) return <Navigate to="/terms/accept" replace />;
+  if (!isWaiter) return <Navigate to={homeFor(account)} replace />;
+  if (!current) return <div className="page page-waiter waiter-app"><main className="waiter-content waiter-choose">
+    <h1>Where are you working today?</h1>
+    <ul className="waiter-choose-list">{waiterBranches.map((branch) => <li key={branch.id}>
+      <button type="button" className="waiter-choose-button" onClick={() => choose(branch.id)}><strong>{branch.name}</strong>{branch.location && <span>{branch.location}</span>}</button>
+    </li>)}</ul>
+  </main></div>;
+  if (current.id !== getActiveBranch()) return <Loading />;
+  const restaurantName = current.name?.trim() || 'Your restaurant';
   const initials = account.name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join('').toUpperCase();
 
-  return <LiveProvider><div className="page page-waiter waiter-app">
+  return <LiveProvider key={current.id}><div className="page page-waiter waiter-app">
     <header className="waiter-header">
-      <div className="waiter-restaurant"><span className="waiter-restaurant-name" title={restaurantName}>{restaurantName}</span><span className="waiter-restaurant-meta">Waiter</span></div>
+      <div className="waiter-restaurant"><span className="waiter-restaurant-name" title={restaurantName}>{restaurantName}</span><span className="waiter-restaurant-meta">Waiter{waiterBranches.length > 1 && <> · <button type="button" className="waiter-switch" onClick={() => choose(null)}>Switch branch</button></>}</span></div>
       <div className="waiter-header-actions">
         <RefreshButton />
         <NotificationCenter presentation="sheet" />

@@ -4,6 +4,7 @@ import { OIcon } from '../../components/owner/ui';
 import { useNotifications } from '../../components/notifications/NotificationProvider';
 import { SECTION_SUGGESTIONS, guestMenuUrl } from '../../lib/onboarding';
 import { Note, SaveActions, SettingsCard, useSaver } from './parts';
+import { branchPath } from '../../lib/branch';
 
 const MAX_TABLES = 200;
 
@@ -37,7 +38,7 @@ function TablesCard({ tables, setTables }) {
         <span className="st-counter-unit">tables</span>
       </div>
       {removing > 0 && <Note tone="warning" icon="alert">Tables {value + 1}–{tables.length} will be removed, along with their QR codes. Tables with unpaid orders can’t be removed.</Note>}
-      <p className="st-hint">Assign tables to sections, rename them or see who’s seated on <Link className="o-text-link" to="/owner/tables">Tables</Link>.</p>
+      <p className="st-hint">Assign tables to sections, rename them or see who’s seated on <Link className="o-text-link" to={branchPath('tables')}>Tables</Link>.</p>
     </div>
   </SettingsCard>;
 }
@@ -98,7 +99,7 @@ function QrCard({ restaurant }) {
       <div className="st-actions">
         <Link className="o-btn is-primary" to="/onboarding/qr"><OIcon name="printer" size={16} />Print QR codes</Link>
         <a className="o-btn" href={url} target="_blank" rel="noreferrer"><OIcon name="external" size={16} />Open guest menu</a>
-        <Link className="o-btn is-quiet" to="/owner/menu"><OIcon name="sparkle" size={16} />Change the menu’s look</Link>
+        <Link className="o-btn is-quiet" to={branchPath('menu')}><OIcon name="sparkle" size={16} />Change the menu’s look</Link>
       </div>
     </div>
   </SettingsCard>;

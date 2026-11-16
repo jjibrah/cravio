@@ -9,6 +9,7 @@ import useOrderParam from '../../components/owner/useOrderParam';
 import { QrSvg, downloadQrPng, printQr } from '../../components/owner/TableBits';
 import { EmptyState, ErrorState, OIcon, Panel, SkeletonRows } from '../../components/owner/ui';
 import '../../components/owner/tables.css';
+import { branchPath } from '../../lib/branch';
 import {
   REQUEST_TYPES, formatAge, formatDayLabel, formatKes, formatNumber, formatRelative, menuApi, opsApi, plural, tableStateLabel,
   useLive, useNow, useResource,
@@ -52,19 +53,19 @@ export default function TableDetailPage() {
     try {
       await opsApi.removeTable(number);
       notify(`Table ${number} removed.`);
-      navigate('/owner/tables', { replace: true });
+      navigate(branchPath('tables'), { replace: true });
     } catch (problem) {
       setRemoveError(problem.status === 409 ? `Table ${number} has unpaid orders. Settle them first.` : problem.message);
       setRemoving(false);
     }
   }
 
-  const back = <Link className="o-back" to="/owner/tables"><OIcon name="arrowLeft" size={16} />Tables</Link>;
+  const back = <Link className="o-back" to={branchPath('tables')}><OIcon name="arrowLeft" size={16} />Tables</Link>;
 
   if (detail.error && !data) {
     return <>{back}<header className="page-header"><div className="page-heading"><h1>Table {number}</h1></div></header>
       <div className="o-panel">{detail.error.status === 404
-        ? <EmptyState icon="table" tone="neutral" title={`There’s no table ${number}`} action={<Link className="o-btn" to="/owner/tables">See all tables</Link>}>It may have been removed.</EmptyState>
+        ? <EmptyState icon="table" tone="neutral" title={`There’s no table ${number}`} action={<Link className="o-btn" to={branchPath('tables')}>See all tables</Link>}>It may have been removed.</EmptyState>
         : <ErrorState error={detail.error} onRetry={detail.reload} what="this table" />}</div></>;
   }
 
@@ -144,7 +145,7 @@ export default function TableDetailPage() {
           </div>
         </Panel>
 
-        <Panel title="Orders at this table" sub="The 10 most recent" actions={<Link className="o-btn is-quiet is-small" to={`/owner/orders?view=all&range=30d&table=${number}`}>All orders<OIcon name="arrowRight" size={14} /></Link>}>
+        <Panel title="Orders at this table" sub="The 10 most recent" actions={<Link className="o-btn is-quiet is-small" to={branchPath(`orders?view=all&range=30d&table=${number}`)}>All orders<OIcon name="arrowRight" size={14} /></Link>}>
           {!data && <SkeletonRows rows={3} thumb={false} label="Loading orders" />}
           {data && !data.recentOrders.length && <EmptyState icon="bill" tone="neutral" title="No orders here yet">Orders taken at table {number} appear here.</EmptyState>}
           {data && data.recentOrders.length > 0 && <ul className="o-order-list o-table-orders">

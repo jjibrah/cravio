@@ -4,6 +4,8 @@ import { supabase } from '../../lib/supabase';
 import { homeFor, useAuth } from '../../lib/auth';
 import { Loading, Notice, PageShell } from '../AuthPages';
 import OnbIcon from '../../components/onboarding/OnbIcon';
+import { api } from '../../lib/api';
+import '../../components/legal/legal.css';
 import '../../components/onboarding/onboarding.css';
 
 const PENDING_KEY = 'cravio-welcome-pending';
@@ -31,6 +33,15 @@ export default function WelcomePage() {
   const [done, setDone] = useState(false);
   const errorId = useId();
   const hintId = useId();
+  // The current terms, if Cravio has published any: creating an account requires agreeing to them.
+  const [terms, setTerms] = useState(undefined);
+  const [agreed, setAgreed] = useState(false);
+  useEffect(() => {
+    let live = true;
+    fetch(`${import.meta.env.VITE_API_URL || ''}/api/public/legal/terms`)
+      .then((response) => (response.ok ? response.json() : null)).then((doc) => live && setTerms(doc), () => live && setTerms(null));
+    return () => { live = false; };
+  }, []);
 
   useEffect(() => {
     if (!done || !account) return;
@@ -54,13 +65,18 @@ export default function WelcomePage() {
     if (busy) return;
     setError('');
     if (password.length < 8) { setError('Use at least 8 characters.'); return; }
+    if (terms && !agreed) { setError('Tick the box to agree to the terms and conditions.'); return; }
     setBusy(true);
     try {
       const { error: updateError } = await supabase.auth.updateUser({ password });
       if (updateError) throw updateError;
+      if (terms) {
+        try { await api('/api/me/terms/accept', { method: 'POST', body: { version: terms.version } }); }
+        catch (acceptError) { setError(acceptError.message); return; }
+      }
       try { sessionStorage.removeItem(PENDING_KEY); } catch { /* storage blocked */ }
       setDone(true);
-      if (!account) retry();
+      if (!account || terms) retry(); // the account now reports the terms as accepted
     } catch (updateError) {
       setError(updateError.code === 'weak_password' ? 'Choose a stronger password: mix letters, numbers and symbols.'
         : updateError.code === 'same_password' ? 'That’s your current password. Choose a new one.'
@@ -81,9 +97,13 @@ export default function WelcomePage() {
           <OnbIcon name={visible ? 'eyeOff' : 'eye'} size={18} /></button>
       </div>
       {!error && <p className="welcome-hint" id={hintId}>At least 8 characters.</p>}
+      {terms && <label className="legal-agree">
+        <input type="checkbox" checked={agreed} onChange={(event) => { setAgreed(event.target.checked); setError(''); }} required />
+        <span>I agree to the <a href="/terms" target="_blank" rel="noreferrer">{terms.title}</a> (version {terms.version}).</span>
+      </label>}
       <Notice error id={errorId}>{error}</Notice>
       {accountError && done && <Notice error>{accountError}</Notice>}
-      <button type="submit" className="button-block" disabled={busy || (done && accountLoading)}>
+      <button type="submit" className="button-block" disabled={busy || (done && accountLoading) || terms === undefined || (terms && !agreed)}>
         {busy ? 'Saving…' : done ? 'Opening Cravio…' : 'Continue'}</button>
     </form>
     <p className="auth-note">Not you? <button type="button" className="auth-link welcome-inline" onClick={async () => {

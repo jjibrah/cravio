@@ -1,6 +1,6 @@
 import ActionsMenu from './ActionsMenu';
 import UserIcon from './UserIcon';
-import { Avatar, RestaurantName, RoleChip, StatusChip, TimeAgo, UserBadges } from './parts';
+import { AccessChip, Avatar, RestaurantName, StatusChip, TimeAgo, UserBadges } from './parts';
 import { relativeTime } from './users-model';
 
 const skeletonWidths = ['52%', '64%', '44%', '58%', '70%', '48%'];
@@ -40,7 +40,7 @@ export function UserTable({ users, loading, onOpen, menuFor, highlightId, captio
         <col className="u-c-status" /><col className="u-c-active u-col-active" /><col className="u-c-actions" />
       </colgroup>
       <thead><tr>
-        <th scope="col">User</th><th scope="col">Role</th><th scope="col" className="u-col-restaurant">Restaurant</th>
+        <th scope="col">User</th><th scope="col">Access</th><th scope="col" className="u-col-restaurant">Business or branch</th>
         <th scope="col">Status</th><th scope="col" className="u-col-active">Last active</th><th scope="col"><span className="visually-hidden">Actions</span></th>
       </tr></thead>
       <tbody>
@@ -48,7 +48,7 @@ export function UserTable({ users, loading, onOpen, menuFor, highlightId, captio
           className={`u-row${user.id === highlightId ? ' is-new' : ''}${user.pending ? ' is-pending' : ''}`}
           onClick={(event) => { if (!event.target.closest('button, a, [role="menu"]')) onOpen(user); }}>
           <td><button type="button" className="u-row-open" onClick={() => onOpen(user)} aria-label={`${user.name}, ${user.email}. View details`}><Identity user={user} /></button></td>
-          <td><RoleChip role={user.role} /></td>
+          <td><AccessChip user={user} /></td>
           <td className="u-col-restaurant"><RestaurantName user={user} /></td>
           <td><StatusChip status={user.status} /></td>
           <td className="u-col-active">{lastActive(user)}</td>
@@ -71,7 +71,7 @@ export function UserCards({ users, loading, onOpen, menuFor, highlightId, captio
       <button type="button" className="u-card-open" onClick={() => onOpen(user)} aria-label={`${user.name}, ${user.email}. View details`}>
         <Identity user={user} />
         <span className="u-card-meta">
-          <RoleChip role={user.role} /><StatusChip status={user.status} />
+          <AccessChip user={user} /><StatusChip status={user.status} />
         </span>
         <span className="u-card-foot">
           <span className="u-card-restaurant"><UserIcon name="restaurants" size={13} /><RestaurantName user={user} /></span>

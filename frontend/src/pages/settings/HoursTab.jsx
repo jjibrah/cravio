@@ -26,7 +26,7 @@ export default function HoursTab({ restaurant, patchRestaurant }) {
     await run(() => patchRestaurant({ openingHours: hours }), 'Opening hours saved');
   }
 
-  return <SettingsCard id="hours" title="Opening hours" description="Guests see these on your menu. Ordering still works whenever staff are on shift."
+  return <SettingsCard id="hours" title="Weekly hours" description="Guests see these on your menu. Ordering still works whenever staff are on shift."
     footer={<SaveActions dirty={dirty} saving={saving} onSave={save} onReset={() => { setHours(initial); setError(''); }} />}>
     <div className="st-stack">
       <Segmented label="Opening pattern" options={PATTERNS} value={hours.preset || 'custom'} onChange={setPattern} />

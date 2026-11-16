@@ -6,13 +6,16 @@ import { useNotifications } from '../../components/notifications/NotificationPro
 /* Small building blocks shared by every Settings tab. */
 
 /** A white card with a title, a one-line explanation and, optionally, a footer of actions. */
-export function SettingsCard({ title, description, children, footer, id, tone }) {
+export function SettingsCard({ title, description, children, footer, id, tone, actions }) {
   const generated = useId();
   const titleId = id ? `${id}-title` : generated;
   return <section className={`st-card${tone ? ` is-${tone}` : ''}`} id={id} aria-labelledby={titleId}>
     <header className="st-card-head">
-      <h2 className="st-card-title" id={titleId}>{title}</h2>
-      {description && <p className="st-card-desc">{description}</p>}
+      <div className="st-card-titles">
+        <h2 className="st-card-title" id={titleId}>{title}</h2>
+        {description && <p className="st-card-desc">{description}</p>}
+      </div>
+      {actions && <div className="st-card-actions">{actions}</div>}
     </header>
     <div className="st-card-body">{children}</div>
     {footer && <footer className="st-card-foot">{footer}</footer>}
@@ -64,9 +67,9 @@ export function useSaver() {
 /** A yes/no confirmation for anything destructive. */
 export function Confirm({ open, title, children, confirmLabel, onConfirm, onClose, busy }) {
   return <Modal open={open} onClose={onClose} title={title}>
-    <div className="st-confirm">
-      <div className="st-confirm-text">{children}</div>
-      <div className="st-confirm-actions">
+    <div className="cs-confirm">
+      <div className="cs-confirm-text">{children}</div>
+      <div className="cs-confirm-actions">
         <button type="button" className="o-btn" onClick={onClose} disabled={busy} data-autofocus>Cancel</button>
         <button type="button" className="o-btn is-danger-solid" onClick={onConfirm} disabled={busy}>{busy ? 'Working…' : confirmLabel}</button>
       </div>

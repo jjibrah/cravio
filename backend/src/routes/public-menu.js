@@ -59,6 +59,16 @@ const publicDeal = (summary) => ({
   items: summary.items.map(({ itemId, name, quantity, unitPrice, photoUrl }) => ({ itemId, name, quantity, unitPrice, photoUrl })),
 });
 
+/** Ids of dishes sold out by stock (none before migration 009, or if the check fails: ordering still re-checks). */
+async function stockSoldOut(db, id) {
+  const { data, error } = await db.rpc('stock_menu_availability', { p_restaurant: id });
+  if (error) {
+    if (!['PGRST202', '42883', 'PGRST205', '42P01'].includes(error.code)) console.error('[public-menu] stock availability failed:', error.code || error.message);
+    return new Set();
+  }
+  return new Set(data.filter((row) => row.sold_out).map((row) => row.menu_item_id));
+}
+
 /** Reads everything guests see in one parallel round of queries. */
 async function buildMenu(db, id) {
   const merch = await hasMerchSchema(db);
@@ -73,6 +83,9 @@ async function buildMenu(db, id) {
     merch ? loadDeals(db, id) : [],
   ]);
   if (!restaurant || restaurant.status !== 'live') return { unavailable: true };
+  // Dishes tracked in inventory (migration 009) with too few servings left show as sold out, not hidden.
+  const stockOut = await stockSoldOut(db, id);
+  for (const item of items) if (stockOut.has(item.id)) item.available = false;
 
   // Items follow their category's position, then their own.
   const order = new Map(categories.map((category, index) => [category.id, index]));
@@ -87,7 +100,7 @@ async function buildMenu(db, id) {
   }
   const pairsByItem = new Map();
   for (const pair of pairings) {
-    if (!available.has(pair.paired_item_id)) continue; // only dishes a guest can add
+    if (!available.get(pair.paired_item_id)?.available) continue; // only dishes a guest can add
     pairsByItem.set(pair.item_id, [...(pairsByItem.get(pair.item_id) || []), pair.paired_item_id]);
   }
   const now = Date.now();

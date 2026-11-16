@@ -175,14 +175,28 @@ textarea.o-input { min-height: 84px; resize: vertical; line-height: 1.45; }
 .o-drawer { inset: 8px 8px 8px auto; width: min(480px, calc(100vw - 16px)); height: calc(100dvh - 16px); max-width: none; max-height: none; margin: 0; padding: 0; border: 0; border-radius: var(--r-card, 14px); background: var(--surface); color: var(--ink); overflow: hidden; box-shadow: 0 0 0 1px #11111014, 0 32px 80px -24px #1111104d, 0 8px 20px -8px #11111026; }
 .o-drawer.is-wide { width: min(560px, calc(100vw - 16px)); }
 .o-drawer[open] { display: flex; animation: o-drawer-in 220ms var(--ease) both; }
-.o-drawer::backdrop { background: #11111033; }
+.o-drawer::backdrop, .o-modal::backdrop {
+  /* A light, warm dimming layer with a soft blur: the page stays legible but recedes, instead of turning grey. */
+  background: rgb(26 24 20 / .1);
+  -webkit-backdrop-filter: blur(1.5px) saturate(.95);
+  backdrop-filter: blur(1.5px) saturate(.95);
+  animation: o-scrim-in 200ms var(--ease) both;
+}
 .o-drawer-panel { display: flex; flex-direction: column; width: 100%; min-height: 0; }
 .o-drawer-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-shrink: 0; padding: 20px 14px 14px 24px; border-bottom: 1px solid var(--line); }
 .o-drawer-titles { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; min-width: 0; padding-top: 6px; }
 .o-drawer-title { font-size: 20px; line-height: 1.25; font-weight: 640; letter-spacing: -.02em; }
 .o-drawer-body { flex: 1; min-height: 0; padding: 18px 24px 28px; overflow-y: auto; overscroll-behavior: contain; }
 .o-drawer-footer { display: flex; gap: 8px; flex-shrink: 0; padding: 14px 24px; border-top: 1px solid var(--line); background: #fafaf8; }
-@keyframes o-drawer-in { from { opacity: .4; transform: translateX(24px); } to { opacity: 1; transform: none; } }
+/* The panel slides in solid (no see-through phase), lifted by its shadow. */
+@keyframes o-drawer-in { from { transform: translateX(32px); } to { transform: none; } }
+@keyframes o-scrim-in { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-transparency: reduce) {
+  .o-drawer::backdrop, .o-modal::backdrop { background: rgb(26 24 20 / .28); -webkit-backdrop-filter: none; backdrop-filter: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .o-drawer[open], .o-drawer::backdrop, .o-modal::backdrop { animation: none; }
+}
 .o-sheet .sheet-content { padding-bottom: max(28px, env(safe-area-inset-bottom)); }
 .o-sheet-header-extra { margin: -4px 0 12px; }
 .o-sheet-footer { display: flex; gap: 8px; padding-top: 16px; }
@@ -291,7 +305,6 @@ textarea.o-input { min-height: 84px; resize: vertical; line-height: 1.45; }
 /* Small centred dialog (bottom sheet on phones) */
 .o-modal { inset: 0; width: min(440px, calc(100vw - 32px)); max-height: min(640px, calc(100dvh - 48px)); margin: auto; padding: 0; border: 0; border-radius: var(--r-card, 14px); background: var(--surface); color: var(--ink); overflow: hidden; box-shadow: 0 0 0 1px #11111014, 0 32px 80px -24px #1111104d; }
 .o-modal[open] { display: flex; flex-direction: column; animation: menu-in 180ms var(--ease) both; }
-.o-modal::backdrop { background: #11111033; }
 .o-modal-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 18px 14px 6px 22px; }
 .o-modal-header h2 { font-size: 18px; line-height: 1.3; font-weight: 640; letter-spacing: -.015em; }
 .o-modal-body { padding: 8px 22px 22px; overflow-y: auto; }

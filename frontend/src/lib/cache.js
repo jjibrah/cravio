@@ -32,6 +32,15 @@ export function setCacheScope(next) {
   clearCache();
 }
 
+let branchScope = null;
+/** Sets the branch the cached answers belong to; a different branch empties the cache (lib/branch.js). */
+export function setBranchScope(next) {
+  const value = next || null;
+  if (value === branchScope) return;
+  branchScope = value;
+  clearCache();
+}
+
 export function clearCache() {
   generation += 1;
   const keys = [...entries.keys()];

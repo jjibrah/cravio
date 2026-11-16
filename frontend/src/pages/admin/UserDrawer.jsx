@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import Dialog from './Dialog';
 import UserIcon from './UserIcon';
-import { Avatar, RestaurantName, StatusChip, TimeAgo, UserBadges } from './parts';
+import { AccessList, Avatar, StatusChip, TimeAgo, UserBadges } from './parts';
 import { ROLE_OPTIONS, blockedReason, exactTime, firstName, roleArticle, roleLabel } from './users-model';
 
 function Confirm({ tone = 'danger', title, children, confirmLabel, onConfirm, onCancel }) {
@@ -148,7 +148,7 @@ export default function UserDrawer({ user, open, onClose, intent, activeAdmins, 
           </span>}
         </dd></div>
         <div className="u-detail"><dt>Email</dt><dd className="u-ellipsis">{user.email}</dd></div>
-        <div className="u-detail"><dt>Restaurant</dt><dd><RestaurantName user={user} /></dd></div>
+        <div className="u-detail"><dt>Access</dt><dd><AccessList user={user} /></dd></div>
         <div className="u-detail"><dt>Status</dt><dd><StatusChip status={user.status} /></dd></div>
         <div className="u-detail"><dt>Created</dt><dd>{user.created_at ? <time dateTime={user.created_at}>{exactTime(user.created_at)}</time> : '—'}</dd></div>
         <div className="u-detail"><dt>Last sign-in</dt><dd>{user.last_sign_in_at

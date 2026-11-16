@@ -201,3 +201,4 @@
   .st-banner, .st-section-detail { animation: none; }
   .st-switch span, .st-switch, .st-chevron, .st-tab { transition: none; }
 }
+.st-confirm:not([open]) { display: none; }

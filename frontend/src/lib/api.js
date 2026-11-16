@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useReducer, useState } from 'react';
 import { supabase } from './supabase';
 import { invalidate, peek, revalidate, setCached, subscribe, swr } from './cache';
+import { getActiveBranch } from './branch';
 
 export { invalidate } from './cache';
 
@@ -15,6 +16,7 @@ async function request(path, { method = 'GET', body, signal } = {}) {
     signal,
     headers: {
       ...(session ? { Authorization: `Bearer ${session.access_token}` } : {}),
+      ...(getActiveBranch() ? { 'X-Cravio-Branch': getActiveBranch() } : {}),
       ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
     },
     body: body !== undefined ? JSON.stringify(body) : undefined,

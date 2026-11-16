@@ -358,3 +358,5 @@
 @media (prefers-reduced-motion: reduce) {
   .u-menu, .u-dialog[open], .u-confirm, .u-row.is-new, .u-card.is-new { animation: none !important; }
 }
+.u-access { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 4px; }
+.u-access strong { font-weight: 600; }

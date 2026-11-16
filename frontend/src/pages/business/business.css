@@ -1,0 +1,79 @@
+/* Owner / operations-manager interface. Uses the owner design tokens and components (owner.css, overview.css). */
+.biz-stack { display: flex; flex-direction: column; gap: 20px; }
+.biz-meta { margin: 0; color: var(--muted); font-size: 13px; }
+
+.biz-branches { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.biz-branch { display: grid; grid-template-columns: minmax(0, 1.6fr) repeat(4, minmax(0, 1fr)) minmax(0, 15rem); align-items: center; gap: 12px;
+  padding: 14px 16px; border-top: 1px solid var(--line); }
+.biz-branch:first-child { border-top: 0; }
+.biz-branch-name { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.biz-branch-name a, .biz-branch-name strong { color: var(--ink); font-weight: 600; text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.biz-branch-name a:hover { text-decoration: underline; }
+.biz-branch-sub { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; color: var(--muted); font-size: 12px; }
+.biz-figure { display: flex; flex-direction: column; min-width: 0; }
+.biz-figure dt { color: var(--muted); font-size: 12px; }
+.biz-figure dd { margin: 2px 0 0; font-weight: 600; font-variant-numeric: tabular-nums; }
+.biz-figure dd.is-alert { color: var(--warning); }
+.biz-branch-actions { display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap; }
+
+.biz-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.biz-two { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+
+.biz-week { width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; }
+.biz-week th, .biz-week td { padding: 8px 16px; text-align: left; border-top: 1px solid var(--line); }
+.biz-week th { color: var(--muted); font-weight: 550; font-size: 12px; border-top: 0; }
+.biz-week td:not(:first-child), .biz-week th:not(:first-child) { text-align: right; }
+
+.biz-people { list-style: none; margin: 0; padding: 0; }
+.biz-person { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; border-top: 1px solid var(--line); }
+.biz-person:first-child { border-top: 0; }
+.biz-person-main { display: flex; flex-direction: column; min-width: 0; gap: 2px; }
+.biz-person-main strong { font-weight: 600; }
+.biz-person-main span { color: var(--muted); font-size: 13px; }
+.biz-person-actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+
+.biz-form { padding: 16px; display: flex; flex-direction: column; gap: 4px; max-width: 560px; }
+.biz-checks { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 0; border: 0; }
+.biz-checks label { display: flex; align-items: center; gap: 8px; font-size: 14px; }
+.biz-form-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+.biz-notice { margin: 0 16px 16px; padding: 10px 12px; border-radius: var(--r-row); background: var(--warning-soft); color: #7d5106; font-size: 13px; }
+
+.biz-choose { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.biz-choose a { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 14px 16px; border-radius: var(--r-card);
+  background: var(--surface); box-shadow: 0 0 0 1px var(--line), var(--shadow-card); color: var(--ink); text-decoration: none; }
+.biz-choose a:hover, .biz-choose a:focus-visible { box-shadow: 0 0 0 1px var(--line-strong), var(--shadow-card); background: var(--hover); }
+
+@media (max-width: 900px) {
+  .biz-branch { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .biz-branch-name, .biz-branch-actions { grid-column: 1 / -1; }
+  .biz-branch-actions { justify-content: flex-start; }
+  .biz-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .biz-two { grid-template-columns: minmax(0, 1fr); }
+}
+.biz-checks-inline { display: flex; align-items: center; gap: 8px; margin: 0 0 4px; font-size: 14px; }
+.biz-back { display: inline-flex; align-items: center; gap: 6px; color: var(--ink-2); font-size: 14px; text-decoration: none; }
+.biz-back:hover { color: var(--ink); }
+
+/* ---------- Overview → Briefing (the owner's PA) ---------- */
+.pa-brief { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(280px, 1fr); gap: 28px; padding: 24px 28px;
+  border-radius: var(--r-card); background: var(--surface); box-shadow: 0 0 0 1px var(--line), var(--shadow-card); }
+.pa-brief-side { padding-left: 28px; border-left: 1px solid var(--line); }
+.pa-eyebrow { margin: 0 0 8px; color: var(--muted); font-size: 13px; font-weight: 550; }
+.pa-headline { margin: 0 0 14px; font-size: 24px; line-height: 1.3; font-weight: 650; letter-spacing: -.02em; text-wrap: balance; }
+.pa-points { margin: 0 0 16px; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 8px; color: var(--ink-2); font-size: 15px; line-height: 1.5; }
+.pa-points li { padding-left: 16px; position: relative; }
+.pa-points li::before { content: ''; position: absolute; left: 0; top: .62em; width: 6px; height: 6px; border-radius: 50%; background: var(--line-strong); }
+.pa-subhead { margin: 0 0 8px; font-size: 13px; font-weight: 600; color: var(--muted); text-transform: none; }
+.pa-attention { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--line); }
+.pa-attention li { display: flex; align-items: center; gap: 12px; min-height: 48px; padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 15px; }
+.pa-attention-text { flex: 1; min-width: 0; }
+.pa-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--line-strong); }
+.pa-attention .is-urgent .pa-dot, .pa-attention li.is-urgent .pa-dot { background: var(--danger); }
+.pa-attention li.is-action .pa-dot { background: var(--ember); }
+.pa-attention li.is-info .pa-dot { background: #2156a5; }
+.pa-clear { margin: 0; color: var(--success); font-size: 15px; }
+.pa-foot { margin: 0; color: var(--muted); font-size: 13px; }
+.pa-foot .o-text-link { padding: 0; border: 0; background: none; font: inherit; cursor: pointer; }
+
+@media (max-width: 1000px) { .pa-brief { grid-template-columns: minmax(0, 1fr); gap: 16px; } .pa-brief-side { padding-left: 0; border-left: 0; border-top: 1px solid var(--line); padding-top: 16px; } }
+@media (max-width: 640px) { .pa-brief { padding: 20px 16px 16px; } .pa-headline { font-size: 20px; } }

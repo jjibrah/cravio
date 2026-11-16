@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState } f
 import { useNavigate } from 'react-router-dom';
 import { supabase } from './supabase';
 import { setCacheScope } from './cache';
+import { bindBranchUser } from './branch';
 import { useNotifications } from '../components/notifications/NotificationProvider';
 import LoadingScreen from '../components/loading/LoadingScreen';
 
@@ -62,6 +63,7 @@ export function AuthProvider({ children }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, nextSession) => {
       if (!active) return;
       setCacheScope(nextSession?.user.id || null);
+      bindBranchUser(nextSession?.user.id || null);
       adoptCached(nextSession);
       setSession(nextSession);
       setUser(nextSession?.user.id || null);
@@ -71,6 +73,7 @@ export function AuthProvider({ children }) {
       if (!active) return;
       if (error) setAccountError('Your sign-in link is invalid or expired. Request a new one.');
       setCacheScope(data.session?.user.id || null);
+      bindBranchUser(data.session?.user.id || null);
       adoptCached(data.session);
       setSession(data.session);
       setUser(data.session?.user.id || null);
@@ -141,4 +144,6 @@ export function AuthProvider({ children }) {
 }
 
 export const useAuth = () => useContext(AuthContext);
-export const homeFor = (account) => ['admin', 'owner', 'waiter'].includes(account?.role) ? `/${account.role}` : '/account';
+/** Where a signed-in account lands. /api/me decides (business grant → /owner, branch manager → /branch/…, waiter, admin). */
+export const homeFor = (account) => account?.home
+  || (account?.role === 'admin' ? '/admin' : account?.role === 'waiter' ? '/waiter' : account?.role === 'owner' ? '/branch' : '/account');

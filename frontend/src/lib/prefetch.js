@@ -4,6 +4,7 @@
  * so a click a moment later renders without waiting. Loaders run once; a failed load can be retried.
  */
 import { getCacheScope } from './cache';
+import { getActiveBranch } from './branch';
 
 // `loader.module` holds the module once it has loaded, so App can render it without suspending.
 const once = (load) => {
@@ -30,7 +31,9 @@ export const chunks = {
   settings: once(() => import('../pages/settings/SettingsPage')),
   contact: once(() => import('../pages/owner/ContactPage')),
   adminOverview: once(() => import('../pages/admin/AdminOverviewPage')),
-  adminRestaurants: once(() => import('../pages/admin/RestaurantsPage')),
+  adminBusinesses: once(() => import('../pages/admin/BusinessesPage')),
+  adminBusiness: once(() => import('../pages/admin/BusinessDetailPage')),
+  adminActivity: once(() => import('../pages/admin/ActivityPage')),
   adminPerformance: once(() => import('../pages/admin/PerformancePage')),
   adminMoney: once(() => import('../pages/admin/MoneyPage')),
   adminRequests: once(() => import('../pages/admin/RequestsPage')),
@@ -43,13 +46,25 @@ export const chunks = {
   welcome: once(() => import('../pages/onboarding/WelcomePage')),
   onboarding: once(() => import('../pages/onboarding/OnboardingPage')),
   guestMenu: once(() => import('../pages/GuestMenuPage')),
+  ownerOverview: once(() => import('../pages/business/OwnerOverviewPage')),
+  ownerLocations: once(() => import('../pages/business/LocationsPage')),
+  ownerPeople: once(() => import('../pages/business/PeoplePage')),
+  ownerBranch: once(() => import('../pages/business/BranchDetailPage')),
+  branchChooser: once(() => import('../pages/business/BranchChooserPage')),
+  branchInventory: once(() => import('../pages/stock/BranchInventoryPage')),
+  ownerInventory: once(() => import('../pages/stock/OwnerInventoryPage')),
+  receiveCode: once(() => import('../pages/stock/ReceiveCodePage')),
+  terms: once(() => import('../components/legal/TermsPage')),
+  termsAccept: once(() => import('../components/legal/TermsAcceptPage')),
+  adminTerms: once(() => import('../pages/admin/AdminTermsPage')),
 };
 
 /** The GETs the owner Overview reads through the cache (OverviewPage uses the same keys). */
 export const OVERVIEW_GETS = ['/api/ops/live', '/api/ops/analytics?range=today', '/api/ops/health', '/api/restaurant/onboarding'];
 
-const OWNER_PAGES = { '': 'overview', orders: 'orders', tables: 'tables', products: 'products', menu: 'menuConfig', insights: 'insights', settings: 'settings', 'contact-cravio': 'contact' };
-const ADMIN_PAGES = { '': 'adminOverview', restaurants: 'adminRestaurants', performance: 'adminPerformance', money: 'adminMoney', 'leads-requests': 'adminRequests', complaints: 'adminRequests', users: 'users', settings: 'settings' };
+const BRANCH_PAGES = { '': 'overview', orders: 'orders', tables: 'tables', products: 'products', menu: 'menuConfig', insights: 'insights', settings: 'settings', 'contact-cravio': 'contact', inventory: 'branchInventory' };
+const OWNER_PAGES = { '': 'ownerOverview', locations: 'ownerLocations', people: 'ownerPeople', branches: 'ownerBranch', inventory: 'ownerInventory' };
+const ADMIN_PAGES = { '': 'adminOverview', businesses: 'adminBusinesses', activity: 'adminActivity', terms: 'adminTerms', performance: 'adminPerformance', money: 'adminMoney', 'leads-requests': 'adminRequests', complaints: 'adminRequests', users: 'users', settings: 'settings' };
 const WAITER_PAGES = { '': 'waiterTables', services: 'waiterServices', menu: 'waiterMenu', order: 'newOrder', cart: 'cartImport' };
 
 /** Which chunks a pathname needs, or null for a path outside the app. */
@@ -60,15 +75,24 @@ export function chunksFor(pathname) {
   switch (area) {
     case '': return [...signedIn, 'authPages'];
     case 'guest-menu': return ['guestMenu'];
+    case 'terms': return page === 'accept' ? [...signedIn, 'termsAccept'] : ['terms'];
     case 'login': case 'forgot-password': case 'reset-password': return [...signedIn, 'authPages'];
     case 'account': return [...signedIn, 'account'];
     case 'welcome': return [...signedIn, 'welcome'];
     case 'onboarding': return [...signedIn, 'onboarding'];
+    case 'receive': return [...signedIn, 'receiveCode'];
     case 'owner': {
-      const key = page === 'tables' && detail ? 'tableDetail' : OWNER_PAGES[page] || 'pageFrame';
+      if (BRANCH_PAGES[page] && page) return [...signedIn, 'branchChooser']; // legacy link, redirected to a branch
+      return [...signedIn, 'dashboard', OWNER_PAGES[page] || 'pageFrame'];
+    }
+    case 'branch': {
+      if (!page) return [...signedIn, 'branchChooser'];
+      // /branch/<id>/<section>/<detail>
+      const [section = '', sub] = [detail, parts[3]];
+      const key = section === 'tables' && sub ? 'tableDetail' : BRANCH_PAGES[section] || 'pageFrame';
       return [...signedIn, 'dashboard', key];
     }
-    case 'admin': return [...signedIn, 'dashboard', ADMIN_PAGES[page] || 'pageFrame'];
+    case 'admin': return [...signedIn, 'dashboard', page === 'businesses' && detail ? 'adminBusiness' : ADMIN_PAGES[page] || 'pageFrame'];
     case 'waiter': return [...signedIn, 'waiter', WAITER_PAGES[page] || 'waiterTables'];
     default: return null;
   }
@@ -85,7 +109,8 @@ export function prefetchRoute(path, { data = true } = {}) {
   if (!keys) return Promise.resolve();
   const loading = Promise.all(keys.map((key) => chunks[key]())).catch(() => undefined);
   // lib/api pulls in the Supabase client, so it's imported on demand to keep it out of the entry chunk.
-  if (data && getCacheScope() && pathname.replace(/\/+$/, '') === '/owner') {
+  // Branch overview data only for the branch already active (its header goes with the request).
+  if (data && getCacheScope() && getActiveBranch() && pathname.replace(/\/+$/, '') === `/branch/${getActiveBranch()}`) {
     import('./api').then(({ prefetchApi }) => OVERVIEW_GETS.forEach((get) => prefetchApi(get))).catch(() => {});
   }
   return loading;
@@ -97,11 +122,13 @@ const saveData = () => Boolean(navigator.connection?.saveData) || /(^|-)2g$/.tes
 export function prefetchArea(pathname) {
   if (saveData()) return;
   const area = pathname.split('/')[1];
-  const paths = area === 'owner' ? ['/owner', '/owner/orders', '/owner/tables', '/owner/products', '/owner/menu', '/owner/insights']
+  const branch = pathname.split('/')[2];
+  const paths = area === 'branch' && branch ? ['', '/orders', '/tables', '/products', '/menu', '/insights'].map((page) => `/branch/${branch}${page}`)
+    : area === 'owner' ? ['/owner', '/owner/locations', '/owner/people']
     : area === 'waiter' ? ['/waiter', '/waiter/services', '/waiter/menu', '/waiter/order/new']
       : area === 'admin' ? ['/admin', '/admin/users']
         // After signing in, people land on the owner or waiter home.
-        : area === 'login' ? ['/owner', '/waiter'] : [];
+        : area === 'login' ? ['/owner', '/branch/x', '/waiter'] : [];
   if (!paths.length) return;
   const idle = window.requestIdleCallback || ((fn) => window.setTimeout(fn, 1));
   let index = 0;

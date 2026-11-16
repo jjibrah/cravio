@@ -8,6 +8,7 @@ import { useNotifications } from '../../components/notifications/NotificationPro
 import { EmptyState, ErrorState, OIcon, Panel, Segmented, SkeletonRows } from '../../components/owner/ui';
 import { api, useApi } from '../../lib/api';
 import '../admin/platform.css';
+import { branchPath } from '../../lib/branch';
 
 /**
  * Cravio's support contacts. PLACEHOLDERS: change these to the real support line, WhatsApp number and inbox.
@@ -35,11 +36,11 @@ const URGENCIES = [
 ];
 const STATUS = { open: 'Received', in_progress: 'Working on it', resolved: 'Resolved', closed: 'Closed' };
 const HELP_LINKS = [
-  { to: '/owner/products', label: 'Products', hint: 'Add or edit dishes and prices', icon: 'utensils' },
-  { to: '/owner/menu', label: 'Menu', hint: 'What guests see and when', icon: 'layers' },
-  { to: '/owner/tables', label: 'Tables', hint: 'Your floor and table numbers', icon: 'table' },
+  { to: 'products', branch: true, label: 'Products', hint: 'Add or edit dishes and prices', icon: 'utensils' },
+  { to: 'menu', branch: true, label: 'Menu', hint: 'What guests see and when', icon: 'layers' },
+  { to: 'tables', branch: true, label: 'Tables', hint: 'Your floor and table numbers', icon: 'table' },
   { to: '/onboarding/qr', label: 'QR codes', hint: 'Print table QR codes', icon: 'qr' },
-  { to: '/owner/settings', label: 'Settings', hint: 'Restaurant details, hours, staff', icon: 'edit' },
+  { to: 'settings', branch: true, label: 'Settings', hint: 'Restaurant details, hours, staff', icon: 'edit' },
 ];
 
 const dateTime = new Intl.DateTimeFormat('en-GB', { timeZone: 'Africa/Nairobi', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
@@ -100,7 +101,7 @@ export default function ContactPage({ section }) {
           <p className="o-panel-sub">Most changes you can make yourself, right now.</p>
           <ul>
             {HELP_LINKS.map((link) => <li key={link.to}>
-              <Link to={link.to} className="ct-help-link">
+              <Link to={link.branch ? branchPath(link.to) : link.to} className="ct-help-link">
                 <span className="ct-help-icon" aria-hidden="true"><OIcon name={link.icon} size={16} /></span>
                 <span><strong>{link.label}</strong><small>{link.hint}</small></span>
                 <OIcon name="arrowRight" size={15} className="ct-help-arrow" />

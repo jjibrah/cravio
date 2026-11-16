@@ -18,7 +18,8 @@ const pageKeywords = {
   insights: 'insights reports analytics sales revenue trends performance',
   settings: 'settings account profile password preferences restaurant team notifications',
   'contact-cravio': 'help support contact cravio team question',
-  restaurants: 'restaurants customers venues accounts owners',
+  businesses: 'businesses restaurants branches customers venues accounts owners',
+  activity: 'activity audit log access history grants',
   performance: 'performance usage uptime analytics platform',
   money: 'money billing invoices revenue payments subscriptions sales',
   'leads-requests': 'leads requests sign ups onboarding prospects',
@@ -28,8 +29,9 @@ const pageKeywords = {
 
 // Pages whose records can be searched once data is connected.
 export const searchableScopes = {
-  owner: ['orders', 'tables', 'products'],
-  admin: ['users', 'restaurants', 'leads-requests', 'complaints'],
+  branch: ['orders', 'tables', 'products'],
+  owner: [],
+  admin: ['users', 'businesses', 'leads-requests', 'complaints'],
 };
 
 function pageItems(role) {
@@ -45,7 +47,7 @@ function pageItems(role) {
 }
 
 function categoryItems(role) {
-  if (role !== 'owner') return [];
+  if (role !== 'branch') return [];
   return productCategories.filter((category) => category.id !== 'all').map((category) => ({
     id: `category:${category.id}`,
     group: 'Product categories',
@@ -53,13 +55,13 @@ function categoryItems(role) {
     hint: 'Products',
     icon: category.icon,
     keywords: 'category products menu',
-    to: `/owner/products?category=${category.id}`,
+    to: `/branch/products?category=${category.id}`,
   }));
 }
 
 function actionItems(role) {
   return [
-    ...(role === 'owner' ? [{ id: 'action:guest-menu', group: 'Actions', label: 'Open guest menu', hint: 'Opens in a new tab', icon: 'qr', keywords: 'qr guest menu preview public', href: '/guest-menu' }] : []),
+    ...(role === 'branch' ? [{ id: 'action:guest-menu', group: 'Actions', label: 'Open guest menu', hint: 'Opens in a new tab', icon: 'qr', keywords: 'qr guest menu preview public', href: '/guest-menu' }] : []),
     { id: 'action:refresh', group: 'Actions', label: 'Refresh data', hint: 'Reload this page', icon: 'refresh', keywords: 'reload update sync', action: 'refresh' },
     { id: 'action:sign-out', group: 'Actions', label: 'Log out', hint: 'End this session', icon: 'logout', keywords: 'sign out logout exit', action: 'sign-out', destructive: true },
   ];
@@ -136,6 +138,7 @@ export function searchFor(role, rawQuery, perGroup = 5) {
 
 export const searchPlaceholder = {
   owner: 'Search or jump to…',
+  branch: 'Search or jump to…',
   admin: 'Search or jump to…',
 };
 

@@ -14,7 +14,9 @@
   box-shadow: 0 -12px 40px -16px #12121140;
 }
 .sheet[open] { display: flex; animation: sheet-in 240ms var(--ease) both; }
-.sheet::backdrop { background: #12121166; }
+.sheet::backdrop { background: rgb(26 24 20 / .32); animation: sheet-scrim-in 200ms var(--ease) both; }
+@keyframes sheet-scrim-in { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .sheet::backdrop { animation: none; } }
 .sheet-panel { display: flex; flex-direction: column; width: 100%; min-height: 0; max-height: calc(100dvh - 24px); }
 .sheet-handle { flex-shrink: 0; width: 36px; height: 4px; margin: 10px auto 2px; border-radius: 999px; background: var(--line-strong); }
 .sheet-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-shrink: 0; padding: 4px 12px 8px 24px; }
