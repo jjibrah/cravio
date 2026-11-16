@@ -1,6 +1,6 @@
 # Inventory (V2-05 → V2-07) and migration 009 review pack
 
-Status: **implemented on v2-dev; migration 009 PROPOSED, NOT applied.** Until it is applied, Inventory pages say “isn’t switched on yet” and ordering/serving behave exactly as before. Rehearsed on disposable PGlite (`npm run test:v2`, 58 inventory checks incl. rollback).
+Status: **implemented; migration 009 APPLIED to the shared development database on 16 Nov 2026** (file in `backend/db/migrations/`; rollback in `backend/db/proposed/009_inventory.down.sql`). Counts of orders, order lines, menu items, restaurants and memberships were identical before and after. No dish is tracked until a branch manager links it, so ordering and serving are unchanged until then. Rehearsed on disposable PGlite (`npm run test:v2`, 58 inventory checks incl. rollback).
 
 ## Rules (product owner answers, 16 Nov 2026)
 

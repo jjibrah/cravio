@@ -16,7 +16,7 @@ const fails = async (promise, test, m) => {
   checks++;
 };
 
-const db = await freshDatabase({ extra: ['proposed/009_inventory.sql'] });
+const db = await freshDatabase();
 const one = async (sql, p) => (await db.query(sql, p)).rows[0];
 const tx = (fn) => db.transaction(fn);
 
@@ -191,7 +191,7 @@ eq((await one(`select to_regclass('public.stock_items') is null as gone`)).gone,
 const after = await order([{ itemId: fantaDish, name: 'Fanta', quantity: 50 }]);
 await serve(after);
 eq((await one('select status from public.orders where id = $1', [after])).status, 'served', 'orders work without inventory after rollback');
-await db.exec(readSql('proposed/009_inventory.sql'));
+await db.exec(readSql('migrations/009_inventory.sql'));
 eq((await one(`select to_regclass('public.stock_items') is not null as back`)).back, true, 're-apply after rollback works');
 
 console.log(`Inventory: ${checks} checks passed (disposable PGlite database).`);

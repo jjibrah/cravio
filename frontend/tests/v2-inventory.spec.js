@@ -1,4 +1,4 @@
-// Inventory screens. First test is real and read-only (before migration 009 the page explains it isn't on yet).
+// Inventory screens. First test is real and read-only (migration 009 applied; nothing tracked yet).
 // The others MOCK /api/stock and /api/owner/stock responses and abort every write, so nothing reaches the database.
 import { test, expect } from '@playwright/test';
 
@@ -54,11 +54,13 @@ async function mock(page) {
   });
 }
 
-test('before migration 009 the branch Inventory page says it isn’t switched on (real, read-only)', async ({ page }) => {
+test('branch Inventory is live and starts empty (real, read-only)', async ({ page }) => {
   await signIn(page, 'manager@gmail.com');
   await expect(page).toHaveURL(new RegExp(`/branch/${ABDIS}$`));
   await page.getByRole('navigation', { name: 'Branch navigation' }).getByRole('link', { name: 'Inventory' }).click();
-  await expect(page.getByText('Inventory isn’t switched on yet')).toBeVisible();
+  await expect(page.getByText('No stock items yet')).toBeVisible();
+  await page.getByRole('radio', { name: /Dish links/ }).click();
+  await expect(page.getByText('Not tracked').first()).toBeVisible();
 });
 
 test('branch manager: stock, dish links, requests, deliveries and history (mocked)', async ({ page }, info) => {

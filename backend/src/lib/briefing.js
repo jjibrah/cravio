@@ -60,6 +60,7 @@ async function stockFacts(db, ids, businessIds) {
 function trend(now, before, money = false) {
   if (!before && !now) return 'quiet so far, as it was this time last week';
   if (!before) return 'nothing at this time last week';
+  if (!now) return `none yet (${money ? kes(before) : before} by this time last week)`;
   const diff = now - before;
   const pct = Math.round((diff / before) * 100);
   if (Math.abs(pct) < 5) return 'about the same as this time last week';

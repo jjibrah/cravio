@@ -10,7 +10,7 @@ Prepared 16 November 2026. Branch: **v2-dev**. Base code: `e0de46635182613b9536b
 | V2-02 membership & scoping | **Done.** Branch APIs resolve `X-Cravio-Branch` against memberships. Migration 008 **applied**; owner@ = business owner, manager@ = branch manager | `npm run test:v2` |
 | V2-03 branch-manager routing | **Done.** `/branch/:id/*`, legacy `/owner/<page>` redirects, switcher, per-branch cache, waiter branch choice | `npm run test:v2-ui` |
 | V2-04 owner interface | **Done.** Overview with **Briefing** (daily brief from records + ask-about-today assistant, no AI model yet) and Branches; Locations (+ add branch); Branch detail (+ add staff); Inventory; People & access. Preview pages removed. Tasks open in a side sheet | live check with owner@; mocked UI checks |
-| V2-05…07 inventory | **Built; needs migration 009 (proposed, not applied).** Servings, dish links, count/add/waste, deduct on serving, sold out + override, order corrections, requests → approval → dispatch (QR) → receipt | [INVENTORY.md](INVENTORY.md); 58 PGlite checks; UI checks with mocked data |
+| V2-05…07 inventory | **Live: migration 009 applied 16 Nov 2026.** Servings, dish links, count/add/waste, deduct on serving, sold out + override, order corrections, requests → approval → dispatch (QR) → receipt | [INVENTORY.md](INVENTORY.md); 58 PGlite checks; UI checks with mocked data |
 | V2-08 regression | Read-only browser checks (11). Inherited Playwright suites write to the shared DB and were not run | — |
 
 Test accounts (shared dev DB): owner@gmail.com (business owner → `/owner`), manager@gmail.com (branch manager → `/branch/106fe2fb…`), waiter@gmail.com (`/waiter`). admin@gmail.com does not exist in this database.
