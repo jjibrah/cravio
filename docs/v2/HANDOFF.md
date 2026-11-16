@@ -35,14 +35,14 @@ Use Node.js compatible with the current project (README specifies 22.12+). Inspe
 
 ## Local application setup
 
-For a fresh clone, create ignored config files from templates:
+The frontend and backend development `.env` files are now included on `v2-dev` at the user's explicit request for the other-device handoff. The user plans to rotate the keys. Do not overwrite these files with empty templates. If a future checkout does not contain them, create config files from templates:
 
 ```bash
 cp backend/.env.example backend/.env
 cp frontend/.env.example frontend/.env
 ```
 
-Only do that if these files do not already exist. Populate credentials through the team's secure channel; Git does not transfer `.env` files, database contents or local worktrees. Server service/database credentials belong only in backend config. The frontend needs its public Supabase URL/key and an empty `VITE_API_URL` for the local proxy. Use the same Supabase target in frontend and backend.
+Only do that if these files do not already exist. This branch transfers the included development environment files, but not database contents or local worktrees. If the keys have been rotated, obtain the replacement values through the team's secure channel. Server service/database credentials belong only in backend config. The frontend needs its public Supabase URL/key and an empty `VITE_API_URL` for the local proxy. Use the same Supabase target in frontend and backend.
 
 For the v2 checkout set `PORT=3004` and `FRONTEND_URL=http://localhost:5174` in `backend/.env`, then run in separate terminals from the repository root:
 
@@ -66,7 +66,7 @@ To prepare a separate baseline checkout on the new device, with a non-existing d
 git worktree add --detach ../cravio-main-baseline origin/main
 ```
 
-In that baseline directory, install dependencies and configure its own ignored environment files. Set backend `PORT=3003`, `FRONTEND_URL=http://localhost:5173`, matching Supabase settings and empty frontend `VITE_API_URL`. Then run the baseline backend and frontend in their own terminals:
+In that baseline directory, install dependencies and configure its own environment files (main does not include the v2 development environment files). Set backend `PORT=3003`, `FRONTEND_URL=http://localhost:5173`, matching Supabase settings and empty frontend `VITE_API_URL`. Then run the baseline backend and frontend in their own terminals:
 
 ```bash
 npm run dev:backend
