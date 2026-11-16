@@ -2,16 +2,16 @@
 // Fixture mirrors the shape of the audited data: two restaurants, a legacy owner per restaurant, waiters, orders.
 // Usage: node backend/tests/migration-008.js
 import assert from 'node:assert/strict';
-import { asUser, createUser, freshDatabase, readSql } from './support/pg.js';
+import { asUser, createUser, freshDatabase, migrationFiles, readSql } from './support/pg.js';
 
 let checks = 0;
 const ok = (value, message) => { assert.ok(value, message); checks++; };
 const equal = (a, b, message) => { assert.equal(a, b, message); checks++; };
 const rejects = async (promise, pattern, message) => { await assert.rejects(promise, pattern, message); checks++; };
-const UP = 'proposed/008_business_branches.sql';
+const UP = 'migrations/008_business_branches.sql';
 const DOWN = 'proposed/008_business_branches.down.sql';
 
-const db = await freshDatabase();
+const db = await freshDatabase({ migrations: migrationFiles().filter((name) => name < '008') });
 const one = async (sql, params) => (await db.query(sql, params)).rows[0];
 
 // ---- Pre-migration fixture (007 shape) ----

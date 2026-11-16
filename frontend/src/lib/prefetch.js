@@ -50,13 +50,16 @@ export const chunks = {
   ownerPeople: once(() => import('../pages/business/PeoplePage')),
   ownerBranch: once(() => import('../pages/business/BranchDetailPage')),
   branchChooser: once(() => import('../pages/business/BranchChooserPage')),
+  branchInventory: once(() => import('../pages/stock/BranchInventoryPage')),
+  ownerInventory: once(() => import('../pages/stock/OwnerInventoryPage')),
+  receiveCode: once(() => import('../pages/stock/ReceiveCodePage')),
 };
 
 /** The GETs the owner Overview reads through the cache (OverviewPage uses the same keys). */
 export const OVERVIEW_GETS = ['/api/ops/live', '/api/ops/analytics?range=today', '/api/ops/health', '/api/restaurant/onboarding'];
 
-const BRANCH_PAGES = { '': 'overview', orders: 'orders', tables: 'tables', products: 'products', menu: 'menuConfig', insights: 'insights', settings: 'settings', 'contact-cravio': 'contact' };
-const OWNER_PAGES = { '': 'ownerOverview', locations: 'ownerLocations', people: 'ownerPeople', branches: 'ownerBranch', inventory: 'inventory', management: 'inventory', assistant: 'inventory' };
+const BRANCH_PAGES = { '': 'overview', orders: 'orders', tables: 'tables', products: 'products', menu: 'menuConfig', insights: 'insights', settings: 'settings', 'contact-cravio': 'contact', inventory: 'branchInventory' };
+const OWNER_PAGES = { '': 'ownerOverview', locations: 'ownerLocations', people: 'ownerPeople', branches: 'ownerBranch', inventory: 'ownerInventory', management: 'inventory', assistant: 'inventory' };
 const ADMIN_PAGES = { '': 'adminOverview', restaurants: 'adminRestaurants', performance: 'adminPerformance', money: 'adminMoney', 'leads-requests': 'adminRequests', complaints: 'adminRequests', users: 'users', settings: 'settings' };
 const WAITER_PAGES = { '': 'waiterTables', services: 'waiterServices', menu: 'waiterMenu', order: 'newOrder', cart: 'cartImport' };
 
@@ -72,6 +75,7 @@ export function chunksFor(pathname) {
     case 'account': return [...signedIn, 'account'];
     case 'welcome': return [...signedIn, 'welcome'];
     case 'onboarding': return [...signedIn, 'onboarding'];
+    case 'receive': return [...signedIn, 'receiveCode'];
     case 'owner': {
       if (BRANCH_PAGES[page] && page) return [...signedIn, 'branchChooser']; // legacy link, redirected to a branch
       return [...signedIn, 'dashboard', OWNER_PAGES[page] || 'pageFrame'];

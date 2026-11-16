@@ -7,7 +7,7 @@ import { invalidateUser } from '../lib/cache.js';
 import { email as cleanEmail } from '../lib/restaurants.js';
 import { serviceClient } from '../lib/supabase.js';
 import { welcomeUrl } from '../lib/staff-invites.js';
-import { database } from '../inventory/database.js';
+import { withDb } from '../lib/db.js';
 import { addBranchStaff, branchDetail, createBranch, overview, people, revokeOperations, setOperations } from '../lib/business.js';
 
 const ID = '[0-9a-fA-F-]{36}';
@@ -18,24 +18,6 @@ async function ownerUser(request) {
   if (context.grants === undefined) throw new HttpError(503, 'The owner interface needs database update 008, which hasn’t been applied yet.', { code: 'business_schema_missing' });
   if (context.profile.role === 'admin') throw new HttpError(403, 'Platform admins use the admin workspace.');
   return context;
-}
-
-async function withDb(fn, { transaction = false } = {}) {
-  const client = await database().connect();
-  try {
-    if (!transaction) return await fn(client);
-    await client.query('begin');
-    const result = await fn(client);
-    await client.query('commit');
-    return result;
-  } catch (error) {
-    if (transaction) await client.query('rollback').catch(() => {});
-    if (error instanceof HttpError) throw error;
-    if (['42P01', '42703'].includes(error.code)) throw new HttpError(503, 'The owner interface needs database update 008, which hasn’t been applied yet.', { code: 'business_schema_missing' });
-    if (error.code === '23505') throw new HttpError(409, 'That already exists.');
-    if (['23503', '23514', '22P02'].includes(error.code)) throw new HttpError(400, 'Some details are invalid. Check them and try again.');
-    throw error;
-  } finally { client.release(); }
 }
 
 /** An existing account's id by email, or a newly invited account (they set a password from the email). */

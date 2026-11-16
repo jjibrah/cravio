@@ -21,7 +21,7 @@
     "test:inventory": "node backend/tests/inventory.js",
     "test:inventory-ui": "node backend/tests/inventory-ui.js",
     "test:workspace-ui": "node backend/tests/workspace-layout.js",
-    "test:v2": "node backend/tests/access.js && node backend/tests/migration-008.js && node backend/tests/business.js && node backend/tests/access-mapping.js",
+    "test:v2": "node backend/tests/access.js && node backend/tests/migration-008.js && node backend/tests/business.js && node backend/tests/access-mapping.js && node backend/tests/inventory-v2.js",
     "test:v2-ui": "npm exec --workspace frontend -- playwright test -c playwright.v2.config.js",
     "audit:accounts": "node backend/scripts/audit-accounts.js"
   },

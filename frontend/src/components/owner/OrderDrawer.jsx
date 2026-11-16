@@ -4,6 +4,8 @@ import {
   NEXT_ACTION, ORDER_STAGES, PAY_METHODS, componentsText, confirmationOf, extrasText, formatClock, formatDateTime, formatKes,
   formatRelative, opsApi, payMethodLabel, shortId, tableName, useNow, useResource,
 } from '../../lib/ops';
+import { Link } from 'react-router-dom';
+import { branchPath, getActiveBranch } from '../../lib/branch';
 import Drawer from './Drawer';
 import { ErrorState, OIcon, SkeletonRows, StatusChip } from './ui';
 
@@ -189,6 +191,10 @@ function OrderDetail({ orderId, onChanged, onLoaded }) {
           <button type="button" className="o-btn is-quiet" onClick={() => setMode('idle')} disabled={busy}>Keep order</button>
         </div>
       </form>}
+      {/* Stock left when this order was served; a swap afterwards (Fanta → Coke) is corrected in Inventory. */}
+      {order.servedAt && getActiveBranch() && <p className="o-inline-help">
+        <Link className="o-text-link" to={branchPath(`inventory?correct=${order.id}`)}>Correct stock for this order</Link> if something was swapped or came back after serving.
+      </p>}
     </section>
   </div>;
 }

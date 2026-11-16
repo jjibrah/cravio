@@ -285,6 +285,7 @@ async function createOrder({ request, body }) {
     check(itemsError);
   }
   if (cart) check((await db.from('guest_carts').update({ claimed_order_id: id }).eq('id', cart.id)).error);
+  invalidateMenu(restaurantId); // held servings can make a dish sold out
   return { order: await loadOrder(context, id) };
 }
 
@@ -340,6 +341,7 @@ async function advanceOrder({ request, params, body }) {
   const saved = must(await db.from('orders').update(update)
     .eq('id', order.id).eq('status', order.status).select('id').maybeSingle());
   if (!saved) throw changed((await currentOrder(db, context, order.id)).status);
+  invalidateMenu(context.restaurantId); // serving deducts stock (migration 009 trigger)
   return { order: await loadOrder(context, order.id) };
 }
 
@@ -395,6 +397,7 @@ async function cancelOrder({ request, params, body }) {
   const saved = must(await db.from('orders').update({ status: 'cancelled', cancelled_by: context.user.id, cancelled_at: new Date().toISOString(), cancel_reason: reason })
     .eq('id', order.id).eq('status', order.status).select('id').maybeSingle());
   if (!saved) throw changed((await currentOrder(db, context, order.id)).status);
+  invalidateMenu(context.restaurantId); // releases servings an unserved order was holding
   return { order: await loadOrder(context, order.id) };
 }
 

@@ -12,7 +12,7 @@ const fails = async (promise, status, message) => {
   checks++;
 };
 
-const db = await freshDatabase({ extra: ['proposed/008_business_branches.sql'] });
+const db = await freshDatabase();
 const one = async (sql, params) => (await db.query(sql, params)).rows[0];
 
 const owner = await createUser(db, 'owner@example.test', { role: 'owner' });

@@ -65,6 +65,7 @@ export function check(error, messages = {}) {
   if (!error) return;
   if (error instanceof HttpError) throw error;
   if (isMissingSchema(error) || ['42703', '42883', 'PGRST202', 'PGRST204'].includes(error.code)) throw new HttpError(503, NOT_INSTALLED);
+  if (error.code === 'P0001' && error.hint === 'stock_sold_out') throw new HttpError(409, error.message, { code: 'sold_out' });
   if (error.code === '23505') throw new HttpError(409, messages.duplicate || 'That already exists.');
   if (error.code === '23514' || error.code === '22P02') throw new HttpError(400, messages.invalid || 'Some details are invalid. Check them and try again.');
   if (error.code === '42501') throw new HttpError(403, 'You do not have access to this.');

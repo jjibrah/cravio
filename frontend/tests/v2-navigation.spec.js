@@ -14,13 +14,13 @@ async function signIn(page, email) {
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
 }
 
-test('legacy owner lands in the branch-manager workspace, not the owner interface', async ({ page }) => {
+test('branch manager lands in the branch workspace, not the owner interface', async ({ page }) => {
   const branchHeaders = new Set();
   page.on('request', (request) => {
     const url = new URL(request.url());
     if (url.pathname.startsWith('/api/ops') || url.pathname.startsWith('/api/restaurant')) branchHeaders.add(request.headers()['x-cravio-branch'] || 'missing');
   });
-  await signIn(page, 'owner@gmail.com');
+  await signIn(page, 'manager@gmail.com');
   await expect(page).toHaveURL(/\/branch\/[0-9a-f-]{36}$/);
   await expect(page.getByRole('heading', { name: 'Overview', exact: true })).toBeVisible();
   const branchId = page.url().split('/branch/')[1];
@@ -48,6 +48,15 @@ test('legacy owner lands in the branch-manager workspace, not the owner interfac
   // A branch the account doesn't manage is refused.
   await page.goto('/branch/0f743f69-0386-4ce6-8c51-f03b417e2784');
   await expect(page).toHaveURL(new RegExp(`/branch/${branchId}$`));
+});
+
+test('business owner (reviewed mapping) lands in the owner interface and can open the branch workspace', async ({ page }) => {
+  await signIn(page, 'owner@gmail.com');
+  await expect(page).toHaveURL(/\/owner$/);
+  await expect(page.getByRole('heading', { name: 'Abdis Test Restaurant', exact: false }).first()).toBeVisible();
+  await page.getByRole('link', { name: 'Open workspace' }).first().click();
+  await expect(page).toHaveURL(/\/branch\/106fe2fb-94bb-4f5d-bd0d-bd694004424c$/);
+  await expect(page.getByRole('heading', { name: 'Overview', exact: true })).toBeVisible();
 });
 
 test('waiter lands in the waiter app scoped to their branch and cannot open branch or owner areas', async ({ page }) => {

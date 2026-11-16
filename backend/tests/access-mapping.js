@@ -7,7 +7,7 @@ import { overview } from '../src/lib/business.js';
 
 let checks = 0;
 const eq = (a, b, m) => { assert.deepEqual(a, b, m); checks++; };
-const db = await freshDatabase({ extra: ['proposed/008_business_branches.sql'] });
+const db = await freshDatabase();
 const one = async (sql, p) => (await db.query(sql, p)).rows[0];
 const owner = await createUser(db, 'owner@example.test', { role: 'owner' });
 const second = await createUser(db, 'second@example.test', { role: 'owner' });

@@ -52,6 +52,13 @@ Added 16 Nov 2026 with the first implementation slice (V2-02/03/04). Each is rev
 
 | Decision | Answer | Approved by/date | Evidence or example | Affected work packages |
 | --- | --- | --- | --- | --- |
-| D01–D13 | Open; fill individually when answered | | | |
+| D02 | owner@gmail.com is the **business owner** of Abdis Test Restaurant; manager@gmail.com its **branch manager**. Business owners see and manage their branches' managers. Business owners act as operations managers for now (R1–R7 accepted). Migration 008 approved and applied. | Product owner, 16 Nov 2026 | MIGRATION-008.md | V2-02, V2-04 |
+| D03 | Unit is **servings**. Main center dispatches to branches; branches request from the center and track their own stock. | Product owner, 16 Nov 2026 | INVENTORY.md | V2-05 |
+| D04 | Stock leaves **on serving**. Plan for changes (e.g. Fanta → Coke). | Product owner, 16 Nov 2026 | INVENTORY.md | V2-06 |
+| D05 | The **branch manager** corrects stock. | Product owner, 16 Nov 2026 | INVENTORY.md | V2-06 |
+| D06 | At zero: **show sold out**; branch manager can override. | Product owner, 16 Nov 2026 | INVENTORY.md | V2-06 |
+| D07 | Requests go to the **owner**, who can approve partly or reject; follow common practice; receipt verified with a **dispatch number / QR**. | Product owner, 16 Nov 2026 | INVENTORY.md | V2-07 |
+| D08 | Shared-table multi-device ordering **on hold**. | Product owner, 16 Nov 2026 | — | — |
+| D01, D09–D13 | Open | | | |
 
 Record answers here and revise the implementation plan before implementing affected behavior. Preserve the original question and evidence trail when a decision changes.

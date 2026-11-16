@@ -1,6 +1,6 @@
 # Migration 008 — businesses, branches and access (for review, NOT applied)
 
-Status: **proposed**. Files live in `backend/db/proposed/` so `npm run db:migrate` cannot apply them. Nothing in this document has been run against the shared database. Rehearsed only on disposable in-process Postgres (PGlite) via `npm run test:v2`.
+Status: **APPLIED to the shared development database on 16 Nov 2026** after approval (file now in `backend/db/migrations/`; rollback stays in `backend/db/proposed/008_business_branches.down.sql`). Pre-apply snapshot of the touched rows was taken outside the repo. Mapping applied: owner@gmail.com → business owner of Abdis Test Restaurant. manager@gmail.com created as Abdis branch manager at the product owner's request.
 
 ## What it changes
 
