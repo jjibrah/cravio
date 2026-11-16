@@ -61,6 +61,8 @@ export default function useStudio() {
   const [publishError, setPublishError] = useState('');
   const [publishedAt, setPublishedAt] = useState(null);
   const restaurantId = load.onboarding?.restaurant?.id;
+  // The design as it was when the studio opened (a restored draft included), to tell edits made during this visit.
+  const [openedKey, setOpenedKey] = useState(null);
 
   useEffect(() => {
     let live = true;
@@ -82,6 +84,7 @@ export default function useStudio() {
         }
       } catch { /* storage blocked */ }
       dispatch({ type: 'load', design: present });
+      setOpenedKey(designKey(present));
       setLoad({ status: 'ready', onboarding, merch, designAvailable: Boolean(designResponse), options: designResponse?.options || null });
     }).catch((error) => { if (live) setLoad({ status: 'error', error }); });
     return () => { live = false; };
@@ -89,6 +92,8 @@ export default function useStudio() {
 
   const draft = state.present;
   const dirty = Boolean(draft && published) && designKey(draft) !== designKey(published);
+  // Unpublished AND changed since the studio opened: only then is leaving worth a warning.
+  const changedThisVisit = dirty && openedKey !== null && designKey(draft) !== openedKey;
 
   // Autosave the unpublished draft on this device (and forget it once published or undone back).
   useEffect(() => {
@@ -139,7 +144,7 @@ export default function useStudio() {
   const preview = useMemo(() => (menu && resolved ? { restaurant, ...menu, design: resolved } : null), [menu, resolved, restaurant]);
 
   return {
-    load, retry: () => setAttempt((n) => n + 1), restaurant, menu, draft, published, resolved, preview, dirty,
+    load, retry: () => setAttempt((n) => n + 1), restaurant, menu, draft, published, resolved, preview, dirty, changedThisVisit,
     canUndo: state.past.length > 0, canRedo: state.future.length > 0,
     set, update, undo, redo, reset, discard, publish, publishing, publishError, publishedAt, restored, dismissRestored: () => setRestored(null), setRestaurant,
   };
