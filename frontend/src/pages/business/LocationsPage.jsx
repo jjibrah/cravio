@@ -3,6 +3,7 @@ import { useId, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '../../components/dashboard/PageFrame';
 import { EmptyState, OIcon, Panel, SkeletonRows } from '../../components/owner/ui';
+import { Modal } from '../../components/owner/Drawer';
 import '../../components/owner/overview.css';
 import { api, useApi } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
@@ -39,7 +40,7 @@ function AddBranch({ business, onDone }) {
   return <form className="biz-form" onSubmit={submit} noValidate>
     <div className="o-field">
       <label className="o-label" htmlFor={`${ids}-name`}>Branch name</label>
-      <input id={`${ids}-name`} className="o-input" value={values.name} maxLength={120} autoComplete="off"
+      <input id={`${ids}-name`} className="o-input" value={values.name} maxLength={120} autoComplete="off" data-autofocus
         onChange={(event) => setValues({ ...values, name: event.target.value })} aria-invalid={Boolean(error) || undefined} aria-describedby={error ? `${ids}-error` : undefined} />
     </div>
     <div className="o-field">
@@ -70,11 +71,13 @@ export default function LocationsPage({ section }) {
         : !businesses.length ? <EmptyState icon="store" tone="neutral" title="No business access yet">Ask the business owner or Cravio to grant access.</EmptyState>
           : businesses.map((business) => <Panel key={business.id} title={business.name} count={business.branches.length}
             sub={business.role === 'owner' ? 'You own this business' : 'Branches assigned to you'}
-            actions={business.role === 'owner' && adding !== business.id && <button type="button" className="o-btn is-small" onClick={() => setAdding(business.id)}>
+            actions={business.role === 'owner' && <button type="button" className="o-btn is-small" onClick={() => setAdding(business.id)}>
               <OIcon name="plus" size={15} />Add branch</button>}>
-            {adding === business.id && <AddBranch business={business} onDone={() => setAdding(null)} />}
             {business.branches.length ? <BranchRows branches={business.branches} />
               : <EmptyState icon="store" tone="neutral" title="No branches yet">{business.role === 'owner' ? 'Add your first branch.' : 'None are assigned to you yet.'}</EmptyState>}
           </Panel>)}
+    <Modal open={Boolean(adding)} onClose={() => setAdding(null)} title="Add a branch">
+      {adding && <AddBranch business={businesses.find((b) => b.id === adding)} onDone={() => setAdding(null)} />}
+    </Modal>
   </div>;
 }

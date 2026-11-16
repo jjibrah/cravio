@@ -3,6 +3,7 @@
 import { useId, useState } from 'react';
 import { PageHeader } from '../../components/dashboard/PageFrame';
 import { EmptyState, OIcon, Panel, SkeletonRows } from '../../components/owner/ui';
+import { Modal } from '../../components/owner/Drawer';
 import { api, useApi } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import { useNotifications } from '../../components/notifications/NotificationProvider';
@@ -45,7 +46,7 @@ function OperationsForm({ businessId, branches, person, onDone }) {
     {!person && <>
       <div className="o-field">
         <label className="o-label" htmlFor={`${ids}-email`}>Email</label>
-        <input id={`${ids}-email`} type="email" className="o-input" value={values.email} autoComplete="off" required
+        <input id={`${ids}-email`} type="email" className="o-input" value={values.email} autoComplete="off" required data-autofocus
           onChange={(event) => setValues({ ...values, email: event.target.value })} />
         <p className="o-field-hint">Someone without a Cravio account gets an invitation email.</p>
       </div>
@@ -90,9 +91,8 @@ function BusinessPeople({ business }) {
   return <>
     <Panel title={`Business access · ${business.name}`} count={data.businessAccess.length}
       sub={data.canManageAccess ? 'Business owners see every branch. Operations managers see the branches you choose.' : 'Only the business owner changes access.'}
-      actions={data.canManageAccess && editing !== 'new' && data.branches.length > 0
+      actions={data.canManageAccess && data.branches.length > 0
         && <button type="button" className="o-btn is-small" onClick={() => setEditing('new')}><OIcon name="plus" size={15} />Grant operations access</button>}>
-      {editing === 'new' && <OperationsForm businessId={business.id} branches={data.branches} onDone={() => setEditing(null)} />}
       <ul className="biz-people">{data.businessAccess.map((person) => <li key={person.userId}>
         <div className="biz-person">
           <span className="biz-person-main">
@@ -104,9 +104,13 @@ function BusinessPeople({ business }) {
             <button type="button" className="o-btn is-quiet is-small" onClick={() => revoke(person)} disabled={revoking === person.userId}>Remove</button>
           </span>}
         </div>
-        {editing === person.userId && <OperationsForm businessId={business.id} branches={data.branches} person={person} onDone={() => setEditing(null)} />}
       </li>)}</ul>
     </Panel>
+    <Modal open={Boolean(editing)} onClose={() => setEditing(null)}
+      title={editing === 'new' ? 'Grant operations access' : `${data.businessAccess.find((p) => p.userId === editing)?.name || 'Their'}’s branches`}>
+      {editing && <OperationsForm businessId={business.id} branches={data.branches}
+        person={editing === 'new' ? null : data.businessAccess.find((p) => p.userId === editing)} onDone={() => setEditing(null)} />}
+    </Modal>
     <Panel title="Branch staff" count={data.branchStaff.length} sub="Add staff from a branch’s page. Change branch roles in that branch’s Settings → Team.">
       {data.branchStaff.length ? <ul className="biz-people">{data.branchStaff.map((person) => <li className="biz-person" key={`${person.branchId}:${person.userId}`}>
         <span className="biz-person-main"><strong>{person.name}</strong><span>{roleName[person.role]} · {branchName(person.branchId)}</span></span>
