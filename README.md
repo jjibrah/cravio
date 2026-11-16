@@ -1,5 +1,7 @@
 # CRAVIO
 
+**v2 planning branch:** Start with [the five-interface plan](docs/v2/IMPLEMENTATION-PLAN.md), [PRD context](docs/v2/PRD-CONTEXT.md), [open decisions](docs/v2/DECISIONS.md) and [setup on another device](docs/v2/HANDOFF.md). This branch inherits the current dev code; the new owner/operations and branch-manager separation is **not implemented**. Older descriptions below describe earlier development stages and are not the v2 acceptance specification. `npm run compare` currently requires `dev`; the handoff provides manual main/v2 run instructions.
+
 Minimal sign-in, password recovery, and reusable dashboards with three protected roles.
 
 ## Tech stack

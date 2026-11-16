@@ -1,5 +1,11 @@
 # Cravio: inventory, management and AI implementation plan
 
+**Superseded for v2:** use [docs/v2/IMPLEMENTATION-PLAN.md](docs/v2/IMPLEMENTATION-PLAN.md), based on the supplied Cravio PRD and the five-interface instruction. This older roadmap includes bakery, external POS and other proposals that are not approved v2 scope. The first v2 inventory target is restaurant quantities by branch with agreed Cravio order effects. Development handoff is on `v2-dev`; no main merge is authorized.
+
+**16 November clarification:** this is a general Cravio product, not a bespoke Fayaz build. First-version tracking is product quantities by branch, without batch traceability. The forthcoming PRD will guide the next planning revision; further implementation is pending that review. Historical Fayaz-specific proposals below are discovery context, not confirmed general-product requirements.
+
+**Planning correction:** the business owner needs a separate multi-branch dashboard; existing restaurant operations become branch-manager workspaces. [The revised multi-branch and traceability plan](docs/MULTI-BRANCH-PLAN.md) supersedes this document's earlier owner-dashboard placement and account-owner preview assumptions. This correction is planning only and has not been implemented.
+
 Status: implementation in progress. A first owner-scoped inventory/management preview is available on dev; the full roadmap is not complete. See [preview scope and verification](docs/INVENTORY-PREVIEW.md).
 
 Prepared 14 November 2026. Read alongside [question.md](question.md), the Fayaz discovery questionnaire.
