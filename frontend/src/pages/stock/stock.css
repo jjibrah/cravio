@@ -34,3 +34,27 @@
   .st-note .biz-form-actions { display: none; }
 }
 .st-short { color: var(--warning); }
+
+/* Toolbar: views on the leading side, actions on the trailing side. */
+.st-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.st-toolbar-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+/* Needs you */
+.st-needs { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+.st-need { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 16px; border-radius: var(--r-card);
+  background: var(--surface); box-shadow: 0 0 0 1px var(--line), var(--shadow-card); border-left: 4px solid var(--line-strong); }
+.st-need.is-urgent { border-left-color: var(--danger); }
+.st-need.is-action { border-left-color: var(--ember); }
+.st-need.is-info { border-left-color: #2156a5; }
+.st-need-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; font-size: 14px; }
+.st-need-text span { color: var(--muted); font-size: 13px; }
+/* Forms inside the side sheet have no divider or width cap. */
+.st-drawer .st-form { padding: 0; border-bottom: 0; }
+.st-drawer .st-form > * { max-width: none; }
+.st-row-button { padding: 0; border: 0; background: none; font: inherit; font-weight: 600; color: var(--ink); text-align: left; cursor: pointer; text-decoration: underline; text-decoration-color: transparent; text-underline-offset: 3px; }
+.st-row-button:hover, .st-row-button:focus-visible { text-decoration-color: var(--line-strong); }
+.st-table .is-low { color: #7d5106; }
+/* index.css styles every input/button as a full-width field / dark 44px button; these controls opt out. */
+.st-row-button { display: inline; min-height: 0; padding: 0; background: none; color: var(--ink); border-radius: 0; }
+.st-row-button:hover { background: none; }
+.st-table th small, .st-table td small { display: block; margin-top: 2px; }
+.st-form input[type="radio"], .st-form input[type="checkbox"], .biz-checks input, .biz-checks-inline input { width: auto; min-height: 0; margin: 0; }

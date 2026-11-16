@@ -53,7 +53,8 @@ test('branch manager lands in the branch workspace, not the owner interface', as
 test('business owner (reviewed mapping) lands in the owner interface and can open the branch workspace', async ({ page }) => {
   await signIn(page, 'owner@gmail.com');
   await expect(page).toHaveURL(/\/owner$/);
-  await expect(page.getByRole('heading', { name: 'Abdis Test Restaurant', exact: false }).first()).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1, name: /^Good (morning|afternoon|evening)/ })).toBeVisible();
+  await page.getByRole('tab', { name: /Branches/ }).click();
   await page.getByRole('link', { name: 'Open workspace' }).first().click();
   await expect(page).toHaveURL(/\/branch\/106fe2fb-94bb-4f5d-bd0d-bd694004424c$/);
   await expect(page.getByRole('heading', { name: 'Overview', exact: true })).toBeVisible();

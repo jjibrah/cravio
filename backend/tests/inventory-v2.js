@@ -175,6 +175,13 @@ await fails(db.query('delete from public.stock_movements'), /append-only/, 'move
 await fails(db.transaction(async (t) => { await t.query(`select set_config('request.jwt.claim.sub', $1, true)`, [manager]); await t.exec('set local role authenticated'); await t.query('select * from public.stock_balances'); }), /permission denied/, 'balances not readable directly by browsers');
 await fails(db.transaction(async (t) => { await t.query(`select set_config('request.jwt.claim.sub', $1, true)`, [rivalOwner]); await t.exec('set local role authenticated'); await t.query('select * from public.stock_menu_availability($1)', [main.id]); }), /Not a member/, 'availability limited to branch members');
 
+// Briefing reads stock facts for the business owner.
+await db.query(`insert into public.business_members (business_id, user_id, role) values ($1, $2, 'owner')`, [biz, owner]);
+const { briefing } = await import('../src/lib/briefing.js');
+const brief = await briefing(db, { id: owner });
+eq(brief.answers.stock.includes('Coke 300ml at Main (0 servings)'), true, 'briefing lists out-of-stock items per branch');
+eq(brief.attention.some((a) => a.kind === 'stock' && a.tone === 'urgent'), true, 'out-of-stock is urgent in the briefing');
+
 // Rollback: refused while history exists; after a deliberate clear it removes everything and orders keep working.
 await fails(db.exec(readSql('proposed/009_inventory.down.sql')), /Refusing rollback/, 'rollback refuses while stock history exists');
 await db.exec(`alter table public.stock_movements disable trigger stock_movements_no_change; delete from public.order_stock_effects; delete from public.stock_movements;

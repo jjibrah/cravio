@@ -24,7 +24,6 @@ function SidebarContent({ account, scope, onNavigate, mobile, onClose }) {
       {mobile && <button className="icon-button sidebar-close" onClick={onClose} aria-label="Close navigation"><Icon name="close" /></button>}
     </div>
     {branchArea && <PlaceSummary place={scope.place} settingsPath={`${base}/settings`} onNavigate={onNavigate} />}
-    {scope.area !== 'admin' && <BranchSwitcher account={account} scope={scope} onNavigate={onNavigate} />}
     <nav className="sidebar-navigation" aria-label={`${config.label} navigation`}>
       {groupSections(config.sections).map((group, index) => <div className="sidebar-group" key={group.label || index}>
         {group.label && <p className="sidebar-group-label">{group.label}</p>}
@@ -34,6 +33,8 @@ function SidebarContent({ account, scope, onNavigate, mobile, onClose }) {
           <span className="nav-icon"><Icon name="qr" size={16} /></span><span>Guest menu</span><Icon name="external" size={13} className="guest-menu-external" />
         </a>}
       </div>)}
+      {/* Other places this account works: after the area's own navigation, so it never outranks it. */}
+      {scope.area !== 'admin' && <BranchSwitcher account={account} scope={scope} onNavigate={onNavigate} />}
     </nav>
     <div className="sidebar-footer">
       {scope.area !== 'owner' && <SidebarLink to={`${base}/${settingsSection.path}`} icon={settingsSection.icon} label={settingsSection.label} onNavigate={onNavigate} />}

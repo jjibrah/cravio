@@ -1,6 +1,7 @@
 // Shared pieces of the branch and owner Inventory pages.
 import { useCallback, useId, useRef, useState } from 'react';
 import { EmptyState, ErrorState, OIcon } from '../../components/owner/ui';
+import Drawer from '../../components/owner/Drawer';
 import { api } from '../../lib/api';
 import { useNotifications } from '../../components/notifications/NotificationProvider';
 
@@ -117,7 +118,7 @@ export function AdjustForm({ item, path, onDone }) {
   }
   return <form className="st-form" onSubmit={submit} noValidate>
     <fieldset className="biz-checks st-kinds">
-      <legend className="o-label">{item.name}</legend>
+      <legend className="o-label">What are you recording?</legend>
       {[['count', 'Count'], ['added', 'Add stock'], ['waste', 'Waste']].map(([value, label]) => <label key={value}>
         <input type="radio" name={`${ids}-kind`} value={value} checked={kind === value} onChange={() => setKind(value)} />{label}</label>)}
     </fieldset>
@@ -130,6 +131,7 @@ export function AdjustForm({ item, path, onDone }) {
       <label className="o-label" htmlFor={`${ids}-note`}>Note <span className="o-optional">{kind === 'waste' ? 'Required' : 'Optional'}</span></label>
       <input id={`${ids}-note`} className="o-input" value={text} maxLength={280} onChange={(event) => setText(event.target.value)} />
     </div>
+    <p className="o-field-hint">Now {servings(item.onHand ?? item.centerOnHand ?? 0)} on hand.</p>
     <FormError error={error} />
     <div className="biz-form-actions">
       <button type="submit" className="o-btn is-primary" disabled={busy || amount === ''}>{busy ? 'Saving…' : 'Save'}</button>
@@ -164,4 +166,20 @@ export function NewItemForm({ path, onDone }) {
       <button type="button" className="o-btn is-quiet" onClick={() => onDone(null)} disabled={busy}>Cancel</button>
     </div>
   </form>;
+}
+
+/** A short task (count, request, receive, review…) in the side sheet: one job, an obvious way out. */
+export function TaskDrawer({ open, title, onClose, children, wide = false }) {
+  return <Drawer open={open} onClose={onClose} title={title} className="st-drawer" wide={wide}>{open ? children : null}</Drawer>;
+}
+
+/** “Needs you” cards: the few things that are waiting on this person, each with its action. */
+export function NeedsYou({ items }) {
+  if (!items.length) return null;
+  return <section className="st-needs" aria-label="Needs you">
+    {items.map((item) => <div key={item.key} className={`st-need is-${item.tone || 'action'}`}>
+      <span className="st-need-text"><strong>{item.title}</strong>{item.detail && <span>{item.detail}</span>}</span>
+      <button type="button" className={`o-btn is-small${item.primary ? ' is-primary' : ''}`} onClick={item.onClick}>{item.action}</button>
+    </div>)}
+  </section>;
 }

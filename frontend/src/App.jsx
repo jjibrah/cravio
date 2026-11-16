@@ -28,7 +28,6 @@ function page(loader, name = 'default') {
   Page.displayName = `Page(${name})`;
   return Page;
 }
-const InventoryPage = page(chunks.inventory);
 const GuestMenuPage = page(chunks.guestMenu);
 const AuthProvider = page(chunks.auth, 'AuthProvider');
 const LoginPage = page(chunks.authPages, 'LoginPage');
@@ -76,7 +75,7 @@ const waiterPages = { '': WaiterTablesPage, services: WaiterServicesPage, menu: 
 /** Picks the page for a dashboard section; anything without a real page yet falls back to a page frame. */
 const ADMIN_PAGES = { '': AdminOverviewPage, restaurants: RestaurantsPage, performance: PerformancePage, money: MoneyPage, 'leads-requests': RequestsPage, complaints: RequestsPage };
 const BRANCH_PAGES = { '': OverviewPage, orders: OrdersPage, tables: TablesPage, products: ProductsPage, menu: MenuConfigPage, insights: InsightsPage, 'contact-cravio': ContactPage, settings: SettingsPage, inventory: BranchInventoryPage };
-const OWNER_PAGES = { '': OwnerOverviewPage, locations: LocationsPage, people: PeoplePage, inventory: OwnerInventoryPage, management: InventoryPage, assistant: InventoryPage };
+const OWNER_PAGES = { '': OwnerOverviewPage, locations: LocationsPage, people: PeoplePage, inventory: OwnerInventoryPage };
 function DashboardPage({ section, area }) {
   let Page = PageFrame;
   if (section.kind === 'settings') Page = SettingsPage;

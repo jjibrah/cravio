@@ -9,7 +9,7 @@ Prepared 16 November 2026. Branch: **v2-dev**. Base code: `e0de46635182613b9536b
 | V2-01 decisions | D02–D08 answered (DECISIONS.md answer log); D01, D09–D13 open | — |
 | V2-02 membership & scoping | **Done.** Branch APIs resolve `X-Cravio-Branch` against memberships. Migration 008 **applied**; owner@ = business owner, manager@ = branch manager | `npm run test:v2` |
 | V2-03 branch-manager routing | **Done.** `/branch/:id/*`, legacy `/owner/<page>` redirects, switcher, per-branch cache, waiter branch choice | `npm run test:v2-ui` |
-| V2-04 owner interface | **Done.** Overview, Locations (+ add branch), Branch detail (+ add staff), People & access | live check with owner@ |
+| V2-04 owner interface | **Done.** Overview with **Briefing** (daily brief from records + ask-about-today assistant, no AI model yet) and Branches; Locations (+ add branch); Branch detail (+ add staff); Inventory; People & access. Preview pages removed. Tasks open in a side sheet | live check with owner@; mocked UI checks |
 | V2-05…07 inventory | **Built; needs migration 009 (proposed, not applied).** Servings, dish links, count/add/waste, deduct on serving, sold out + override, order corrections, requests → approval → dispatch (QR) → receipt | [INVENTORY.md](INVENTORY.md); 58 PGlite checks; UI checks with mocked data |
 | V2-08 regression | Read-only browser checks (11). Inherited Playwright suites write to the shared DB and were not run | — |
 

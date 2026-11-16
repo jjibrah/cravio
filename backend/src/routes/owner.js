@@ -8,6 +8,7 @@ import { email as cleanEmail } from '../lib/restaurants.js';
 import { serviceClient } from '../lib/supabase.js';
 import { welcomeUrl } from '../lib/staff-invites.js';
 import { withDb } from '../lib/db.js';
+import { briefing } from '../lib/briefing.js';
 import { addBranchStaff, branchDetail, createBranch, overview, people, revokeOperations, setOperations } from '../lib/business.js';
 
 const ID = '[0-9a-fA-F-]{36}';
@@ -37,6 +38,15 @@ async function accountFor(db, value, name) {
 }
 
 export const routes = [
+  {
+    // The daily briefing (Overview → Briefing). Facts only from the caller's overseen branches.
+    method: 'GET', path: '/api/owner/briefing',
+    async handler({ request }) {
+      const { user, profile } = await ownerUser(request);
+      const result = await withDb((db) => briefing(db, user));
+      return { ...result, name: profile.name?.split(/\s+/)[0] || '' };
+    },
+  },
   {
     method: 'GET', path: '/api/owner/overview',
     async handler({ request }) {

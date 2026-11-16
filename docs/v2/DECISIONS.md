@@ -46,7 +46,7 @@ Added 16 Nov 2026 with the first implementation slice (V2-02/03/04). Each is rev
 | R4 | Business owners/operations open a branch's workspace only with a branch manager role there (no impersonation). | `WorkspaceLink`, `DashboardLayout` |
 | R5 | A request with several eligible branches must name one (`X-Cravio-Branch`); the server never guesses. | `selectMembership` |
 | R6 | Admin “invite owner” keeps today's behaviour (creates one restaurant, owner membership → branch manager); it does not create a business-owner grant. | unchanged `admin-users.js` |
-| R7 | Inherited inventory/management/AI preview pages stay reachable only under the owner interface's “Preview” group; their data and API are untouched. | `config/dashboards.js` |
+| R7 | ~~Preview pages kept under “Preview”.~~ Superseded 16 Nov 2026 by the product owner: Preview removed. Inventory is the real Inventory page; Management preview removed; the AI assistant became the Overview → Briefing tab. The old preview API and its (empty) data are untouched. | `config/dashboards.js` |
 
 ## Answer log
 
@@ -58,6 +58,7 @@ Added 16 Nov 2026 with the first implementation slice (V2-02/03/04). Each is rev
 | D05 | The **branch manager** corrects stock. | Product owner, 16 Nov 2026 | INVENTORY.md | V2-06 |
 | D06 | At zero: **show sold out**; branch manager can override. | Product owner, 16 Nov 2026 | INVENTORY.md | V2-06 |
 | D07 | Requests go to the **owner**, who can approve partly or reject; follow common practice; receipt verified with a **dispatch number / QR**. | Product owner, 16 Nov 2026 | INVENTORY.md | V2-07 |
+| UX | Owner sidebar: Overview (Briefing, Branches), Locations, Inventory, People & access. Assistant = a PA-style daily briefing with questions, not a separate page. No live AI yet; it answers from records and says so. | Product owner, 16 Nov 2026 | Apple HIG review (generative-ai.md › Transparency) | V2-04 |
 | D08 | Shared-table multi-device ordering **on hold**. | Product owner, 16 Nov 2026 | — | — |
 | D01, D09–D13 | Open | | | |
 

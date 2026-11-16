@@ -31,12 +31,10 @@ export const dashboards = {
   owner: {
     label: 'Owner',
     sections: [
-      { path: '', label: 'Overview', icon: 'overview', kind: 'business', description: 'Every branch you oversee, today.' },
+      { path: '', label: 'Overview', icon: 'overview', kind: 'business', description: 'Your daily briefing and every branch you oversee.' },
       { path: 'locations', group: 'Business', label: 'Locations', icon: 'restaurants', kind: 'business', description: 'Your branches: open one, or add a new location.' },
       { path: 'people', group: 'Business', label: 'People & access', icon: 'team', kind: 'business', description: 'Who can see and run which branches.' },
       { path: 'inventory', group: 'Business', label: 'Inventory', icon: 'products', kind: 'inventory', description: 'Main center stock, branch requests and dispatches.' },
-      { path: 'management', group: 'Preview', label: 'Management preview', icon: 'team', description: 'Daily checklists and operational tasks (preview).' },
-      { path: 'assistant', group: 'Preview', label: 'AI assistant (placeholder)', icon: 'insights', description: 'Placeholder only: no AI provider is connected.' },
     ],
   },
 };

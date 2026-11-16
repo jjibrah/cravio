@@ -81,5 +81,13 @@ await fails(db.transaction((tx) => addBranchStaff(tx, owner, branch2.id, waiter,
 eq((await one(`select role from public.restaurant_members where restaurant_id = $1 and user_id = $2`, [branch2.id, manager])).role, 'manager', 'manager added');
 eq((await overview(db, manager)).businesses, [], 'branch manager role gives no business access');
 
+// Daily briefing: facts only from overseen branches.
+const { briefing } = await import('../src/lib/briefing.js');
+const brief = await briefing(db, { id: owner });
+eq(brief.headline.includes('2 orders today'), true, 'briefing headline counts today’s orders across owned branches');
+eq(brief.answers.best.includes('Nothing has sold') || brief.answers.best.includes('best sellers'), true, 'best-seller answer');
+eq((await briefing(db, { id: otherOwner })).headline.includes('No orders yet today at Rival Diner'), true, 'other business sees only its own branch');
+eq((await briefing(db, { id: waiter })).empty, true, 'no oversight → empty briefing');
+
 console.log(`Owner/operations data layer: ${checks} checks passed (disposable PGlite database).`);
 await db.close();

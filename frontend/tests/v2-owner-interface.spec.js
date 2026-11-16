@@ -25,6 +25,14 @@ async function mockOwner(page, role = 'owner') {
       const real = await (await route.fetch()).json();
       return json({ ...real, home: '/owner', businesses: [{ id: BUSINESS, name: 'Abdis Group', role, branchIds: role === 'owner' ? null : [ABDIS] }], businessAccessAvailable: true });
     }
+    if (url.pathname === '/api/owner/briefing') {
+      return json({ generatedAt: new Date().toISOString(), timeZone: 'Africa/Nairobi', name: 'Owner', scope: 'your 2 branches', branches: 2,
+        headline: 'Your 2 branches have taken 14 orders today, with Ksh 23,850 marked paid.',
+        points: ['Orders are up 17% on this time last week (12). Paid sales are up 9% on this time last week (Ksh 21,880).', 'Selling best today: Pilau (9), Fanta (7), Chapati (6).', '3 orders still in progress.'],
+        attention: [{ kind: 'request', tone: 'action', text: '1 stock request from Abdis Westlands to review', link: '/owner/inventory?view=requests' },
+          { kind: 'guests', tone: 'urgent', text: '1 guest request open at Abdis Test Restaurant · oldest 12 min', link: `/owner/branches/${ABDIS}` }],
+        answers: { sales: 'Your 2 branches have taken 14 orders today.', best: 'Today’s best sellers by quantity: 1. Pilau (9).', attention: 'Needs you now: 1 stock request.', stock: 'Out or low: Pilau at Abdis Westlands (2 servings).', requests: 'Abdis Westlands has 1 request waiting for your review.' } });
+    }
     if (url.pathname === '/api/owner/overview') {
       return json({ generatedAt: new Date().toISOString(), timeZone: 'Africa/Nairobi',
         businesses: [{ id: BUSINESS, name: 'Abdis Group', role, branches: role === 'owner' ? branches : [branches[0]] }] });
@@ -56,7 +64,18 @@ test('business owner: overview, locations, branch detail, people, and the way in
   await mockOwner(page);
   await signIn(page);
   await expect(page).toHaveURL(/\/owner$/);
-  await expect(page.getByRole('heading', { name: 'Overview', exact: true })).toBeVisible();
+  // Briefing is the default Overview view: the brief, what needs you, and the assistant.
+  await expect(page.getByRole('heading', { level: 1, name: /^Good (morning|afternoon|evening)/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /taken 14 orders today/ })).toBeVisible();
+  await expect(page.getByText('Answers come from your Cravio records. No AI model is connected yet.')).toBeVisible();
+  await page.getByRole('button', { name: 'What’s selling best?' }).click();
+  await expect(page.getByRole('log').getByText(/best sellers by quantity/)).toBeVisible();
+  await page.getByLabel('Ask a question').fill('anything low on stock?');
+  await page.getByRole('button', { name: 'Ask', exact: true }).click();
+  await expect(page.getByRole('log').getByText(/Out or low: Pilau/)).toBeVisible();
+  await page.waitForTimeout(400);
+  await page.screenshot({ path: info.outputPath('owner-briefing.png'), fullPage: true });
+  await page.getByRole('tab', { name: /Branches/ }).click();
   await expect(page.getByRole('heading', { name: /Abdis Group/ })).toBeVisible();
   await expect(page.getByText('Ksh 23,850').first()).toBeVisible();
   await page.screenshot({ path: info.outputPath('owner-overview.png'), fullPage: true });
@@ -83,15 +102,16 @@ test('business owner: overview, locations, branch detail, people, and the way in
   await page.screenshot({ path: info.outputPath('owner-people.png'), fullPage: true });
 
   // Owner → branch workspace via the switcher; legacy branch pages work there.
-  await page.getByRole('navigation', { name: 'Switch workspace' }).getByRole('link', { name: /Abdis Test Restaurant/ }).click();
+  await page.getByRole('group', { name: 'Switch workspace' }).getByRole('link', { name: /Abdis Test Restaurant/ }).click();
   await expect(page).toHaveURL(new RegExp(`/branch/${ABDIS}$`));
-  await expect(page.getByRole('navigation', { name: 'Switch workspace' }).getByRole('link', { name: /Owner overview/ })).toBeVisible();
+  await expect(page.getByRole('group', { name: 'Switch workspace' }).getByRole('link', { name: /Owner overview/ })).toBeVisible();
 });
 
 test('operations manager: assigned branch only, no access controls', async ({ page }) => {
   await mockOwner(page, 'operations');
   await signIn(page);
   await expect(page).toHaveURL(/\/owner$/);
+  await page.getByRole('tab', { name: /Branches/ }).click();
   await expect(page.locator('.biz-branch')).toHaveCount(1);
   await page.goto('/owner/people');
   await expect(page.getByText('Only the business owner changes access.')).toBeVisible();
@@ -102,7 +122,7 @@ test('mobile: owner overview fits without horizontal scroll', async ({ page }) =
   await page.setViewportSize({ width: 390, height: 844 });
   await mockOwner(page);
   await signIn(page);
-  await expect(page.getByRole('heading', { name: /Abdis Group/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /taken 14 orders today/ })).toBeVisible();
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(overflow).toBeLessThanOrEqual(0);
 });
