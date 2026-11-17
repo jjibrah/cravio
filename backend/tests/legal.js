@@ -8,8 +8,8 @@ let checks = 0;
 const eq = (a, b, m) => { assert.deepEqual(a, b, m); checks++; };
 const fails = async (promise, test, m) => { await assert.rejects(promise, (e) => { if (typeof test === 'number') assert.equal(e.status, test, `${m}: ${e.status} ${e.message}`); else assert.match(e.message, test, m); return true; }); checks++; };
 
-const db = await freshDatabase({ extra: ['proposed/010_legal_terms.sql'] });
-await db.exec(readSql('proposed/010_legal_terms.sql')); // idempotent re-run
+const db = await freshDatabase();
+await db.exec(readSql('migrations/010_legal_terms.sql')); // idempotent re-run
 const admin = await createUser(db, 'admin@example.test', { role: 'admin' });
 const oldUser = await createUser(db, 'old@example.test', { role: 'owner' });
 const tx = (fn) => db.transaction(fn);

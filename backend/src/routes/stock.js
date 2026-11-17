@@ -1,4 +1,4 @@
-// Inventory API (migration 009).
+// Inventory API (migration 009; units, packs and recipes from 012).
 //   /api/stock/*        – the branch named by X-Cravio-Branch; branch managers act, waiters read availability.
 //   /api/owner/stock/*  – the main center and requests of a business; business owners act, operations view.
 // The caller's access is checked here (membership / business grant) and again inside src/stock/service.js
@@ -12,8 +12,9 @@ import { MANAGER_ROLES } from '../lib/access.js';
 import { managerContext, staffContext, withBody } from '../lib/operations.js';
 import {
   adjust, availability, branchLocation, branchSnapshot, businessSnapshot, cancelDispatch, cancelRequest, centerLocation,
-  correctOrder, createItem, dispatch, findByCode, linkMenuItem, once, receive, reviewRequest, submitRequest,
+  correctOrder, createItem, dispatch, findByCode, linkMenuItem, once, receive, reviewRequest, submitRequest, updateItem,
 } from '../stock/service.js';
+import { saveRecipe, suggest, suggestionInput } from '../stock/recipes.js';
 
 const ID = '[0-9a-fA-F-]{36}';
 const stockDb = (fn, transaction = true) => withDb(fn, { transaction, feature: 'stock' });
@@ -70,6 +71,18 @@ export const routes = [
   } },
   { method: 'POST', path: '/api/stock/items', handler: branchWrite('item', (db, ctx, _p, body) => createItem(db, ctx, body), { menuChanges: false }) },
   { method: 'POST', path: '/api/stock/adjust', handler: branchWrite('adjust', (db, ctx, _p, body) => adjust(db, ctx, body)) },
+  { method: 'PATCH', path: new RegExp(`^/api/stock/items/(?<id>${ID})$`), handler: branchWrite('item_edit', (db, ctx, params, body) => updateItem(db, ctx, params.id, body)) },
+  // Recipes: several ingredients per dish, any compatible unit. Saving replaces the dish's single link.
+  { method: 'PUT', path: new RegExp(`^/api/stock/recipes/(?<id>${ID})$`), handler: branchWrite('recipe', (db, ctx, params, body) => saveRecipe(db, ctx, params.id, body)) },
+  // AI draft of a recipe (OpenRouter). Returns a draft only; nothing is saved. 503 when OPENROUTER_API_KEY isn't set.
+  { method: 'POST', path: '/api/stock/recipes/suggest', handler: withBody(async ({ request, body }) => {
+    const { restaurantId } = await branch(request);
+    const input = await stockDb(async (db) => {
+      const { rows } = await db.query('select business_id from public.restaurants where id = $1', [restaurantId]);
+      return suggestionInput(db, { businessId: rows[0].business_id, restaurantId }, String(body.menuItemId || ''));
+    }, false);
+    return suggest(input);
+  }) },
   { method: 'PUT', path: new RegExp(`^/api/stock/links/(?<id>${ID})$`), handler: branchWrite('link', (db, ctx, params, body) => linkMenuItem(db, ctx, params.id, body)) },
   { method: 'POST', path: new RegExp(`^/api/stock/orders/(?<id>${ID})/correction$`), handler: branchWrite('correction', (db, ctx, params, body) => correctOrder(db, ctx, params.id, body)) },
   { method: 'POST', path: '/api/stock/requests', handler: branchWrite('request', (db, ctx, _p, body) => submitRequest(db, ctx, body), { menuChanges: false }) },
@@ -96,6 +109,7 @@ export const routes = [
       requests: snapshot.requests.filter((r) => mine.has(r.branchId)), transfers: snapshot.transfers.filter((t) => mine.has(t.branchId)) };
   } },
   { method: 'POST', path: new RegExp(`^/api/owner/stock/(?<businessId>${ID})/items$`), handler: ownerWrite('item', (db, ctx, _p, body) => createItem(db, ctx, body)) },
+  { method: 'PATCH', path: new RegExp(`^/api/owner/stock/(?<businessId>${ID})/items/(?<id>${ID})$`), handler: ownerWrite('item_edit', (db, ctx, params, body) => updateItem(db, ctx, params.id, body)) },
   { method: 'POST', path: new RegExp(`^/api/owner/stock/(?<businessId>${ID})/adjust$`), handler: ownerWrite('adjust', async (db, ctx, _p, body) => adjust(db, { ...ctx, locationId: await centerLocation(db, ctx.businessId) }, body)) },
   { method: 'POST', path: new RegExp(`^/api/owner/stock/(?<businessId>${ID})/requests/(?<id>${ID})/review$`), handler: ownerWrite('review', (db, ctx, params, body) => reviewRequest(db, ctx, params.id, body)) },
   { method: 'POST', path: new RegExp(`^/api/owner/stock/(?<businessId>${ID})/dispatches$`), handler: ownerWrite('dispatch', (db, ctx, _p, body) => dispatch(db, ctx, body)) },

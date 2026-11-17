@@ -1,0 +1,57 @@
+/* The dish sheet's video (SheetVideo.jsx): poster first, a soft shimmer, a crossfade on the first frame. */
+.gx-dish-media.is-video.dv { background: var(--mv-soft-2); isolation: isolate; }
+.dv-poster, .dv-slot, .dv-video, .dv-toggle, .dv-loading { position: absolute; inset: 0; }
+.dv .dv-poster { z-index: 0; width: 100%; height: 100%; object-fit: cover; }
+.dv-slot { z-index: 1; display: block; }
+.dv .dv-video { width: 100%; height: 100%; max-width: none; object-fit: cover; opacity: 0; transition: opacity 320ms var(--mv-ease, ease); }
+.dv.is-shown .dv-video { opacity: 1; }
+.dv.is-blocked:not(.is-shown) .dv-video, .dv.is-error .dv-video { visibility: hidden; }
+
+/* Loading: a slow light sweep over the poster; a small ring only if it takes a while. */
+.dv-loading { z-index: 2; overflow: hidden; pointer-events: none; }
+.dv-loading::before {
+  content: ''; position: absolute; inset: 0; transform: translateX(-100%);
+  background: linear-gradient(100deg, transparent 20%, #ffffff2e 50%, transparent 80%);
+  animation: dv-sweep 1.6s ease-in-out infinite;
+}
+.dv.no-poster .dv-loading::before { background: linear-gradient(100deg, transparent 20%, color-mix(in srgb, var(--mv-bg, #fff) 60%, transparent) 50%, transparent 80%); }
+.dv-spinner {
+  position: absolute; left: 14px; bottom: 14px; width: 22px; height: 22px; border-radius: 50%;
+  border: 2px solid #ffffff59; border-top-color: #fff; box-shadow: 0 0 0 5px #11111040;
+  opacity: 0; animation: dv-spin 900ms linear infinite, dv-in 240ms ease 600ms forwards;
+}
+@keyframes dv-sweep { to { transform: translateX(100%); } }
+@keyframes dv-spin { to { rotate: 360deg; } }
+@keyframes dv-in { to { opacity: 1; } }
+
+/* The whole picture is the play/pause button; the close button sits above it. */
+.dv-toggle { z-index: 3; display: block; width: 100%; height: 100%; padding: 0; border: 0; background: none; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.dv-toggle:focus-visible { outline: 2px solid var(--mv-action, #111); outline-offset: -4px; }
+.dv .gx-media-close { z-index: 4; }
+
+.dv-big-play {
+  position: absolute; top: 50%; left: 50%; display: grid; place-items: center; width: 64px; height: 64px; margin: -32px 0 0 -32px; padding-left: 4px;
+  border-radius: 50%; background: #111110a6; color: #fff; box-shadow: 0 8px 24px -8px #0000008c;
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  animation: dv-in 200ms ease both;
+}
+.dv-badge {
+  position: absolute; left: 12px; bottom: 12px; display: grid; place-items: center; width: 30px; height: 30px; padding-left: 2px;
+  border-radius: 50%; background: #111110a6; color: #fff; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+}
+.dv-flash {
+  position: absolute; top: 50%; left: 50%; display: grid; place-items: center; width: 56px; height: 56px; margin: -28px 0 0 -28px;
+  border-radius: 50%; background: #11111080; color: #fff; pointer-events: none;
+  animation: dv-flash 700ms var(--mv-ease, ease) forwards;
+}
+.dv.is-blocked .dv-flash { display: none; }
+@keyframes dv-flash { 0% { opacity: 0; scale: .8; } 20% { opacity: 1; scale: 1; } 100% { opacity: 0; scale: 1.15; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .dv .dv-video { transition-duration: 1ms; }
+  .dv-loading::before { animation: none; transform: none; background: #ffffff14; }
+  .dv-spinner { animation: dv-in 1ms 600ms forwards; }
+  .dv-flash { animation: dv-in 1ms forwards, dv-fade 1ms 500ms forwards; }
+  .dv-big-play { animation: none; }
+}
+@keyframes dv-fade { to { opacity: 0; } }

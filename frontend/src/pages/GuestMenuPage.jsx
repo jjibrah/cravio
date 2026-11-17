@@ -1,12 +1,13 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { BrandMark } from '../components/Brand';
 import Icon from '../components/Icon';
 import MenuExperience from '../components/menu/MenuExperience';
-import { MenuSkeleton } from '../components/menu/MenuView';
+import BrandedLoader from '../components/menu/BrandedLoader';
+import { brandFromMenu, criticalImages, preloadImages, readBrand, writeBrand } from '../components/menu/brand-cache';
+import { prefersReducedMotion } from '../components/menu/MenuCards';
 import Glyph from '../components/media/Glyph';
 import { publicApi } from '../components/guest/guestApi';
-import { designColors } from '../lib/menu-design';
 import './guest-menu.css';
 
 /*
@@ -57,6 +58,35 @@ function useDocumentLook(title, color) {
   }, [color]);
 }
 
+/*
+ * The loading screen's life: 'on' while the menu loads and its first images arrive, 'leaving' while it fades
+ * over the menu (already rendered underneath), then 'off' for good. Once the menu is here it waits for the cover,
+ * logo and first dish images, but never more than HOLD_CAP ms; a short minimum keeps a fast load from flashing.
+ */
+const HOLD_CAP = 1200;
+const FADE_MS = 400;
+
+function useLoaderPhase(data, firstVisit) {
+  const [phase, setPhase] = useState('on');
+  useEffect(() => {
+    if (!data || phase !== 'on') return undefined;
+    let cancelled = false;
+    const minimum = firstVisit ? 450 : 220;
+    const leave = () => { if (!cancelled) setPhase((current) => (current === 'on' ? 'leaving' : current)); };
+    const cap = setTimeout(leave, HOLD_CAP);
+    Promise.all([preloadImages(criticalImages(data), HOLD_CAP), new Promise((resolve) => { setTimeout(resolve, minimum); })]).then(leave);
+    return () => { cancelled = true; clearTimeout(cap); };
+    // Runs once per menu load; `firstVisit` is fixed for the visit.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data]);
+  useEffect(() => {
+    if (phase !== 'leaving') return undefined;
+    const timer = setTimeout(() => setPhase('off'), prefersReducedMotion() ? 180 : FADE_MS);
+    return () => clearTimeout(timer);
+  }, [phase]);
+  return phase;
+}
+
 function Notice({ icon, title, children, action, brand = false }) {
   return <main className="gm-notice">
     {brand && <p className="gm-brand"><span className="brand-word">Cravio</span><BrandMark /></p>}
@@ -76,7 +106,13 @@ export default function GuestMenuPage() {
   const table = tableFrom(params.get('t')?.trim());
   const [state, retry] = usePublicMenu(restaurantId, table);
   const data = state.status === 'ready' ? state.data : null;
-  useDocumentLook(data?.restaurant?.name || (state.status === 'idle' ? 'Guest menu · Cravio' : 'Menu'), data ? designColors(data.design || { theme: data.restaurant?.theme }).bg : null);
+  // A returning guest's first paint is already the restaurant's; a first visit starts neutral.
+  const [cachedBrand] = useState(() => readBrand(restaurantId));
+  const liveBrand = useMemo(() => (data ? brandFromMenu(data) : null), [data]);
+  useEffect(() => { if (liveBrand) writeBrand(restaurantId, liveBrand); }, [restaurantId, liveBrand]);
+  const brand = liveBrand || cachedBrand;
+  const loader = useLoaderPhase(data, !cachedBrand);
+  useDocumentLook(data?.restaurant?.name || cachedBrand?.name || (state.status === 'idle' ? 'Guest menu · Cravio' : 'Menu'), brand?.bg || null);
 
   if (state.status === 'idle') {
     return <div className="gm-page gm-plain">
@@ -104,11 +140,11 @@ export default function GuestMenuPage() {
     </div>;
   }
 
-  if (!data) return <div className="gm-page"><MenuSkeleton /></div>;
-
-  const tableNumber = data.table?.number;
-  return <div className="gm-page">
-    <MenuExperience data={data} restaurantId={restaurantId} tableNumber={tableNumber}
-      afterHero={!tableNumber && <p className="gx-no-table"><Glyph name="qr" size={16} />Scan the code on your table to call a waiter.</p>} />
+  const tableNumber = data?.table?.number;
+  // Same tree while loading and after, so the loader carries on (neutral to branded, then fading) without a remount.
+  return <div className="gm-page" style={!data && brand ? { background: brand.bg } : undefined} aria-busy={loader === 'on' ? 'true' : undefined}>
+    {data && <MenuExperience data={data} restaurantId={restaurantId} tableNumber={tableNumber}
+      afterHero={!tableNumber && <p className="gx-no-table"><Glyph name="qr" size={16} />Scan the code on your table to call a waiter.</p>} />}
+    {loader !== 'off' && <BrandedLoader brand={brand} leaving={loader === 'leaving'} />}
   </div>;
 }

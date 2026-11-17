@@ -19,7 +19,7 @@
     "db:migrate": "npm run db:migrate --workspace backend",
     "compare": "node scripts/compare.js --shared-db",
     "test:inventory": "node backend/tests/inventory.js",
-    "test:v2": "node backend/tests/access.js && node backend/tests/migration-008.js && node backend/tests/business.js && node backend/tests/access-mapping.js && node backend/tests/inventory-v2.js && node backend/tests/admin-business.js && node backend/tests/legal.js",
+    "test:v2": "node backend/tests/access.js && node backend/tests/migration-008.js && node backend/tests/business.js && node backend/tests/access-mapping.js && node backend/tests/inventory-v2.js && node backend/tests/admin-business.js && node backend/tests/legal.js && node backend/tests/table-sessions.js && node backend/tests/recipes.js",
     "test:v2-ui": "npm exec --workspace frontend -- playwright test -c playwright.v2.config.js",
     "audit:accounts": "node backend/scripts/audit-accounts.js"
   },

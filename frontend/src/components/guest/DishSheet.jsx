@@ -1,6 +1,7 @@
 import { useId, useMemo, useState } from 'react';
 import GuestSheet from '../menu/GuestSheet';
-import { Img, prefersReducedMotion } from '../menu/MenuCards';
+import { Img } from '../menu/MenuCards';
+import SheetVideo from '../menu/SheetVideo';
 import Glyph from '../media/Glyph';
 import { formatKsh } from '../../lib/format';
 
@@ -26,7 +27,7 @@ export function KitchenNote({ value, onChange, open, onOpen }) {
 /**
  * A dish up close: big photo or video, name, price, description, "Goes well with" (extras that change this line,
  * and paired dishes that are added as their own lines), a note, a quantity, and "Add to order · Ksh total".
- * Render it with key={item.id} so each dish starts fresh.
+ * Render it with key={item.id} so each dish starts fresh. A video starts by itself (see menu/SheetVideo.jsx).
  */
 export default function DishSheet({ item, itemsById, open, onClose, onAdd, onVideoPlay, contained }) {
   const titleId = useId();
@@ -43,6 +44,7 @@ export default function DishSheet({ item, itemsById, open, onClose, onAdd, onVid
   const total = item ? (Number(item.price || 0) + extrasTotal) * quantity + pairsTotal : 0;
   const toggle = (setter, id) => setter((current) => { const next = new Set(current); if (next.has(id)) next.delete(id); else next.add(id); return next; });
   const poster = item?.videoPosterUrl || item?.photoUrl || undefined;
+  const closeButton = <button type="button" className="gx-media-close" onClick={onClose} aria-label="Close"><Glyph name="close" size={18} /></button>;
   const added = pairIds.size ? ` + ${pairIds.size} more` : '';
 
   const footer = item && <div className="gx-add-bar">
@@ -54,13 +56,12 @@ export default function DishSheet({ item, itemsById, open, onClose, onAdd, onVid
 
   return <GuestSheet open={open && Boolean(item)} onClose={onClose} labelledBy={titleId} contained={contained} className="gx-dish-sheet" footer={footer}>
     {item && <article className="gx-dish">
-      <div className={`gx-dish-media${item.videoUrl ? ' is-video' : ''}${!item.videoUrl && !item.photoUrl ? ' is-empty' : ''}`}>
-        {item.videoUrl
-          ? <video src={item.videoUrl} poster={poster} controls playsInline loop muted autoPlay={!contained && !prefersReducedMotion()} aria-label={`Video of ${item.name}`}
-            onPlaying={() => onVideoPlay?.(item)} />
-          : item.photoUrl ? <Img src={item.photoUrl} alt={`Photo of ${item.name}`} eager /> : <span className="gx-dish-monogram" aria-hidden="true">{[...item.name][0]}</span>}
-        <button type="button" className="gx-media-close" onClick={onClose} aria-label="Close"><Glyph name="close" size={18} /></button>
-      </div>
+      {item.videoUrl
+        ? <SheetVideo item={item} poster={poster} onPlay={onVideoPlay}>{closeButton}</SheetVideo>
+        : <div className={`gx-dish-media${!item.photoUrl ? ' is-empty' : ''}`}>
+          {item.photoUrl ? <Img src={item.photoUrl} alt={`Photo of ${item.name}`} eager /> : <span className="gx-dish-monogram" aria-hidden="true">{[...item.name][0]}</span>}
+          {closeButton}
+        </div>}
       <div className="gx-dish-head">
         <h2 id={titleId} className="gx-dish-name">{item.name}</h2>
         <p className="gx-dish-price">{formatKsh(item.price, item.currency)}</p>

@@ -13,6 +13,8 @@ import { text } from '../lib/restaurants.js';
 import { serviceClient } from '../lib/supabase.js';
 import { invalidateMenu } from '../lib/cache.js';
 import { hasMerchSchema } from '../lib/menu-merch.js';
+import { withDb } from '../lib/db.js';
+import { afterCartClaimed, afterOrderPaid, listOpen, rotateCode, sessionsAvailable, staffClose, verify } from '../lib/table-sessions.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const MAX_TABLES = 200;
@@ -284,7 +286,10 @@ async function createOrder({ request, body }) {
     await unclaim();
     check(itemsError);
   }
-  if (cart) check((await db.from('guest_carts').update({ claimed_order_id: id }).eq('id', cart.id)).error);
+  if (cart) {
+    check((await db.from('guest_carts').update({ claimed_order_id: id }).eq('id', cart.id)).error);
+    await tableSessionHook((pg) => afterCartClaimed(pg, { cartId: cart.id }));
+  }
   invalidateMenu(restaurantId); // held servings can make a dish sold out
   return { order: await loadOrder(context, id) };
 }
@@ -378,6 +383,7 @@ async function payOrder({ request, params, body }) {
       if (resolveError) console.error('[operations] auto-resolve bill requests failed:', resolveError.code || resolveError.message);
     }
   }
+  await tableSessionHook((pg) => afterOrderPaid(pg, { orderId: order.id }));
   return { order: await loadOrder(context, order.id) };
 }
 
@@ -756,7 +762,40 @@ async function health({ request }) {
   };
 }
 
+/* ---------- Table sessions (proposed migration 011, docs/v2/TABLE-SESSIONS.md) ---------- */
+
+/**
+ * Best effort: a confirmed table cart verifies its session and empties what was sent; a solo cart replaces an
+ * unverified session at its table; a fully paid session closes. Never fails the order itself.
+ */
+async function tableSessionHook(fn) {
+  try { await withDb(async (pg) => ((await sessionsAvailable(pg)) ? fn(pg) : null)); }
+  catch (error) { if (error?.status !== 503) console.error('[table sessions] follow-up failed:', error.code || error.message); }
+}
+
+const SESSION_PATH = (action) => new RegExp(`^/api/ops/table-sessions/(?<id>${UUID})/${action}/?$`);
+
+/** GET /api/ops/table-sessions — open sessions of the branch (table, people, join code, verified, last activity). */
+async function listSessions({ request }) {
+  const context = await staffContext(request);
+  try {
+    return await withDb(async (pg) => ((await sessionsAvailable(pg)) ? { available: true, sessions: await listOpen(pg, context.restaurantId) } : { available: false, sessions: [] }));
+  } catch (error) {
+    if (error instanceof HttpError && error.status !== 503) throw error;
+    return { available: false, sessions: [] };
+  }
+}
+
+const sessionAction = (fn) => async ({ request, params }) => {
+  const context = await staffContext(request);
+  return withDb((pg) => fn(pg, { restaurantId: context.restaurantId, sessionId: params.id.toLowerCase(), userId: context.user.id }));
+};
+
 export const routes = [
+  { method: 'GET', path: '/api/ops/table-sessions', handler: listSessions },
+  { method: 'POST', path: SESSION_PATH('close'), handler: sessionAction(staffClose) },
+  { method: 'POST', path: SESSION_PATH('code'), handler: sessionAction(rotateCode) },
+  { method: 'POST', path: SESSION_PATH('verify'), handler: sessionAction(verify) },
   { method: 'GET', path: '/api/ops/live', handler: live },
   { method: 'POST', path: REQUEST_PATH('acknowledge'), handler: (ctx) => requestAction('acknowledge', ctx) },
   { method: 'POST', path: REQUEST_PATH('resolve'), handler: (ctx) => requestAction('resolve', ctx) },
