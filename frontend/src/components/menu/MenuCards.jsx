@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { formatKsh } from '../../lib/format';
+import { coolVideo, onSheetVideo, primeVideo, sheetVideoActive, warmVideo } from './video-warm';
 
 /* Cards for the guest menu: dishes (tile, row or text), featured photo cards and deal cards, with lazy media. */
 
@@ -13,6 +14,21 @@ function autoplayAllowed() {
   if (typeof window === 'undefined') return false;
   if (prefersReducedMotion()) return false;
   return !navigator.connection?.saveData;
+}
+
+/**
+ * Press and open handlers for a card with a video: a press starts buffering the video the dish sheet will play
+ * (cancelled if the press turns into a scroll); the opening tap starts playback inside the gesture.
+ */
+function videoIntent(item, onOpen) {
+  if (!item.videoUrl || !onOpen) return { open: onOpen ? () => onOpen(item) : undefined, press: {} };
+  return {
+    open: () => { primeVideo(item.videoUrl, { play: !prefersReducedMotion() }); onOpen(item); },
+    press: {
+      onPointerDown: (event) => { if (!event.target.closest?.('.mv-add, .mv-stepper')) warmVideo(item.videoUrl); },
+      onPointerCancel: () => coolVideo(item.videoUrl),
+    },
+  };
 }
 
 /** An <img> that falls back (to a monogram tile) if it fails. Lazy and async unless `eager`. */
@@ -40,7 +56,7 @@ function DishVideo({ item, onStarted, sizes }) {
   const inView = useRef(false);
   const started = useRef(false);
   const poster = item.videoPosterUrl || item.photoUrl || undefined;
-  const tryPlay = () => { const video = videoRef.current; if (video && inView.current && autoplayAllowed()) video.play().catch(() => {}); };
+  const tryPlay = () => { const video = videoRef.current; if (video && inView.current && !sheetVideoActive() && autoplayAllowed()) video.play().catch(() => {}); };
 
   useEffect(() => {
     const element = wrapRef.current;
@@ -55,7 +71,9 @@ function DishVideo({ item, onStarted, sizes }) {
     }, { threshold: [0, 0.6, 1] });
     nearObserver.observe(element);
     viewObserver.observe(element);
-    return () => { nearObserver.disconnect(); viewObserver.disconnect(); };
+    // While a dish sheet plays its video, cards rest: one video decoding at a time.
+    const offSheet = onSheetVideo((active) => { if (active) videoRef.current?.pause(); else tryPlay(); });
+    return () => { nearObserver.disconnect(); viewObserver.disconnect(); offSheet(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -110,11 +128,12 @@ export function DishCard({ item, shape = 'tile', showDescription = true, heading
   const quick = cart && !soldOut ? <QuickAdd name={item.name} quantity={cart.quantity} onAdd={cart.add} onMinus={cart.minus} size={shape === 'tile' ? 'md' : 'sm'} /> : null;
   const media = shape === 'text' ? null : shape === 'row' && !hasMedia ? null
     : <div className="mv-card-media"><DishMedia item={item} preview={preview} onVideoPlay={onVideoPlay} sizes={sizes} />{shape === 'tile' && quick}</div>;
-  return <li className={`mv-card is-${shape}${soldOut ? ' is-sold-out' : ''}${onOpen ? ' is-openable' : ''}${cart?.quantity ? ' is-in-cart' : ''}`} data-item={item.id}>
+  const intent = videoIntent(item, onOpen);
+  return <li className={`mv-card is-${shape}${soldOut ? ' is-sold-out' : ''}${onOpen ? ' is-openable' : ''}${cart?.quantity ? ' is-in-cart' : ''}`} data-item={item.id} {...intent.press}>
     {shape === 'tile' && media}
     <div className="mv-card-body">
       <Name className="mv-card-name">{onOpen
-        ? <button type="button" className="mv-card-open" onClick={() => onOpen(item)} aria-haspopup="dialog">{item.name}</button>
+        ? <button type="button" className="mv-card-open" onClick={intent.open} aria-haspopup="dialog">{item.name}</button>
         : item.name}</Name>
       <p className="mv-card-price">
         <span className={soldOut ? 'mv-price-struck' : undefined}>{formatKsh(item.price, item.currency)}</span>
@@ -130,11 +149,12 @@ export function DishCard({ item, shape = 'tile', showDescription = true, heading
 /** A large photo card for the Featured carousel: name and price over a soft gradient. */
 export function FeaturedCard({ item, headingLevel = 3, preview, onOpen, onVideoPlay, eager }) {
   const Name = `h${headingLevel}`;
-  return <li className={`mv-feature${onOpen ? ' is-openable' : ''}`} data-item={item.id}>
+  const intent = videoIntent(item, onOpen);
+  return <li className={`mv-feature${onOpen ? ' is-openable' : ''}`} data-item={item.id} {...intent.press}>
     <div className="mv-feature-media"><DishMedia item={item} preview={preview} onVideoPlay={onVideoPlay} eager={eager} sizes="(min-width: 900px) 280px, 46vw" /></div>
     <div className="mv-feature-text">
       <Name className="mv-feature-name">{onOpen
-        ? <button type="button" className="mv-card-open" onClick={() => onOpen(item)} aria-haspopup="dialog">{item.name}</button>
+        ? <button type="button" className="mv-card-open" onClick={intent.open} aria-haspopup="dialog">{item.name}</button>
         : item.name}</Name>
       <p className="mv-feature-price">{formatKsh(item.price, item.currency)}</p>
     </div>

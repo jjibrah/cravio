@@ -278,3 +278,13 @@
 .w-manual-head .w-section-title { margin: 0; }
 .w-manual-note { display: flex; align-items: flex-start; gap: 8px; margin: 0; color: var(--muted); font-size: 13.5px; line-height: 1.4; }
 .w-manual-note svg { flex-shrink: 0; margin-top: 2px; color: var(--w-attention); }
+
+/* Table sessions on the table sheet (docs/v2/TABLE-SESSIONS.md) */
+.w-session { gap: 10px; }
+.w-session.is-unverified { border-color: #ecd3a6; background: #fffaf0; }
+.w-session-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.w-session-title { margin: 0 0 2px; font-size: 15px; font-weight: 700; }
+.w-session-code { margin: 0; font-size: 26px; font-weight: 800; letter-spacing: .14em; font-variant-numeric: tabular-nums; line-height: 1; }
+.w-session-note { display: flex; align-items: center; gap: 6px; margin: 0; color: var(--muted); font-size: 13px; }
+.w-session-note.is-error { color: var(--danger); }
+.w-session-actions { display: flex; flex-wrap: wrap; gap: 6px; }

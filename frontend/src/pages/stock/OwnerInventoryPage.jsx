@@ -11,7 +11,7 @@ import '../business/business.css';
 import { useApi } from '../../lib/api';
 import {
   AdjustForm, FormError, LineEditor, Movements, NeedsYou, NewItemForm, REQUEST_STATUS, StockError, TRANSFER_STATUS,
-  TaskDrawer, cleanLines, servings, useCommand, when,
+  TaskDrawer, cleanLines, friendly, servings, unitOf, useCommand, when,
 } from './parts';
 import './stock.css';
 
@@ -23,12 +23,12 @@ function StockMatrix({ data, canEdit, onOpen }) {
     <thead><tr><th scope="col">Item</th><th scope="col">Main center</th>{data.branches.map((branch) => <th scope="col" key={branch.id}>{branch.name}</th>)}</tr></thead>
     <tbody>{data.items.map((item) => <tr key={item.id}>
       <th scope="row">{canEdit ? <button type="button" className="st-row-button" onClick={() => onOpen(item)}>{item.name}</button> : item.name}
-        {item.lowLevel !== null && <><br /><small>Low at {item.lowLevel}</small></>}</th>
-      <td><strong>{servings(item.centerOnHand)}</strong></td>
+        {item.lowLevel !== null && <><br /><small>Low at {servings(item.lowLevel, item.unit)}</small></>}</th>
+      <td><strong>{friendly(item.centerOnHand, item)}</strong></td>
       {data.branches.map((branch) => {
         const value = item.branches[branch.id];
         const low = value !== undefined && item.lowLevel !== null && value <= item.lowLevel;
-        return <td key={branch.id} className={value < 0 || value === 0 ? 'is-minus' : low ? 'is-low' : ''}>{value === undefined ? '—' : servings(value)}</td>;
+        return <td key={branch.id} className={value < 0 || value === 0 ? 'is-minus' : low ? 'is-low' : ''}>{value === undefined ? '—' : servings(value, item.unit)}</td>;
       })}
     </tr>)}</tbody>
   </table></div>;
@@ -46,7 +46,7 @@ function ReviewForm({ request, base, onDone }) {
   return <div className="st-form">
     <p className="o-field-hint">{request.branchName} asked on {when(request.createdAt)}{request.note ? `: “${request.note}”` : '.'} Lower any amount, or set it to 0, to approve part of the request. Approving doesn’t move stock; you dispatch next.</p>
     {request.lines.map((line) => <div className="o-field" key={line.itemId}>
-      <label className="o-label" htmlFor={`${ids}-${line.itemId}`}>{line.name} <span className="o-optional">asked for {servings(line.requested)}</span></label>
+      <label className="o-label" htmlFor={`${ids}-${line.itemId}`}>{line.name} <span className="o-optional">asked for {servings(line.requested, line.unit)}</span></label>
       <input id={`${ids}-${line.itemId}`} className="o-input st-qty" type="number" inputMode="decimal" min="0" max={line.requested} step="any"
         value={approved[line.itemId]} onChange={(event) => setApproved({ ...approved, [line.itemId]: event.target.value })} />
     </div>)}
@@ -67,7 +67,7 @@ function Requests({ data, canEdit, onReview, onDispatch, busy }) {
   if (!data.requests.length) return <EmptyState icon="layers" tone="neutral" title="No requests yet">Branch managers ask for stock from their Inventory page.</EmptyState>;
   return <ul className="biz-people">{data.requests.map((request) => <li className="biz-person" key={request.id}>
     <span className="biz-person-main"><strong>#{request.number} · {request.branchName} · {REQUEST_STATUS[request.status]}</strong>
-      <span>{request.lines.map((line) => `${line.name}: ${servings(line.requested)}${line.approved !== null ? ` → ${line.approved}` : ''}`).join(' · ')}</span>
+      <span>{request.lines.map((line) => `${line.name}: ${servings(line.requested, line.unit)}${line.approved !== null ? ` → ${line.approved}` : ''}`).join(' · ')}</span>
       {(request.note || request.reviewNote) && <span>{[request.note && `Branch: ${request.note}`, request.reviewNote && `You: ${request.reviewNote}`].filter(Boolean).join(' — ')}</span>}
       <span>{when(request.createdAt)}</span></span>
     {canEdit && <span className="biz-person-actions">
@@ -110,21 +110,21 @@ function DispatchForm({ data, base, onDone }) {
 }
 
 /** Printable dispatch note. The QR opens /receive/<code> on the branch manager's phone. */
-function DispatchNote({ transfer, base, canEdit, onClose }) {
+function DispatchNote({ transfer, items, base, canEdit, onClose }) {
   const [svg, setSvg] = useState('');
   const [run, busy, error] = useCommand();
   const url = `${window.location.origin}/receive/${transfer.code}`;
   useEffect(() => { QRCode.toString(url, { type: 'svg', margin: 1, errorCorrectionLevel: 'M' }).then(setSvg, () => setSvg('')); }, [url]);
   const cancel = async () => {
-    if (!window.confirm(`Cancel dispatch #${transfer.number}? The servings go back to the main center.`)) return;
+    if (!window.confirm(`Cancel dispatch #${transfer.number}? The stock goes back to the main center.`)) return;
     if (await run(`${base}/dispatches/${transfer.id}/cancel`, {}, { success: `Dispatch #${transfer.number} cancelled.` })) onClose();
   };
   return <div className="st-note">
     <div>
       <p className="biz-meta">To {transfer.branchName} · sent {when(transfer.dispatchedAt)} · {TRANSFER_STATUS[transfer.status]}</p>
       <table className="st-table"><thead><tr><th scope="col">Item</th><th scope="col">Sent</th><th scope="col">Received</th></tr></thead>
-        <tbody>{transfer.lines.map((line) => <tr key={line.itemId}><td>{line.name}</td><td>{servings(line.quantity)}</td>
-          <td className={line.received !== null && line.received < line.quantity ? 'is-minus' : ''}>{line.received === null ? '—' : servings(line.received)}</td></tr>)}</tbody></table>
+        <tbody>{transfer.lines.map((line) => <tr key={line.itemId}><td>{line.name}</td><td>{servings(line.quantity, unitOf(items, line.itemId))}</td>
+          <td className={line.received !== null && line.received < line.quantity ? 'is-minus' : ''}>{line.received === null ? '—' : servings(line.received, unitOf(items, line.itemId))}</td></tr>)}</tbody></table>
       {transfer.note && <p className="biz-meta">Note: {transfer.note}</p>}
       <p>Receiving code <span className="st-note-code">{transfer.code}</span></p>
       <p className="biz-meta">On arrival the branch manager scans this code and counts what came.</p>
@@ -144,8 +144,8 @@ function Dispatches({ data, onOpen }) {
     const short = transfer.lines.reduce((sum, line) => sum + (line.received === null ? 0 : line.quantity - line.received), 0);
     return <li className="biz-person" key={transfer.id}>
       <span className="biz-person-main"><strong>#{transfer.number} → {transfer.branchName} · {TRANSFER_STATUS[transfer.status]}</strong>
-        <span>{transfer.lines.map((line) => `${line.name}: ${servings(line.quantity)}`).join(' · ')}</span>
-        {short > 0 && <span className="st-short">Arrived {servings(short)} short{transfer.note ? ` — “${transfer.note}”` : ''}</span>}
+        <span>{transfer.lines.map((line) => `${line.name}: ${servings(line.quantity, unitOf(data.items, line.itemId))}`).join(' · ')}</span>
+        {short > 0 && <span className="st-short">Arrived {transfer.lines.length === 1 ? servings(short, unitOf(data.items, transfer.lines[0].itemId)) : `${Math.round(short * 1000) / 1000}`} short{transfer.note ? ` — “${transfer.note}”` : ''}</span>}
         <span>Sent {when(transfer.dispatchedAt)}{transfer.receivedAt ? ` · received ${when(transfer.receivedAt)}` : ''}</span></span>
       <span className="biz-person-actions"><button type="button" className="o-btn is-quiet is-small" onClick={() => onOpen(transfer)}>Note & QR</button></span>
     </li>;
@@ -202,10 +202,10 @@ function BusinessInventory({ business, params, setParams }) {
 
     <TaskDrawer open={Boolean(task)} title={titles[task?.kind] || 'Inventory'} onClose={() => setTask(null)} wide={task?.kind === 'note'}>
       {task?.kind === 'adjust' && <AdjustForm item={task.item} path={`${base}/adjust`} onDone={() => setTask(null)} />}
-      {task?.kind === 'item' && <NewItemForm path={`${base}/items`} onDone={() => setTask(null)} />}
+      {task?.kind === 'item' && <NewItemForm path={`${base}/items`} unitsOn={Boolean(data.recipes)} onDone={() => setTask(null)} />}
       {task?.kind === 'review' && <ReviewForm request={task.request} base={base} onDone={() => setTask(null)} />}
       {task?.kind === 'dispatch' && <DispatchForm data={data} base={base} onDone={(id) => { setTask(id ? { kind: 'note', transferId: id } : null); if (id) setView('dispatches'); }} />}
-      {noteTransfer && <DispatchNote transfer={noteTransfer} base={base} canEdit={canEdit} onClose={() => setTask(null)} />}
+      {noteTransfer && <DispatchNote transfer={noteTransfer} items={data.items} base={base} canEdit={canEdit} onClose={() => setTask(null)} />}
     </TaskDrawer>
   </>;
 }

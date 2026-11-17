@@ -1,4 +1,4 @@
-// Inventory (migration 009): servings per location, branch stock actions, requests, dispatches and receipts.
+// Inventory (migrations 009 + 012): stock per location in each item's unit (servings, pieces, g/kg, ml/l), branch stock actions, requests, dispatches and receipts.
 // Every function takes `db` (query(sql, params) -> { rows }) inside a transaction the caller opened, and ids the
 // route has already authorised (branch membership or business ownership). Each function re-checks that the
 // records it touches belong to that branch/business, so a substituted id fails with 404.
@@ -6,13 +6,14 @@
 import { randomInt } from 'node:crypto';
 import { HttpError } from '../lib/http.js';
 import { isId } from '../lib/business.js';
+import { UNITS, formatAmount, isUnit, toItemUnit } from '../lib/units.js';
 
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const MAX = 100000;
 
 export function quantity(value, label = 'Quantity', { allowZero = false } = {}) {
   const number = typeof value === 'string' ? Number(value.trim()) : value;
-  if (typeof number !== 'number' || !Number.isFinite(number)) throw new HttpError(400, `${label} must be a number of servings.`);
+  if (typeof number !== 'number' || !Number.isFinite(number)) throw new HttpError(400, `${label} must be a number.`);
   if (number < 0 || (!allowZero && number === 0)) throw new HttpError(400, `${label} must be more than zero.`);
   if (number > MAX) throw new HttpError(400, `${label} is too large.`);
   if (Math.round(number * 1000) !== number * 1000) throw new HttpError(400, `${label} can have at most 3 decimal places.`);
@@ -66,10 +67,40 @@ async function businessOfRestaurant(db, restaurantId) {
   return rows[0].business_id;
 }
 
-async function requireItem(db, businessId, itemId) {
-  const { rows } = await db.query('select id, name, active from public.stock_items where id = $1 and business_id = $2', [id(itemId, 'Stock item'), businessId]);
+/** Whether migration 012 (units, packs, recipes) is applied. Without it everything is counted in servings. */
+export async function hasRecipes(db) {
+  const { rows } = await db.query(`select to_regclass('public.menu_item_recipes') is not null as on`);
+  return rows[0].on;
+}
+const packColumns = (on, alias = '') => (on ? `${alias}pack_name, ${alias}pack_size` : 'null::text as pack_name, null::numeric as pack_size');
+
+export async function requireItem(db, businessId, itemId) {
+  const on = await hasRecipes(db);
+  const { rows } = await db.query(`select id, name, active, unit, ${packColumns(on)} from public.stock_items where id = $1 and business_id = $2`, [id(itemId, 'Stock item'), businessId]);
   if (!rows[0]) throw new HttpError(404, 'That stock item isn’t in this business.');
   return rows[0];
+}
+const NEEDS_012 = 'Units other than servings need database update 012 (recipes and units), which hasn’t been applied yet.';
+
+/** Unit and optional pack from a create/edit body. `current` is the item being edited. */
+function unitAndPack(body, current = null) {
+  const unit = body.unit === undefined || body.unit === null || body.unit === '' ? (current?.unit || 'serving') : body.unit;
+  if (!isUnit(unit)) throw new HttpError(400, `Choose a unit: ${UNITS.join(', ')}.`);
+  let packName = current ? current.pack_name : null;
+  let packSize = current ? num(current.pack_size) : null;
+  if (body.packName !== undefined || body.packSize !== undefined) {
+    const nameText = typeof body.packName === 'string' ? body.packName.trim().replace(/\s+/g, ' ') : '';
+    const sizeGiven = !(body.packSize === undefined || body.packSize === null || body.packSize === '');
+    if (!nameText && !sizeGiven) { packName = null; packSize = null; }
+    else {
+      if (!nameText) throw new HttpError(400, 'Name the pack, e.g. crate, carton or bag.');
+      if (nameText.length > 30) throw new HttpError(400, 'Keep the pack name under 30 characters.');
+      if (!sizeGiven) throw new HttpError(400, `Say how much one ${nameText} holds, in ${unit}.`);
+      packName = nameText;
+      packSize = quantity(body.packSize, 'Pack size');
+    }
+  }
+  return { unit, packName, packSize };
 }
 
 /** Locks and returns the balance row (created at 0 when missing). */
@@ -99,9 +130,48 @@ export async function createItem(db, { businessId, actorId }, body = {}) {
   const low = body.lowLevel === undefined || body.lowLevel === null || body.lowLevel === '' ? null : quantity(body.lowLevel, 'Low-stock level', { allowZero: true });
   const { rows: existing } = await db.query('select id, name from public.stock_items where business_id = $1 and lower(btrim(name)) = lower($2)', [businessId, name]);
   if (existing[0]) throw new HttpError(409, `“${existing[0].name}” is already a stock item. Use that one.`, { itemId: existing[0].id });
-  const { rows } = await db.query(`insert into public.stock_items (business_id, name, low_level, created_by) values ($1, $2, $3, $4)
-    returning id, name, unit, low_level`, [businessId, name, low, actorId]);
-  return { id: rows[0].id, name: rows[0].name, unit: rows[0].unit, lowLevel: num(rows[0].low_level) };
+  const { unit, packName, packSize } = unitAndPack(body);
+  if (!(await hasRecipes(db))) {
+    if (unit !== 'serving' || packName) throw new HttpError(503, NEEDS_012, { code: 'recipes_schema_missing' });
+    const { rows } = await db.query(`insert into public.stock_items (business_id, name, low_level, created_by) values ($1, $2, $3, $4)
+      returning id, name, unit, low_level`, [businessId, name, low, actorId]);
+    return { id: rows[0].id, name: rows[0].name, unit: rows[0].unit, lowLevel: num(rows[0].low_level), packName: null, packSize: null };
+  }
+  const { rows } = await db.query(`insert into public.stock_items (business_id, name, low_level, created_by, unit, pack_name, pack_size)
+    values ($1, $2, $3, $4, $5, $6, $7) returning id, name, unit, low_level, pack_name, pack_size`, [businessId, name, low, actorId, unit, packName, packSize]);
+  return { id: rows[0].id, name: rows[0].name, unit: rows[0].unit, lowLevel: num(rows[0].low_level), packName: rows[0].pack_name, packSize: num(rows[0].pack_size) };
+}
+
+/**
+ * Edit an item: name, low-stock level, pack, and the unit. The unit can change only while nothing has been recorded
+ * for the item (no stock history, no dish uses it), because stored quantities are in that unit.
+ */
+export async function updateItem(db, { businessId }, itemId, body = {}) {
+  if (!(await hasRecipes(db))) throw new HttpError(503, NEEDS_012, { code: 'recipes_schema_missing' });
+  const { rows: found } = await db.query('select * from public.stock_items where id = $1 and business_id = $2 for update', [id(itemId, 'Stock item'), businessId]);
+  const item = found[0];
+  if (!item) throw new HttpError(404, 'That stock item isn’t in this business.');
+  let name = item.name;
+  if (body.name !== undefined) {
+    name = typeof body.name === 'string' ? body.name.trim().replace(/\s+/g, ' ') : '';
+    if (!name) throw new HttpError(400, 'Enter the item name.');
+    if (name.length > 80) throw new HttpError(400, 'Keep the name under 80 characters.');
+    const { rows: clash } = await db.query('select name from public.stock_items where business_id = $1 and lower(btrim(name)) = lower($2) and id <> $3', [businessId, name, item.id]);
+    if (clash[0]) throw new HttpError(409, `“${clash[0].name}” is already a stock item.`);
+  }
+  const low = body.lowLevel === undefined ? num(item.low_level)
+    : body.lowLevel === null || body.lowLevel === '' ? null : quantity(body.lowLevel, 'Low-stock level', { allowZero: true });
+  const { unit, packName, packSize } = unitAndPack(body, item);
+  if (unit !== item.unit) {
+    const { rows: used } = await db.query(`select exists (select 1 from public.stock_movements where item_id = $1)
+        or exists (select 1 from public.menu_item_stock where item_id = $1)
+        or exists (select 1 from public.menu_item_recipe_lines where item_id = $1)
+        or exists (select 1 from public.stock_request_lines where item_id = $1) as used`, [item.id]);
+    if (used[0].used) throw new HttpError(409, `${item.name} already has stock history or dishes in ${item.unit}, so its unit can’t change. Add a new item instead.`);
+  }
+  const { rows } = await db.query(`update public.stock_items set name = $2, low_level = $3, unit = $4, pack_name = $5, pack_size = $6
+    where id = $1 returning id, name, unit, low_level, pack_name, pack_size`, [item.id, name, low, unit, packName, packSize]);
+  return { id: rows[0].id, name: rows[0].name, unit: rows[0].unit, lowLevel: num(rows[0].low_level), packName: rows[0].pack_name, packSize: num(rows[0].pack_size) };
 }
 
 /**
@@ -114,14 +184,17 @@ export async function adjust(db, { businessId, locationId, actorId }, body = {})
   const kind = body.kind;
   if (!['count', 'added', 'waste'].includes(kind)) throw new HttpError(400, 'Choose count, add or waste.');
   const item = await requireItem(db, businessId, body.itemId);
-  const amount = quantity(body.quantity, kind === 'count' ? 'Counted servings' : 'Servings', { allowZero: kind === 'count' });
+  const label = kind === 'count' ? 'Counted amount' : 'Amount';
+  // Entered in the item's unit, a compatible unit (g for a kg item) or packs ("40 crates" → 400 kg).
+  const entered = quantity(body.quantity, label, { allowZero: kind === 'count' });
+  const amount = toItemUnit(entered, body.unit, item, { label });
   const text = note(body.note);
-  if (kind === 'waste' && !text) throw new HttpError(400, 'Say why the servings were wasted.');
+  if (kind === 'waste' && !text) throw new HttpError(400, `Say why the ${item.unit === 'serving' ? 'servings were' : 'stock was'} wasted.`);
   const current = await lockBalance(db, locationId, item.id);
-  const delta = kind === 'count' ? amount - current : kind === 'added' ? amount : -amount;
-  if (kind === 'waste' && amount > current) throw new HttpError(409, `Only ${current} servings of ${item.name} are on hand.`);
+  const delta = Math.round((kind === 'count' ? amount - current : kind === 'added' ? amount : -amount) * 1000) / 1000;
+  if (kind === 'waste' && amount > current) throw new HttpError(409, `Only ${formatAmount(current, item.unit)} of ${item.name} ${current === 1 ? 'is' : 'are'} on hand.`);
   const balance = await move(db, { businessId, locationId, itemId: item.id, delta, reason: kind, actorId, note: text });
-  return { itemId: item.id, onHand: balance ?? current, change: delta };
+  return { itemId: item.id, unit: item.unit, onHand: balance ?? current, change: delta, quantity: amount };
 }
 
 /* ---------- Branch: menu links, corrections ---------- */
@@ -131,11 +204,14 @@ export async function linkMenuItem(db, { businessId, restaurantId, actorId }, me
   if (!dish) throw new HttpError(404, 'That dish isn’t on this branch’s menu.');
   if (body.itemId === null) {
     await db.query('delete from public.menu_item_stock where menu_item_id = $1', [dish.id]);
+    if (await hasRecipes(db)) await db.query('delete from public.menu_item_recipes where menu_item_id = $1', [dish.id]);
     return { menuItemId: dish.id, tracked: false };
   }
   const item = await requireItem(db, businessId, body.itemId);
   const servings = body.servings === undefined ? 1 : quantity(body.servings, 'Servings per dish');
   const keepSelling = body.allowWhenOut === true;
+  // A link replaces any recipe for this dish (and vice versa): one source of ingredients per dish.
+  if (await hasRecipes(db)) await db.query('delete from public.menu_item_recipes where menu_item_id = $1', [dish.id]);
   await db.query(`insert into public.menu_item_stock (menu_item_id, restaurant_id, item_id, servings, allow_when_out, updated_by)
     values ($1, $2, $3, $4, $5, $6) on conflict (menu_item_id) do update
     set item_id = excluded.item_id, servings = excluded.servings, allow_when_out = excluded.allow_when_out, updated_by = excluded.updated_by, updated_at = now()`,
@@ -229,7 +305,7 @@ export async function reviewRequest(db, { businessId, actorId }, requestId, body
   const given = new Map((body.lines || []).map((line) => [String(line.itemId).toLowerCase(), line.approved]));
   let total = 0;
   for (const line of lines) {
-    const approved = given.has(line.item_id) ? quantity(given.get(line.item_id), 'Approved servings', { allowZero: true }) : Number(line.requested);
+    const approved = given.has(line.item_id) ? quantity(given.get(line.item_id), 'Approved amount', { allowZero: true }) : Number(line.requested);
     if (approved > Number(line.requested)) throw new HttpError(400, 'You can’t approve more than was requested. Dispatch extra separately.');
     total += approved;
     await db.query('update public.stock_request_lines set approved = $3 where request_id = $1 and item_id = $2', [request.id, line.item_id, approved]);
@@ -275,7 +351,7 @@ export async function dispatch(db, { businessId, actorId }, body = {}) {
   for (const line of [...lines].sort((a, b) => a.itemId.localeCompare(b.itemId))) {
     const item = await requireItem(db, businessId, line.itemId);
     const onHand = await lockBalance(db, from, item.id);
-    if (onHand < line.quantity) throw new HttpError(409, `The main center has ${onHand} servings of ${item.name}; you’re sending ${line.quantity}.`, { itemId: item.id });
+    if (onHand < line.quantity) throw new HttpError(409, `The main center has ${formatAmount(onHand, item.unit)} of ${item.name}; you’re sending ${formatAmount(line.quantity, item.unit)}.`, { itemId: item.id });
     await db.query('insert into public.stock_transfer_lines (transfer_id, item_id, quantity) values ($1, $2, $3)', [transferId, item.id, line.quantity]);
     await move(db, { businessId, locationId: from, itemId: item.id, delta: -line.quantity, reason: 'dispatched', actorId, transferId });
   }
@@ -328,7 +404,7 @@ export async function receive(db, { businessId, restaurantId, actorId }, transfe
   let short = 0;
   for (const line of lines) {
     if (!counted.has(line.item_id)) throw new HttpError(400, 'Enter what arrived for every item on the dispatch.');
-    const received = quantity(counted.get(line.item_id), 'Received servings', { allowZero: true });
+    const received = quantity(counted.get(line.item_id), 'Received amount', { allowZero: true });
     if (received > Number(line.quantity)) throw new HttpError(400, 'You can’t receive more than was dispatched. Add extra as a separate “Add stock”.');
     short += Number(line.quantity) - received;
     await db.query('update public.stock_transfer_lines set received = $3 where transfer_id = $1 and item_id = $2', [transfer.id, line.item_id, received]);
@@ -345,6 +421,7 @@ export async function receive(db, { businessId, restaurantId, actorId }, transfe
 
 /* ---------- Reads ---------- */
 
+// Line units: look up the item (snapshots list every item with its unit).
 const transferOut = (row, lines) => ({
   id: row.id, number: row.number, code: row.code, status: row.status, note: row.note, requestId: row.request_id,
   branchId: row.restaurant_id, branchName: row.branch_name,
@@ -354,14 +431,14 @@ const transferOut = (row, lines) => ({
 const requestOut = (row, lines) => ({
   id: row.id, number: row.number, status: row.status, note: row.note, reviewNote: row.review_note,
   branchId: row.restaurant_id, branchName: row.branch_name, createdAt: row.created_at, reviewedAt: row.reviewed_at,
-  lines: lines.filter((line) => line.request_id === row.id).map((line) => ({ itemId: line.item_id, name: line.name, requested: Number(line.requested), approved: num(line.approved) })),
+  lines: lines.filter((line) => line.request_id === row.id).map((line) => ({ itemId: line.item_id, name: line.name, unit: line.unit, requested: Number(line.requested), approved: num(line.approved) })),
 });
 
 async function transfersFor(db, where, params) {
   const { rows } = await db.query(`select t.*, l.restaurant_id, r.name as branch_name from public.stock_transfers t
     join public.stock_locations l on l.id = t.to_location join public.restaurants r on r.id = l.restaurant_id
     where ${where} order by t.dispatched_at desc limit 50`, params);
-  const { rows: lines } = rows.length ? await db.query(`select tl.*, i.name from public.stock_transfer_lines tl join public.stock_items i on i.id = tl.item_id
+  const { rows: lines } = rows.length ? await db.query(`select tl.*, i.name, i.unit from public.stock_transfer_lines tl join public.stock_items i on i.id = tl.item_id
     where tl.transfer_id = any($1::uuid[]) order by i.name`, [rows.map((row) => row.id)]) : { rows: [] };
   return rows.map((row) => transferOut(row, lines));
 }
@@ -369,16 +446,16 @@ async function transfersFor(db, where, params) {
 async function requestsFor(db, where, params) {
   const { rows } = await db.query(`select q.*, r.name as branch_name from public.stock_requests q join public.restaurants r on r.id = q.restaurant_id
     where ${where} order by q.created_at desc limit 50`, params);
-  const { rows: lines } = rows.length ? await db.query(`select ql.*, i.name from public.stock_request_lines ql join public.stock_items i on i.id = ql.item_id
+  const { rows: lines } = rows.length ? await db.query(`select ql.*, i.name, i.unit from public.stock_request_lines ql join public.stock_items i on i.id = ql.item_id
     where ql.request_id = any($1::uuid[]) order by i.name`, [rows.map((row) => row.id)]) : { rows: [] };
   return rows.map((row) => requestOut(row, lines));
 }
 
 async function movementsAt(db, locationId, limit = 60) {
-  const { rows } = await db.query(`select m.id, m.item_id, i.name, m.delta, m.balance_after, m.reason, m.note, m.order_id, m.transfer_id, m.created_at,
+  const { rows } = await db.query(`select m.id, m.item_id, i.name, i.unit, m.delta, m.balance_after, m.reason, m.note, m.order_id, m.transfer_id, m.created_at,
       p.name as actor from public.stock_movements m join public.stock_items i on i.id = m.item_id left join public.profiles p on p.id = m.actor_id
     where m.location_id = $1 order by m.id desc limit $2`, [locationId, limit]);
-  return rows.map((row) => ({ id: Number(row.id), itemId: row.item_id, name: row.name, change: Number(row.delta), balance: Number(row.balance_after),
+  return rows.map((row) => ({ id: Number(row.id), itemId: row.item_id, name: row.name, unit: row.unit, change: Number(row.delta), balance: Number(row.balance_after),
     reason: row.reason, note: row.note, orderId: row.order_id, transferId: row.transfer_id, at: row.created_at, by: row.actor || null }));
 }
 
@@ -386,14 +463,34 @@ async function movementsAt(db, locationId, limit = 60) {
 export async function branchSnapshot(db, restaurantId) {
   const businessId = await businessOfRestaurant(db, restaurantId);
   const location = await branchLocation(db, restaurantId);
-  const [items, committed, links, dishes] = await Promise.all([
-    db.query(`select i.id, i.name, i.unit, i.low_level, i.active, coalesce(b.on_hand, 0) as on_hand, b.updated_at
+  const recipesOn = await hasRecipes(db);
+  const [items, committed, links, dishes, recipes] = await Promise.all([
+    db.query(`select i.id, i.name, i.unit, ${packColumns(recipesOn, 'i.')}, i.low_level, i.active, coalesce(b.on_hand, 0) as on_hand, b.updated_at
       from public.stock_items i left join public.stock_balances b on b.item_id = i.id and b.location_id = $2
       where i.business_id = $1 order by i.name`, [businessId, location]),
     db.query('select item_id, quantity from private.branch_committed($1)', [restaurantId]),
     db.query('select menu_item_id, item_id, servings, allow_when_out from public.menu_item_stock where restaurant_id = $1', [restaurantId]),
     db.query('select id, name, available from public.menu_items where restaurant_id = $1 order by name', [restaurantId]),
+    recipesOn ? db.query(`select r.menu_item_id, r.allow_when_out, l.item_id, l.quantity, l.entered_quantity, l.entered_unit, l.position
+      from public.menu_item_recipes r left join public.menu_item_recipe_lines l on l.menu_item_id = r.menu_item_id
+      where r.restaurant_id = $1 order by r.menu_item_id, l.position, l.item_id`, [restaurantId]) : { rows: [] },
   ]);
+  const recipeOf = new Map();
+  for (const row of recipes.rows) {
+    if (!recipeOf.has(row.menu_item_id)) recipeOf.set(row.menu_item_id, { source: 'recipe', allowWhenOut: row.allow_when_out, lines: [] });
+    if (row.item_id) recipeOf.get(row.menu_item_id).lines.push({ itemId: row.item_id, quantity: Number(row.quantity), enteredQuantity: Number(row.entered_quantity), enteredUnit: row.entered_unit });
+  }
+  const unitOf = new Map(items.rows.map((row) => [row.id, row.unit]));
+  // Ingredients per dish: its recipe, or its 009 link as a one-line recipe.
+  const ingredientsOf = (dishId) => {
+    if (recipeOf.has(dishId)) return recipeOf.get(dishId);
+    const link = links.rows.find((row) => row.menu_item_id === dishId);
+    if (!link) return null;
+    const servings = Number(link.servings);
+    return { source: 'link', allowWhenOut: link.allow_when_out, lines: [{ itemId: link.item_id, quantity: servings, enteredQuantity: servings, enteredUnit: unitOf.get(link.item_id) || 'serving' }] };
+  };
+  const usedBy = new Map();
+  for (const row of dishes.rows) for (const line of ingredientsOf(row.id)?.lines || []) usedBy.set(line.itemId, (usedBy.get(line.itemId) || 0) + 1);
   const held = new Map(committed.rows.map((row) => [row.item_id, Number(row.quantity)]));
   const linkOf = new Map(links.rows.map((row) => [row.menu_item_id, row]));
   const [incoming, requests, movements] = await Promise.all([
@@ -402,20 +499,22 @@ export async function branchSnapshot(db, restaurantId) {
     movementsAt(db, location),
   ]);
   return {
-    businessId, generatedAt: new Date().toISOString(), unit: 'serving',
+    businessId, generatedAt: new Date().toISOString(), unit: 'serving', recipes: recipesOn,
     items: items.rows.map((row) => {
       const onHand = Number(row.on_hand);
       const reserved = held.get(row.id) || 0;
       const available = onHand - reserved;
       const low = num(row.low_level);
-      return { id: row.id, name: row.name, unit: row.unit, active: row.active, onHand, reserved, available, lowLevel: low,
+      return { id: row.id, name: row.name, unit: row.unit, packName: row.pack_name, packSize: num(row.pack_size), active: row.active,
+        onHand, reserved, available, lowLevel: low,
         state: available <= 0 ? 'out' : low !== null && available <= low ? 'low' : 'ok', updatedAt: row.updated_at,
-        dishes: links.rows.filter((link) => link.item_id === row.id).length };
+        dishes: usedBy.get(row.id) || 0 };
     }),
     dishes: dishes.rows.map((row) => {
       const link = linkOf.get(row.id);
       return { id: row.id, name: row.name, manuallySoldOut: !row.available,
-        link: link ? { itemId: link.item_id, servings: Number(link.servings), allowWhenOut: link.allow_when_out } : null };
+        link: link && !recipeOf.has(row.id) ? { itemId: link.item_id, servings: Number(link.servings), allowWhenOut: link.allow_when_out } : null,
+        recipe: ingredientsOf(row.id) };
     }),
     incoming, requests, movements,
   };
@@ -424,8 +523,9 @@ export async function branchSnapshot(db, restaurantId) {
 /** Everything the owner Inventory page shows for one business. */
 export async function businessSnapshot(db, businessId) {
   const center = await centerLocation(db, businessId);
+  const recipesOn = await hasRecipes(db);
   const [items, branches, balances] = await Promise.all([
-    db.query(`select i.id, i.name, i.unit, i.low_level, coalesce(b.on_hand, 0) as on_hand from public.stock_items i
+    db.query(`select i.id, i.name, i.unit, ${packColumns(recipesOn, 'i.')}, i.low_level, coalesce(b.on_hand, 0) as on_hand from public.stock_items i
       left join public.stock_balances b on b.item_id = i.id and b.location_id = $2 where i.business_id = $1 order by i.name`, [businessId, center]),
     db.query('select id, name, status from public.restaurants where business_id = $1 order by name', [businessId]),
     db.query(`select l.restaurant_id, b.item_id, b.on_hand from public.stock_balances b join public.stock_locations l on l.id = b.location_id
@@ -437,9 +537,9 @@ export async function businessSnapshot(db, businessId) {
     movementsAt(db, center),
   ]);
   return {
-    businessId, generatedAt: new Date().toISOString(), unit: 'serving',
+    businessId, generatedAt: new Date().toISOString(), unit: 'serving', recipes: recipesOn,
     center: { id: center, name: 'Main center' },
-    items: items.rows.map((row) => ({ id: row.id, name: row.name, unit: row.unit, lowLevel: num(row.low_level), centerOnHand: Number(row.on_hand),
+    items: items.rows.map((row) => ({ id: row.id, name: row.name, unit: row.unit, packName: row.pack_name, packSize: num(row.pack_size), lowLevel: num(row.low_level), centerOnHand: Number(row.on_hand),
       branches: Object.fromEntries(balances.rows.filter((b) => b.item_id === row.id).map((b) => [b.restaurant_id, Number(b.on_hand)])) })),
     branches: branches.rows.map((row) => ({ id: row.id, name: row.name, status: row.status })),
     requests, transfers, centerMovements: movements,

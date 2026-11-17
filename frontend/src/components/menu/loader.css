@@ -1,0 +1,57 @@
+/* The guest menu's loading screen (BrandedLoader.jsx). Neutral until the brand is known, then the restaurant's. */
+.bl {
+  --bl-bg: var(--paper, #f7f7f5); --bl-surface: #ffffff; --bl-ink: var(--ink, #111110); --bl-muted: var(--muted, #6f6b63); --bl-accent: var(--ink, #111110);
+  --bl-ease: cubic-bezier(.2, .8, .2, 1);
+  position: fixed; inset: 0; z-index: 60; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: 24px 16px max(20px, env(safe-area-inset-bottom));
+  background: var(--bl-bg); color: var(--bl-ink); font-family: var(--font, system-ui, sans-serif);
+  transition: background-color 360ms var(--bl-ease), opacity 380ms var(--bl-ease), visibility 0s linear 0s;
+  touch-action: none; overscroll-behavior: none;
+}
+.bl.is-leaving { opacity: 0; visibility: hidden; pointer-events: none; transition: opacity 380ms var(--bl-ease), visibility 0s linear 380ms; }
+
+/* Cover: full-bleed, softened into the background colour so the logo and name stay readable. */
+.bl-cover { position: absolute; inset: 0; z-index: 0; }
+.bl-cover::after {
+  content: ''; position: absolute; inset: 0;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--bl-bg) 20%, transparent) 0%, color-mix(in srgb, var(--bl-bg) 72%, transparent) 46%, var(--bl-bg) 82%);
+}
+.bl-cover-img { width: 100%; height: 100%; max-width: none; object-fit: cover; opacity: 0; scale: 1.06; transition: opacity 600ms var(--bl-ease), scale 2.4s var(--bl-ease); }
+.bl-cover-img.is-loaded { opacity: 1; scale: 1; }
+
+.bl-center { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; gap: 22px; margin-top: auto; transition: transform 380ms var(--bl-ease); }
+.bl.is-leaving .bl-center { transform: translateY(-6px) scale(1.02); }
+.bl-brand { display: flex; flex-direction: column; align-items: center; gap: 14px; animation: bl-rise 420ms var(--bl-ease) both; }
+.bl-mark {
+  display: grid; place-items: center; width: 84px; height: 84px; overflow: hidden; border-radius: 24px;
+  background: var(--bl-surface); box-shadow: 0 0 0 1px color-mix(in srgb, var(--bl-ink) 8%, transparent), 0 18px 40px -22px color-mix(in srgb, var(--bl-ink) 55%, transparent);
+  animation: bl-breathe 2.4s ease-in-out infinite;
+}
+.bl-mark.has-logo { background: #fff; }
+.bl-logo { width: 100%; height: 100%; max-width: none; padding: 10px; object-fit: contain; opacity: 0; transition: opacity 280ms var(--bl-ease); }
+.bl-logo.is-loaded { opacity: 1; }
+.bl-initial { color: var(--bl-accent); font-family: Georgia, 'Times New Roman', serif; font-size: 40px; font-weight: 600; line-height: 1; }
+.bl-name { max-width: min(80vw, 22ch); margin: 0; overflow: hidden; color: var(--bl-ink); font-size: 21px; font-weight: 650; letter-spacing: -.015em; line-height: 1.2; text-align: center; text-overflow: ellipsis; white-space: nowrap; }
+
+/* A thin line with a slow sweep: motion that says "nearly there" without counting. */
+.bl-progress { position: relative; display: block; width: 112px; height: 3px; overflow: hidden; border-radius: 999px; background: color-mix(in srgb, var(--bl-ink) 10%, transparent); }
+.bl-progress > span { position: absolute; inset: 0; width: 40%; border-radius: inherit; background: var(--bl-accent); animation: bl-sweep 1.3s cubic-bezier(.45, 0, .25, 1) infinite; }
+.bl.is-neutral .bl-progress > span { background: color-mix(in srgb, var(--bl-ink) 45%, transparent); }
+
+.bl-foot { position: relative; z-index: 1; display: flex; align-items: baseline; gap: 3px; margin: auto 0 0; color: var(--bl-muted); font-size: 12px; }
+.bl-powered::before { content: 'Powered by Cravio'; }
+.bl-foot .brand-mark { --mark-size: 5px; }
+
+@keyframes bl-rise { from { opacity: 0; transform: translateY(6px); } }
+@keyframes bl-breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.035); } }
+@keyframes bl-sweep { from { transform: translateX(-110%); } to { transform: translateX(260%); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .bl { transition: opacity 160ms linear; }
+  .bl.is-leaving { transition: opacity 160ms linear, visibility 0s linear 160ms; }
+  .bl-center, .bl.is-leaving .bl-center { transition: none; transform: none; }
+  .bl-brand, .bl-mark { animation: none; }
+  .bl-cover-img { scale: 1; transition: opacity 160ms linear; }
+  .bl-progress > span { animation: none; width: 100%; opacity: .55; }
+}

@@ -62,3 +62,13 @@
 .st-row-button:hover { background: none; }
 .st-table th small, .st-table td small { display: block; margin-top: 2px; }
 .st-form input[type="radio"], .st-form input[type="checkbox"], .biz-checks input, .biz-checks-inline input { width: auto; min-height: 0; margin: 0; }
+/* Units and recipes (migration 012) */
+.st-unit { flex: none; color: var(--muted); font-size: 14px; white-space: nowrap; }
+.st-line .st-unit-select { flex: 0 0 auto; width: auto; min-width: 96px; }
+.st-recipe-preview { margin: 4px 0 8px; padding: 10px 12px; border-radius: 10px; background: var(--surface-2, rgba(0,0,0,.03)); font-size: 14px; display: flex; flex-direction: column; gap: 2px; }
+.st-recipe-preview span { color: var(--muted); font-size: 13px; }
+.st-suggest-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+.st-warn { color: #7d5106; font-size: 13px; }
+.st-guide ol { margin: 0; padding: 4px 16px 16px 36px; display: flex; flex-direction: column; gap: 6px; font-size: 14px; }
+.st-guide ol span { color: var(--muted); }
+.st-guide summary { padding: 14px 16px; cursor: pointer; list-style-position: inside; }

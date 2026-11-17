@@ -286,3 +286,29 @@
 .gx-done-text { margin: 10px 0 0; color: #111110; font-size: 17px; font-weight: 550; line-height: 1.4; font-variant-numeric: tabular-nums; }
 .gx-done-sub { margin: 10px 0 0; max-width: 32ch; color: #6f6b63; font-size: 14px; line-height: 1.45; }
 .gx-card-actions.is-single { grid-template-columns: 1fr; }
+
+/* ---------- Table sessions: join sheet, table strip, grouped lines (docs/v2/TABLE-SESSIONS.md) ---------- */
+.gx-join-lead { margin: 0 0 16px; color: var(--mv-ink); font-size: 15px; line-height: 1.5; }
+.gx-join-form { display: flex; flex-direction: column; gap: 16px; }
+:where(.mv-shell) .gx-join-code, :where(.mv-shell) .gx-join-name {
+  padding: 10px 12px; border: 1px solid var(--mv-line-strong); border-radius: 12px; background: var(--mv-bg); color: var(--mv-ink); font-size: 16px; caret-color: var(--mv-action);
+}
+:where(.mv-shell) .gx-join-code { width: 8.5ch; padding: 10px 14px; font-size: 28px; font-weight: 800; letter-spacing: .3em; font-variant-numeric: tabular-nums; text-align: center; }
+:where(.mv-shell) .gx-join-code:focus, :where(.mv-shell) .gx-join-name:focus { outline: none; border-color: var(--mv-ink); box-shadow: 0 0 0 3px color-mix(in srgb, var(--mv-ink) 12%, transparent); }
+.gx-join-code:disabled { opacity: .5; }
+.gx-table-strip {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; margin: 0; padding: 8px 14px;
+  border-radius: 999px; background: color-mix(in srgb, var(--mv-bg) 92%, transparent); box-shadow: inset 0 0 0 1px var(--mv-line); color: var(--mv-ink);
+  font-size: 13px; line-height: 1.35; backdrop-filter: blur(8px);
+}
+.gx-table-strip strong { font-variant-numeric: tabular-nums; letter-spacing: .06em; }
+.gx-table-strip.is-button { justify-content: center; min-height: 40px; cursor: pointer; }
+.gx-table-strip.is-button strong { color: var(--mv-action); letter-spacing: 0; }
+.gx-table-people { flex-shrink: 0; color: var(--mv-muted); }
+.gx-table-info { margin-bottom: 4px; }
+.gx-table-info .gx-info { margin-top: 0; }
+.gx-group + .gx-group { margin-top: 6px; }
+.gx-group-title { margin: 16px 0 0; color: var(--mv-muted); font-size: 12.5px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+.gx-ordered { margin-top: 18px; text-align: left; }
+.gx-ordered ul { display: flex; flex-direction: column; gap: 8px; margin: 8px 0 0; padding: 0; list-style: none; }
+.gx-ordered li { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border-radius: 12px; background: var(--mv-soft); font-size: 13.5px; }

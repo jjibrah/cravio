@@ -8,10 +8,11 @@ import { routes as menuMerch } from './menu-merch.js';
 import { routes as adminUsers } from './admin-users.js';
 import { routes as publicMenu } from './public-menu.js';
 import { routes as publicGuest } from './public-guest.js';
+import { routes as publicTable } from './public-table.js';
 import { routes as operations } from './operations.js';
 import { routes as support } from './support.js';
 import { routes as adminPlatform } from './admin-platform.js';
 import { routes as adminBusiness } from './admin-business.js';
 import { routes as settings } from './settings.js';
 
-export const routes = [...inventory, ...me, ...legal, ...owner, ...stock, ...settings, ...menuMerch, ...restaurant, ...adminBusiness, ...adminPlatform, ...adminUsers, ...publicMenu, ...publicGuest, ...operations, ...support];
+export const routes = [...inventory, ...me, ...legal, ...owner, ...stock, ...settings, ...menuMerch, ...restaurant, ...adminBusiness, ...adminPlatform, ...adminUsers, ...publicMenu, ...publicGuest, ...publicTable, ...operations, ...support];

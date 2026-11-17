@@ -8,11 +8,13 @@ import {
   must, namesFor, newCartCode, priceLines, rateLimit, requestOut, tableNumber, visitorId, withBody,
 } from '../lib/operations.js';
 import { serviceClient } from '../lib/supabase.js';
+import { withDb } from '../lib/db.js';
+import { isCartMember, sessionsAvailable } from '../lib/table-sessions.js';
 
 const UNAVAILABLE = 'This menu isn’t available.';
 const TEN_MINUTES = 10 * 60 * 1000;
 
-async function liveRestaurant(db, restaurantId) {
+export async function liveRestaurant(db, restaurantId) {
   if (!isUuid(restaurantId)) throw new HttpError(404, UNAVAILABLE);
   const restaurant = must(await db.from('restaurants').select('id, status').eq('id', restaurantId.toLowerCase()).maybeSingle());
   if (!restaurant || restaurant.status !== 'live') throw new HttpError(404, UNAVAILABLE);
@@ -20,11 +22,11 @@ async function liveRestaurant(db, restaurantId) {
 }
 
 /** Per visitor (or, without a visitor id, per connection) and per table. In memory: see lib/operations.js. */
-function limitGuest(kind, request, restaurantId, table) {
+export function limitGuest(kind, request, restaurantId, table, { visitorLimit = 10, tableLimit = 20 } = {}) {
   const visitor = visitorId(request);
   rateLimit([
-    { key: `${kind}:v:${visitor || `ip:${clientAddress(request)}`}`, limit: 10, windowMs: TEN_MINUTES },
-    ...(table ? [{ key: `${kind}:t:${restaurantId}:${table}`, limit: 20, windowMs: TEN_MINUTES }] : []),
+    { key: `${kind}:v:${visitor || `ip:${clientAddress(request)}`}`, limit: visitorLimit, windowMs: TEN_MINUTES },
+    ...(table ? [{ key: `${kind}:t:${restaurantId}:${table}`, limit: tableLimit, windowMs: TEN_MINUTES }] : []),
   ]);
   return visitor;
 }
@@ -107,7 +109,8 @@ async function saveCart({ request, body }) {
 /**
  * GET /api/public/carts/:code/status?restaurantId=… — the guest's phone polls this (about every 5 s) after
  * "Ready to order", to show "Order confirmed ✓" once a waiter confirms it. Only the phone that saved the cart
- * (same X-Cravio-Visitor) can read it; anyone else gets 404, as for an unknown code.
+ * (same X-Cravio-Visitor) or, for a table's shared cart, a member of that table session (migration 011) can read
+ * it; anyone else gets 404, as for an unknown code.
  */
 async function cartStatus({ request, params, url }) {
   const restaurantId = url.searchParams.get('restaurantId');
@@ -119,9 +122,13 @@ async function cartStatus({ request, params, url }) {
   rateLimit([{ key: `cart-status:v:${visitor}`, limit: 300, windowMs: TEN_MINUTES }], 'Too many checks. Please wait a minute.');
 
   const db = serviceClient();
-  const cart = must(await db.from('guest_carts').select('id, code, expires_at, claimed_at, claimed_by, claimed_order_id')
+  let cart = must(await db.from('guest_carts').select('id, code, expires_at, claimed_at, claimed_by, claimed_order_id')
     .eq('code', code).eq('restaurant_id', restaurantId.toLowerCase()).eq('visitor_id', visitor)
     .order('created_at', { ascending: false }).limit(1).maybeSingle());
+  if (!cart && await tableMember(restaurantId.toLowerCase(), code, visitor)) {
+    cart = must(await db.from('guest_carts').select('id, code, expires_at, claimed_at, claimed_by, claimed_order_id')
+      .eq('code', code).eq('restaurant_id', restaurantId.toLowerCase()).order('created_at', { ascending: false }).limit(1).maybeSingle());
+  }
   if (!cart) throw new HttpError(404, 'We couldn’t find that code. Tap Ready to order again.');
 
   // Claimed and the order saved: confirmed. (Claimed without an order yet means the waiter is saving it right now.)
@@ -137,6 +144,13 @@ async function cartStatus({ request, params, url }) {
   }
   if (!cart.claimed_at && new Date(cart.expires_at) <= new Date()) return { status: 'expired', expiresAt: iso(cart.expires_at) };
   return { status: 'ready', expiresAt: iso(cart.expires_at) };
+}
+
+/** Someone else at the table saved this code: members of that table session may follow it too. */
+async function tableMember(restaurantId, code, visitor) {
+  try {
+    return await withDb(async (pg) => (await sessionsAvailable(pg)) && isCartMember(pg, { restaurantId, code, visitor }));
+  } catch { return false; } // no server database connection or 011 not applied: same answer as before
 }
 
 async function createRequest({ request, body }) {

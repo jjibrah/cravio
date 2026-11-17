@@ -181,6 +181,11 @@ export const opsApi = {
   removeTable: (number) => api(`/api/ops/tables/${number}`, { method: 'DELETE' }),
   analytics: (range = 'today', signal) => api(`/api/ops/analytics?range=${range}`, { signal }),
   health: (signal) => api('/api/ops/health', { signal }),
+  // Table sessions (docs/v2/TABLE-SESSIONS.md): { available, sessions: [{ id, table, joinCode, people, verified, … }] }
+  tableSessions: (signal) => api('/api/ops/table-sessions', { signal }),
+  closeTableSession: (id) => post(`/api/ops/table-sessions/${id}/close`),
+  newTableCode: (id) => post(`/api/ops/table-sessions/${id}/code`),
+  verifyTableSession: (id) => post(`/api/ops/table-sessions/${id}/verify`),
 };
 
 export const menuApi = {
