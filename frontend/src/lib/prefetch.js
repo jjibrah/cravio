@@ -53,6 +53,11 @@ export const chunks = {
   branchChooser: once(() => import('../pages/business/BranchChooserPage')),
   branchInventory: once(() => import('../pages/stock/BranchInventoryPage')),
   ownerInventory: once(() => import('../pages/stock/OwnerInventoryPage')),
+  ownerStock: once(() => import('../pages/inventory/OwnerStockPage')),
+  ownerItems: once(() => import('../pages/inventory/OwnerItemsPage')),
+  ownerRecipes: once(() => import('../pages/inventory/OwnerRecipesPage')),
+  ownerHistory: once(() => import('../pages/inventory/OwnerHistoryPage')),
+  inventoryComingNext: once(() => import('../pages/inventory/ComingNextPage')),
   receiveCode: once(() => import('../pages/stock/ReceiveCodePage')),
   terms: once(() => import('../components/legal/TermsPage')),
   termsAccept: once(() => import('../components/legal/TermsAcceptPage')),
@@ -82,6 +87,8 @@ export function chunksFor(pathname) {
     case 'onboarding': return [...signedIn, 'onboarding'];
     case 'receive': return [...signedIn, 'receiveCode'];
     case 'owner': {
+      // Inventory: today's page while the feature is off, the new screen when on (App.jsx InventoryRoute).
+      if (page === 'inventory') return [...signedIn, 'dashboard', 'ownerInventory', { items: 'ownerItems', recipes: 'ownerRecipes', history: 'ownerHistory' }[detail] || 'ownerStock'];
       if (BRANCH_PAGES[page] && page) return [...signedIn, 'branchChooser']; // legacy link, redirected to a branch
       return [...signedIn, 'dashboard', OWNER_PAGES[page] || 'pageFrame'];
     }
@@ -90,7 +97,8 @@ export function chunksFor(pathname) {
       // /branch/<id>/<section>/<detail>
       const [section = '', sub] = [detail, parts[3]];
       const key = section === 'tables' && sub ? 'tableDetail' : BRANCH_PAGES[section] || 'pageFrame';
-      return [...signedIn, 'dashboard', key];
+      // Branch Recipes / History (and Stock when inventory is on) are "coming next" pages until P1-15/16.
+      return [...signedIn, 'dashboard', key, ...(section === 'recipes' || section === 'inventory' ? ['inventoryComingNext'] : [])];
     }
     case 'admin': return [...signedIn, 'dashboard', page === 'businesses' && detail ? 'adminBusiness' : ADMIN_PAGES[page] || 'pageFrame'];
     case 'waiter': return [...signedIn, 'waiter', WAITER_PAGES[page] || 'waiterTables'];

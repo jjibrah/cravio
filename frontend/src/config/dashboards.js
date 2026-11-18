@@ -1,5 +1,9 @@
 // `kind` picks the page-frame skeleton (see components/dashboard/PageFrame.jsx).
 // Consecutive sections that share a `group` render together under that label.
+// Feature switch: `feature: 'inventory'` shows a section only when the business has inventory switched on;
+// `featureOff: 'inventory'` only while it is off (today's single Inventory entry). See visibleSections().
+// Two sections may share a path (old Inventory / new Stock): routes are built once per path, and the page for
+// that path chooses old or new from the same switch (App.jsx InventoryRoute).
 export const dashboards = {
   admin: {
     label: 'Admin',
@@ -24,7 +28,10 @@ export const dashboards = {
       { path: 'tables', label: 'Tables', icon: 'tables', kind: 'floor', description: 'Your floor, table by table.' },
       { path: 'products', group: 'Menu', label: 'Products', icon: 'products', kind: 'products', description: 'Dishes and drinks, organised by category.' },
       { path: 'menu', group: 'Menu', label: 'Menu configuration', icon: 'menu', kind: 'menu', description: 'What guests see on the menu, and when they see it.' },
-      { path: 'inventory', group: 'Operations', label: 'Inventory', icon: 'products', kind: 'inventory', description: 'Servings on hand, requests to the main center and deliveries.' },
+      { path: 'recipes', group: 'Menu', label: 'Recipes', icon: 'utensils', kind: 'inventory', feature: 'inventory', description: 'What goes into each dish, and what it costs you to make.' },
+      { path: 'inventory', group: 'Operations', label: 'Inventory', icon: 'products', kind: 'inventory', featureOff: 'inventory', description: 'Servings on hand, requests to the main center and deliveries.' },
+      { path: 'inventory', group: 'Operations', label: 'Stock', icon: 'products', kind: 'inventory', feature: 'inventory', description: 'What you have on hand at this branch.' },
+      { path: 'inventory/history', group: 'Operations', label: 'History', icon: 'performance', kind: 'inventory', feature: 'inventory', description: 'Every stock change at this branch, newest first.' },
       { path: 'insights', group: 'Analytics', label: 'Insights', icon: 'insights', kind: 'insights', description: 'Sales and service trends over time.' },
     ],
     contact: { path: 'contact-cravio', label: 'Contact Cravio', icon: 'contact', kind: 'support', description: 'Reach the Cravio team about anything in your restaurant.' },
@@ -36,7 +43,11 @@ export const dashboards = {
       { path: '', label: 'Overview', icon: 'overview', kind: 'business', description: 'Your daily briefing and every branch you oversee.' },
       { path: 'locations', group: 'Business', label: 'Locations', icon: 'restaurants', kind: 'business', description: 'Your branches: open one, or add a new location.' },
       { path: 'people', group: 'Business', label: 'People & access', icon: 'team', kind: 'business', description: 'Who can see and run which branches.' },
-      { path: 'inventory', group: 'Business', label: 'Inventory', icon: 'products', kind: 'inventory', description: 'Main center stock, branch requests and dispatches.' },
+      { path: 'inventory', group: 'Business', label: 'Inventory', icon: 'products', kind: 'inventory', featureOff: 'inventory', description: 'Main center stock, branch requests and dispatches.' },
+      { path: 'inventory', group: 'Operations', label: 'Stock', icon: 'products', kind: 'inventory', feature: 'inventory', description: 'What you have on hand in the warehouse and at every branch.' },
+      { path: 'inventory/items', group: 'Operations', label: 'Items', icon: 'layers', kind: 'inventory', feature: 'inventory', description: 'Everything you buy or make: how it is measured and the packs it comes in.' },
+      { path: 'inventory/recipes', group: 'Operations', label: 'Recipes', icon: 'utensils', kind: 'inventory', feature: 'inventory', description: 'What goes into each dish, and what it costs you to make.' },
+      { path: 'inventory/history', group: 'Operations', label: 'History', icon: 'performance', kind: 'inventory', feature: 'inventory', description: 'Every stock change for an item, newest first.' },
     ],
   },
 };
@@ -66,6 +77,17 @@ export function sectionForPath(role, pathname, base = `/${role}`) {
 
 /** Legacy /owner/<page> paths that now belong to the branch workspace. */
 export const LEGACY_BRANCH_PAGES = ['orders', 'tables', 'products', 'menu', 'insights', 'settings', 'contact-cravio'];
+
+/** The sections to show in navigation, given which features are on: `flags = { inventory: true }`. */
+export function visibleSections(sections, flags = {}) {
+  return sections.filter((section) => (!section.feature || flags[section.feature]) && (!section.featureOff || !flags[section.featureOff]));
+}
+
+/** The route paths of an area: one per path, even when an old and a new section share it. */
+export function routeSections(role) {
+  const seen = new Set();
+  return sectionsFor(role).filter((section) => (seen.has(section.path) ? false : seen.add(section.path)));
+}
 
 export function groupSections(sections) {
   return sections.reduce((groups, section) => {
