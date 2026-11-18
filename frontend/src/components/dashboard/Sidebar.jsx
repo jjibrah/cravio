@@ -1,22 +1,26 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { dashboards, groupSections, settingsSection, visibleSections } from '../../config/dashboards';
-import { useApi } from '../../lib/api';
-import { ownerPaths, useInventoryEnabled } from '../../lib/inventory';
+import { api, prefetchApi, useApi } from '../../lib/api';
+import { inventoryGets, ownerPaths, useInventoryEnabled } from '../../lib/inventory';
+import { useVisibleInterval } from '../../lib/usePolling';
 import Brand from '../Brand';
 import Icon from '../Icon';
 import ProfileMenu from './ProfileMenu';
 import PlaceSummary from './PlaceSummary';
 import BranchSwitcher from './BranchSwitcher';
 
-function SidebarLink({ to, icon, label, onNavigate, exact = false, badge = 0 }) {
+function SidebarLink({ to, icon, label, onNavigate, exact = false, badge = 0, onWarm }) {
   // Only the overview link needs an exact match; others stay active on their detail pages
   // (unless another entry lives under them: Stock at /inventory beside Items at /inventory/items).
-  return <NavLink end={exact || to.split('/').length <= 2} to={to} onClick={onNavigate} className={({ isActive }) => `sidebar-link${isActive ? ' is-active' : ''}`}>
+  return <NavLink end={exact || to.split('/').length <= 2} to={to} onClick={onNavigate} onPointerEnter={onWarm} onFocus={onWarm} className={({ isActive }) => `sidebar-link${isActive ? ' is-active' : ''}`}>
     <span className="nav-icon"><Icon name={icon} size={16} /></span><span>{label}</span>
     {badge > 0 && <span className="sidebar-badge" aria-label={`, ${badge} waiting`}>{badge}</span>}
   </NavLink>;
 }
+
+/** A background re-read of one GET: no "Updating…" pill, errors ignored. */
+const prefetchQuiet = (path) => api(path, { cache: 'swr', quiet: true }).catch(() => undefined);
 
 function SidebarContent({ account, scope, onNavigate, mobile, onClose }) {
   const config = dashboards[scope.area];
@@ -27,7 +31,14 @@ function SidebarContent({ account, scope, onNavigate, mobile, onClose }) {
   // The Approvals entry shows how many decisions are waiting (read quietly; no badge when it can't be read).
   const wantsApprovals = inventory && scope.area === 'owner' && sections.some((section) => section.badge === 'approvals');
   const businessId = account?.businesses?.[0]?.id;
-  const approvals = useApi(wantsApprovals && businessId ? ownerPaths(businessId).approvals({ status: 'pending' }) : null, { ttl: 60000 });
+  // Same URL as the Approvals page's "waiting" list, so opening it costs nothing extra.
+  const approvalsPath = wantsApprovals && businessId ? ownerPaths(businessId).approvals({ status: 'pending', limit: 50 }) : null;
+  const approvals = useApi(approvalsPath, { ttl: 60000 });
+  useVisibleInterval(useCallback(() => { if (approvalsPath) prefetchQuiet(approvalsPath); }, [approvalsPath]), 60000, Boolean(approvalsPath));
+  const warm = (section) => {
+    if (!inventory || section.kind !== 'inventory') return;
+    inventoryGets(scope.area, section.path, { businessId }).forEach((get) => prefetchApi(get, { ttl: 10000 }));
+  };
   const badges = { approvals: Number(approvals.data?.pending) || 0 };
   return <>
     <div className="sidebar-brand">
@@ -40,7 +51,8 @@ function SidebarContent({ account, scope, onNavigate, mobile, onClose }) {
         {group.label && <p className="sidebar-group-label">{group.label}</p>}
         {group.sections.map((section) => <SidebarLink key={section.path} to={`${base}${section.path ? `/${section.path}` : ''}`}
           icon={section.icon} label={section.label} onNavigate={onNavigate} badge={badges[section.badge] || 0}
-          exact={sections.some((other) => other.path.startsWith(`${section.path}/`))} />)}
+          exact={sections.some((other) => other.path.startsWith(`${section.path}/`))}
+          onWarm={section.kind === 'inventory' ? () => warm(section) : undefined} />)}
         {branchArea && group.label === 'Menu' && <a className="sidebar-link guest-menu-link" href={`/guest-menu?r=${scope.place.id}`} target="_blank" rel="noopener noreferrer" onClick={onNavigate}>
           <span className="nav-icon"><Icon name="qr" size={16} /></span><span>Guest menu</span><Icon name="external" size={13} className="guest-menu-external" />
         </a>}

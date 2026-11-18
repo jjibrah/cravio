@@ -24,7 +24,7 @@ import { HttpError } from '../lib/http.js';
 import { isId } from '../lib/business.js';
 import { add, cmp, dec, isZero, MONEY, sub } from './decimal.js';
 import { assertDifferentPeople, can, requireCan, ROLE_DEFAULTS } from './permissions.js';
-import { getSettings } from './policies.js';
+import { together } from '../lib/pool.js';
 import { notify } from './notifications.js';
 import { diff, record } from './audit.js';
 
@@ -113,15 +113,17 @@ function chainOf(tree, categoryId) {
  * Branch managers and waiters never hold an approving capability.
  */
 export async function approverIds(db, businessId, capability, locationId = null) {
-  const ids = new Set((await db.query(`select user_id from public.business_members where business_id = $1 and role = 'owner'`, [businessId])).rows.map((r) => r.user_id));
-  if (locationId && ROLE_DEFAULTS.operations_approver.includes(capability) && (await getSettings(db, businessId)).operations_can_approve) {
-    const { rows } = await db.query(`select m.user_id from public.business_members m
+  // One statement: the owners, plus (only when the business turned operations_can_approve on) the operations managers of that branch.
+  const operations = Boolean(locationId) && ROLE_DEFAULTS.operations_approver.includes(capability);
+  const { rows } = await db.query(`select user_id from public.business_members where business_id = $1 and role = 'owner'
+    union
+    select m.user_id from public.business_members m
       join public.business_member_branches b on b.business_id = m.business_id and b.user_id = m.user_id
       join public.stock_locations l on l.restaurant_id = b.restaurant_id and l.business_id = m.business_id
-      where m.business_id = $1 and m.role = 'operations' and l.id = $2`, [businessId, locationId]);
-    for (const r of rows) ids.add(r.user_id);
-  }
-  return [...ids];
+      where $3::boolean and m.business_id = $1 and m.role = 'operations' and l.id = $2::uuid
+        and exists (select 1 from public.inventory_settings s where s.business_id = $1 and s.location_id is null and s.key = 'operations_can_approve' and s.value = 'true'::jsonb)`,
+  [businessId, locationId || null, operations]);
+  return rows.map((r) => r.user_id);
 }
 
 /** True when someone other than the requester holds the approving capability: then the requester can't approve their own request (D2-5). */
@@ -365,7 +367,12 @@ export async function getApproval(db, businessId, id) {
  * expectedDate, status } so the inbox row reads "PO-2026-0007 · Farm Fresh · KES 11,600.00 · 3 lines · Warehouse". Mutates and returns the list.
  */
 export async function attachSummaries(db, items) {
-  await attachTransferSummaries(db, items);
+  // Transfers and purchase orders are looked up together (separate connections on the pool).
+  await together(db, () => attachTransferSummaries(db, items), () => attachPoSummaries(db, items));
+  return items;
+}
+
+async function attachPoSummaries(db, items) {
   const ids = items.filter((a) => a.subject === 'purchase_order').map((a) => a.subjectId);
   if (!ids.length) return items;
   const { rows } = await db.query(`select po.id, po.number, po.status, po.total::text as total, po.expected_date::text as expected_date, s.name as supplier_name,
@@ -533,25 +540,26 @@ export async function inbox(db, scope, options = {}) {
     order by a.requested_at desc, a.id desc limit 1000`, [scope.businessId, statuses, subject]);
   const mayDecide = (r) => (r.location_id ? can(scope, r.approver_capability, { locationId: r.location_id }) : scope.roles.includes('owner') && can(scope, r.approver_capability));
   const visible = rows.filter(mayDecide).slice(0, size);
-  const cache = new Map();
-  const others = async (r) => {
-    const key = `${r.approver_capability}:${r.location_id}:${r.requested_by}`;
-    if (!cache.has(key)) cache.set(key, await approverAvailable(db, scope.businessId, r.requested_by, r.approver_capability, r.location_id));
-    return cache.get(key);
-  };
-  const approvals = [];
-  for (const r of visible) {
-    const item = shape(r);
-    if (r.status === 'pending') {
-      const mine = lc(r.requested_by) === lc(scope.userId);
-      const another = mine ? await others(r) : false;
-      item.canDecide = !mine || !another;
-      item.selfApproval = mine && !another;
-      if (!item.canDecide) item.blocked = 'You asked for this, so another approver has to decide it.';
-    }
-    approvals.push(item);
-  }
-  await attachSummaries(db, approvals);
+  // Rows the caller asked for themselves need to know whether someone else could approve: one question per distinct (capability, place),
+  // asked together with the summaries (the two don't depend on each other).
+  const keyOf = (r) => `${r.approver_capability}:${r.location_id}:${r.requested_by}`;
+  const asked = new Map();
+  for (const r of visible) if (r.status === 'pending' && lc(r.requested_by) === lc(scope.userId) && !asked.has(keyOf(r))) asked.set(keyOf(r), r);
+  const approvals = visible.map(shape);
+  const keys = [...asked.keys()];
+  const answers = await together(db,
+    ...keys.map((key) => () => { const r = asked.get(key); return approverAvailable(db, scope.businessId, r.requested_by, r.approver_capability, r.location_id); }),
+    () => attachSummaries(db, approvals));
+  const another = new Map(keys.map((key, i) => [key, answers[i]]));
+  visible.forEach((r, i) => {
+    if (r.status !== 'pending') return;
+    const item = approvals[i];
+    const mine = lc(r.requested_by) === lc(scope.userId);
+    const others = mine ? another.get(keyOf(r)) : false;
+    item.canDecide = !mine || !others;
+    item.selfApproval = mine && !others;
+    if (!item.canDecide) item.blocked = 'You asked for this, so another approver has to decide it.';
+  });
   return { approvals, pending: statuses.includes('pending') ? visible.filter((r) => r.status === 'pending').length : undefined };
 }
 

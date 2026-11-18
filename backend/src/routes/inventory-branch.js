@@ -12,7 +12,7 @@ import { invalidateMenu } from '../lib/cache.js';
 import { withDb } from '../lib/db.js';
 import { withBody } from '../lib/operations.js';
 import { database } from '../lib/pool.js';
-import { requestedBranch, selectMembership, STAFF_ROLES } from '../lib/access.js';
+import { requestedBranch, selectMembership, STAFF_ROLES, businessOfBranch } from '../lib/access.js';
 import { once } from '../inventory/commands.js';
 import { authorize, inventoryScope } from '../inventory/permissions.js';
 import {
@@ -45,13 +45,12 @@ export function createRoutes({ authenticate = requireUser, pool = () => database
       if (!membership) throw new HttpError(409, 'Choose which branch you are working in. Send the X-Cravio-Branch header.', { code: 'branch_required' });
       restaurantId = String(membership.restaurant.id).toLowerCase();
     }
-    const row = (await db.query('select business_id from public.restaurants where id = $1', [restaurantId])).rows[0];
+    const row = await businessOfBranch(db, context, restaurantId);
     if (!row) throw NO_BRANCH();
     const businessId = row.business_id;
     let scope = null;
     try {
-      scope = await inventoryScope(db, context, businessId);
-      if (scope.enabled && scope.role !== 'none' && scope.role !== 'admin') scope = await inventoryScope(db, context, businessId, { ensureLocations: true });
+      scope = await inventoryScope(db, context, businessId, { ensureLocations: 'active' });
     } catch (error) {
       if (!MISSING_CODES.includes(error?.code)) throw error;
       scope = null;

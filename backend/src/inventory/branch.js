@@ -15,6 +15,7 @@ import { post } from './ledger.js';
 import { getSetting } from './policies.js';
 import { record as audit } from './audit.js';
 import { record as recordWastage } from './wastage.js';
+import { together } from '../lib/pool.js';
 
 const fail = (status, message, code, extra = {}) => new HttpError(status, message, { code, ...extra });
 
@@ -98,35 +99,41 @@ export async function snapshot(db, scope, locationId, { all = false } = {}) {
   const loc = branchLocation(scope, locationId);
   requireCan(scope, 'inv.view', { locationId: loc.id });
   const restaurantId = loc.restaurantId;
-  const units = await loadUnits(db);
   const seeCost = can(scope, 'inv.cost.view', { locationId: loc.id });
 
-  const usedRows = (await db.query(`select item_id, count(distinct dish)::int as dishes from (
-      select rl.item_id, r.menu_item_id as dish from public.recipes r
+  // Which items this branch uses (a recipe, a link or an extra of its dishes). Used both to count dishes per item and to pick the items to list.
+  const USED = `select rl.item_id, r.menu_item_id as dish from public.recipes r
         join public.recipe_lines rl on rl.version_id = r.current_version_id where r.restaurant_id = $1
       union all
       select s.item_id, s.menu_item_id from public.menu_item_stock s where s.restaurant_id = $1
         and not exists (select 1 from public.recipes r where r.menu_item_id = s.menu_item_id and r.current_version_id is not null)
       union all
-      select l.item_id, e.item_id from public.menu_extra_recipe_lines l join public.menu_item_extras e on e.id = l.extra_id where l.restaurant_id = $1
-    ) x group by item_id`, [restaurantId])).rows;
-  const usedBy = new Map(usedRows.map((r) => [r.item_id, r.dishes]));
+      select l.item_id, e.item_id from public.menu_extra_recipe_lines l join public.menu_item_extras e on e.id = l.extra_id where l.restaurant_id = $1`;
 
-  const { rows } = await db.query(`select i.id, i.name, i.sku, i.unit, i.display_unit, i.low_level::text as low_level, i.avg_cost::text as avg_cost,
+  // Six independent reads: on the pool they run on separate connections, so the screen costs one round trip, not nine.
+  const [units, usedRows, rows, heldRows, openRows, dishRows] = await together(db,
+    () => loadUnits(db, scope),
+    async () => (await db.query(`select item_id, count(distinct dish)::int as dishes from (${USED}) x group by item_id`, [restaurantId])).rows,
+    async () => (await db.query(`select i.id, i.name, i.sku, i.unit, i.display_unit, i.low_level::text as low_level, i.avg_cost::text as avg_cost,
       i.category_id, c.name as category_name, b.item_id is not null as has_balance, b.on_hand::text as on_hand, b.reserved::text as reserved, b.updated_at,
-      lv.item_id is not null as has_level, lv.min::text as lv_min, lv.reorder::text as lv_reorder, lv.par::text as lv_par, lv.max::text as lv_max
+      lv.item_id is not null as has_level, lv.min::text as lv_min, lv.reorder::text as lv_reorder, lv.par::text as lv_par, lv.max::text as lv_max,
+      coalesce((select json_agg(json_build_object('name', u.name, 'factor', u.factor::text) order by u.position, lower(u.name))
+        from public.stock_item_units u where u.item_id = i.id), '[]'::json) as own_units
     from public.stock_items i
       left join public.stock_categories c on c.id = i.category_id
       left join public.stock_balances b on b.item_id = i.id and b.location_id = $2
       left join public.stock_item_levels lv on lv.item_id = i.id and lv.location_id = $2
     where i.business_id = $1 and i.archived_at is null
-      and ($3::boolean or b.item_id is not null or lv.item_id is not null or i.id = any($4::uuid[]))
-    order by lower(i.name)`, [scope.businessId, loc.id, Boolean(all), [...usedBy.keys()]]);
-
-  const held = new Map((await db.query('select item_id, quantity::text as quantity from private.branch_committed($1)', [restaurantId])).rows.map((r) => [r.item_id, r.quantity]));
-  const openByItem = new Map((await db.query(`select item_id, count(*)::int as n from public.stock_exceptions
-    where location_id = $1 and status = 'open' group by item_id`, [loc.id])).rows.map((r) => [r.item_id, r.n]));
-  const own = await ownUnits(db, rows.map((r) => r.id));
+      and ($3::boolean or b.item_id is not null or lv.item_id is not null or i.id in (select item_id from (${USED.replaceAll('$1', '$4')}) used))
+    order by lower(i.name)`, [scope.businessId, loc.id, Boolean(all), restaurantId])).rows,
+    async () => (await db.query('select item_id, quantity::text as quantity from private.branch_committed($1)', [restaurantId])).rows,
+    async () => (await db.query(`select item_id, count(*)::int as n from public.stock_exceptions where location_id = $1 and status = 'open' group by item_id`, [loc.id])).rows,
+    async () => (await db.query(`select a.menu_item_id, a.item_id, a.allow_when_out, a.sold_out, m.name, si.name as item_name
+      from public.stock_menu_availability($1) a join public.menu_items m on m.id = a.menu_item_id left join public.stock_items si on si.id = a.item_id order by lower(m.name)`, [restaurantId])).rows);
+  const usedBy = new Map(usedRows.map((r) => [r.item_id, r.dishes]));
+  const held = new Map(heldRows.map((r) => [r.item_id, r.quantity]));
+  const openByItem = new Map(openRows.map((r) => [r.item_id, r.n]));
+  const own = new Map(rows.map((r) => [r.id, typeof r.own_units === 'string' ? JSON.parse(r.own_units) : r.own_units]));
 
   let valueTotal = dec('0');
   let valueUnknown = false;
@@ -169,19 +176,12 @@ export async function snapshot(db, scope, locationId, { all = false } = {}) {
   });
 
   // Dishes: tracked ones and which are sold out (the limiting ingredient decides).
-  const names = new Map(items.map((i) => [i.id, i.name]));
-  const dishRows = (await db.query(`select a.menu_item_id, a.item_id, a.allow_when_out, a.sold_out, m.name
-    from public.stock_menu_availability($1) a join public.menu_items m on m.id = a.menu_item_id order by lower(m.name)`, [restaurantId])).rows;
-  const missing = dishRows.filter((d) => d.sold_out && !names.has(d.item_id)).map((d) => d.item_id);
-  if (missing.length) {
-    for (const r of (await db.query('select id, name from public.stock_items where id = any($1::uuid[])', [missing])).rows) names.set(r.id, r.name);
-  }
   const dishes = {
     tracked: dishRows.length,
     keepSelling: dishRows.filter((d) => d.allow_when_out).length,
-    soldOut: dishRows.filter((d) => d.sold_out).map((d) => ({ id: d.menu_item_id, name: d.name, itemId: d.item_id, itemName: names.get(d.item_id) || null })),
+    soldOut: dishRows.filter((d) => d.sold_out).map((d) => ({ id: d.menu_item_id, name: d.name, itemId: d.item_id, itemName: d.item_name || null })),
   };
-  const openExceptions = (await db.query(`select count(*)::int as n from public.stock_exceptions where location_id = $1 and status = 'open'`, [loc.id])).rows[0].n;
+  const openExceptions = openRows.reduce((sum, r) => sum + r.n, 0);
 
   const summary = { items: items.length, low: items.filter((i) => i.low).length, out: items.filter((i) => i.out).length,
     countNeeded: items.filter((i) => i.countNeeded).length };

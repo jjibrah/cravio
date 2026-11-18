@@ -353,3 +353,9 @@
 .branch-switch-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.2; }
 .branch-switch-text > span, .branch-switch-text > small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .branch-switch-text > small { color: var(--muted, currentColor); opacity: .75; font-size: .75rem; }
+
+/* "Updating…" while saved data is on screen and the fresh answer is coming (UpdatingPill). */
+.updating-pill-slot { position: fixed; right: 16px; bottom: 16px; z-index: 40; pointer-events: none; }
+.updating-pill { display: inline-block; padding: 5px 12px; border-radius: 999px; background: var(--surface, #fff); color: var(--muted); font-size: 12px; font-weight: 500; box-shadow: 0 0 0 1px var(--line), 0 4px 14px -6px #11111033; }
+@media (prefers-reduced-motion: no-preference) { .updating-pill { animation: updating-in 160ms ease-out both; } }
+@keyframes updating-in { from { opacity: 0; transform: translateY(4px); } }

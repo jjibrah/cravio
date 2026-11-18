@@ -9,31 +9,49 @@ const fail = (status, message, code) => new HttpError(status, message, { code })
 const shape = (r) => ({ id: r.id, kind: r.kind, name: r.name, code: r.code || null, status: r.status || 'active',
   restaurantId: r.restaurant_id || null, label: r.kind === 'center' || r.kind === 'warehouse' ? 'Warehouse' : 'Branch' });
 
-/** The business's warehouse row, creating it (named "Warehouse") when it doesn't exist yet. Same logic as 009's centerLocation. */
-export async function getWarehouse(db, businessId) {
-  await db.query(`insert into public.stock_locations (business_id, kind, name)
-    select id, 'center', 'Warehouse' from public.businesses where id = $1 on conflict do nothing`, [businessId]);
-  const { rows } = await db.query(`select id, kind, name, code, status, restaurant_id from public.stock_locations
+const asRow = (r) => ({ id: r.id, kind: r.kind, name: r.name, code: r.code ?? null, status: r.status ?? 'active', restaurant_id: r.restaurant_id ?? null });
+
+/**
+ * The business's warehouse row. Reads first (no write when it exists; the insert only runs for a business that has none yet).
+ * Pass the scope to answer from the rows it already loaded: no query at all.
+ */
+export async function getWarehouse(db, businessId, scope = null) {
+  const fromScope = scope?.locationRows?.find((l) => l.kind === 'center' || l.kind === 'warehouse');
+  if (fromScope) return shape(asRow(fromScope));
+  const find = () => db.query(`select id, kind, name, code, status, restaurant_id from public.stock_locations
     where business_id = $1 and kind in ('center', 'warehouse') order by kind limit 1`, [businessId]);
+  let { rows } = await find();
+  if (!rows[0]) {
+    await db.query(`insert into public.stock_locations (business_id, kind, name)
+      select id, 'center', 'Warehouse' from public.businesses where id = $1 on conflict do nothing`, [businessId]);
+    ({ rows } = await find());
+  }
   if (!rows[0]) throw fail(404, 'That business doesn’t exist.', 'business_not_found');
   return shape(rows[0]);
 }
 
-/** Creates any branch location that is missing (009's private.branch_location is idempotent). */
+/** Creates any branch location that is missing (009's private.branch_location is idempotent). One read; writes only for the missing ones. */
 export async function ensureBranchLocations(db, businessId) {
-  const { rows } = await db.query('select id from public.restaurants where business_id = $1', [businessId]);
+  const { rows } = await db.query(`select r.id from public.restaurants r where r.business_id = $1
+    and not exists (select 1 from public.stock_locations l where l.restaurant_id = r.id and l.kind = 'branch')`, [businessId]);
   for (const r of rows) await db.query('select private.branch_location($1)', [r.id]);
 }
 
 /** Warehouse + branch locations the scope can see (inv.view there), with the capabilities it holds at each. */
 export async function listLocations(db, scope) {
-  await getWarehouse(db, scope.businessId);
-  await ensureBranchLocations(db, scope.businessId);
-  const visible = new Set(locationsWith(scope, 'inv.view'));
-  const { rows } = await db.query(`select l.id, l.kind, l.code, l.status, l.restaurant_id, coalesce(r.name, l.name) as name
+  let source = scope.locationRows;
+  if (!source || !scope.locationsComplete) { // the scope was built without creating locations (or from an older schema): make sure they exist, then read them
+    await getWarehouse(db, scope.businessId);
+    await ensureBranchLocations(db, scope.businessId);
+    source = null;
+  }
+  const rows = source || (await db.query(`select l.id, l.kind, l.code, l.status, l.restaurant_id, coalesce(r.name, l.name) as display_name
     from public.stock_locations l left join public.restaurants r on r.id = l.restaurant_id
-    where l.business_id = $1 order by (l.kind <> 'branch') desc, lower(coalesce(r.name, l.name))`, [scope.businessId]);
-  return rows.filter((l) => visible.has(l.id)).map((l) => ({ ...shape(l), capabilities: [...(scope.locationCaps.get(l.id) || [])].sort() }));
+    where l.business_id = $1 order by l.kind, l.name`, [scope.businessId])).rows;
+  const visible = new Set(locationsWith(scope, 'inv.view'));
+  return rows.filter((l) => visible.has(l.id))
+    .map((l) => ({ ...shape({ ...asRow(l), name: l.display_name ?? l.name }), capabilities: [...(scope.locationCaps.get(l.id) || [])].sort() }))
+    .sort((a, b) => (a.kind !== 'branch' ? 0 : 1) - (b.kind !== 'branch' ? 0 : 1) || a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
 }
 
 /** Renames the warehouse and/or sets its short code (null or '' clears the code). Owner only (inv.settings.edit). */

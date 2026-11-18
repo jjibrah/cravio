@@ -58,8 +58,11 @@ export const branchRole = (membershipRole) => (MANAGER_ROLES.includes(membership
  * [{ businessId, name, role: 'owner'|'operations', branchIds: string[] | null }] where null means every branch.
  */
 export async function loadBusinessGrants(client, userId) {
-  const { data, error } = await client.from('business_members')
-    .select('business_id, role, business:businesses (id, name)').eq('user_id', userId);
+  // inventory_enabled (migration 012) rides along so /api/me can tell the app whether inventory is on without a second call. A database
+  // without it (or a role that can't read it) answers the plain select instead.
+  const select = (columns) => client.from('business_members').select(`business_id, role, business:businesses (${columns})`).eq('user_id', userId);
+  let { data, error } = await select('id, name, inventory_enabled');
+  if (error) ({ data, error } = await select('id, name'));
   if (error) {
     if (isMissingSchema(error) || error.code === '42703') return undefined;
     throw error;
@@ -74,9 +77,19 @@ export async function loadBusinessGrants(client, userId) {
     assigned = result.data;
   }
   return data.filter((row) => row.business).map((row) => ({
-    businessId: row.business_id, name: row.business.name, role: row.role,
+    businessId: row.business_id, name: row.business.name, role: row.role, inventoryEnabled: row.business.inventory_enabled === true,
     branchIds: row.role === 'owner' ? null : assigned.filter((a) => a.business_id === row.business_id).map((a) => a.restaurant_id),
   }));
+}
+
+/**
+ * { business_id } of a branch for the inventory routes, or undefined when it doesn't exist. When the caller's own memberships already
+ * name the branch (they carry business_id since /api/me started returning inventoryEnabled) no query is needed.
+ */
+export async function businessOfBranch(db, context, restaurantId) {
+  const known = (context?.memberships || []).find((m) => String(m.restaurant?.id).toLowerCase() === restaurantId && m.restaurant?.business_id);
+  if (known) return { business_id: known.restaurant.business_id };
+  return (await db.query('select business_id from public.restaurants where id = $1', [restaurantId])).rows[0];
 }
 
 /**

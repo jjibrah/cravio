@@ -8,7 +8,7 @@ import '../../components/owner/overview.css';
 import '../business/business.css';
 import { useApi } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
-import { ownerPaths } from '../../lib/inventory';
+import { ownerPaths, useAccountFlagCheck } from '../../lib/inventory';
 import './inventory.css';
 
 export { EmptyState, ErrorState, OIcon, Panel, SkeletonRows, PageHeader };
@@ -74,6 +74,7 @@ export function OwnerFrame({ title, description, actions, children }) {
   const business = businesses.find((b) => b.id === chosen) || businesses[0];
   const paths = ownerPaths(business?.id);
   const { data, error, loading, refresh } = useApi(business ? paths.overview() : null, { ttl: 15000 });
+  useAccountFlagCheck('owner', business?.id, data ? Boolean(data.enabled) : undefined);
   const pickerId = useId();
   const ctx = business && data?.enabled ? { business, businesses, data, can: data.capabilities || {}, paths, refresh } : null;
   const pick = (id) => { setChosen(id); try { sessionStorage.setItem(CHOICE_KEY, id); } catch { /* storage blocked */ } };

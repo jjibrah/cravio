@@ -8,7 +8,7 @@ import { requireUser } from '../lib/auth.js';
 import { HttpError } from '../lib/http.js';
 import { withDb } from '../lib/db.js';
 import { withBody } from '../lib/operations.js';
-import { database } from '../lib/pool.js';
+import { database, together } from '../lib/pool.js';
 import { once } from '../inventory/commands.js';
 import { CAPABILITIES, authorize, can, inventoryScope } from '../inventory/permissions.js';
 import { getSettings, setSetting } from '../inventory/policies.js';
@@ -49,10 +49,8 @@ export function createRoutes({ authenticate = requireUser, pool = () => database
     const context = await authenticate(request);
     const businessId = String(params.businessId).toLowerCase();
     const db = pool();
-    let scope = await safely(() => inventoryScope(db, context, businessId));
-    if (scope.enabled && scope.role !== 'none' && scope.role !== 'admin') {
-      scope = await safely(() => inventoryScope(db, context, businessId, { ensureLocations: true }));
-    }
+    // One round trip; location rows are created only when one is actually missing (a plain GET never writes once they exist).
+    const scope = await safely(() => inventoryScope(db, context, businessId, { ensureLocations: 'active' }));
     return { db, scope };
   }
 
@@ -86,17 +84,23 @@ export function createRoutes({ authenticate = requireUser, pool = () => database
       }
       await safely(() => authorize(db, scope, 'inv.view', { entity: 'inventory' }));
       const q = url?.searchParams || new URLSearchParams();
-      return safely(async () => ({
-        enabled: true, role: scope.role,
-        capabilities: Object.fromEntries(CAPABILITIES.map((c) => [camel(c), can(scope, c)])),
-        warehouse: await getWarehouse(db, scope.businessId),
-        locations: await listLocations(db, scope),
-        categories: await listCategories(db, scope),
-        units: await loadUnits(db),
-        measuredBy: MEASURED_BY,
-        items: await listItems(db, scope, { search: q.get('search'), categoryId: q.get('category') || undefined, includeArchived: flag(q, 'archived'), lowOnly: flag(q, 'low') }),
-        settings: await getSettings(db, scope.businessId),
-      }));
+      // Locations, the warehouse and the settings came with the scope (no query). Categories, units and items are independent reads: together.
+      return safely(async () => {
+        const [categories, units, items] = await together(db,
+          () => listCategories(db, scope),
+          () => loadUnits(db, scope),
+          () => listItems(db, scope, { search: q.get('search'), categoryId: q.get('category') || undefined, includeArchived: flag(q, 'archived'), lowOnly: flag(q, 'low') }));
+        return {
+          enabled: true, role: scope.role,
+          capabilities: Object.fromEntries(CAPABILITIES.map((c) => [camel(c), can(scope, c)])),
+          warehouse: await getWarehouse(db, scope.businessId, scope),
+          locations: await listLocations(db, scope),
+          categories, units,
+          measuredBy: MEASURED_BY,
+          items,
+          settings: scope.settings || await getSettings(db, scope.businessId),
+        };
+      });
     } },
 
     // ----- Items -----
