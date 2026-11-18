@@ -99,7 +99,9 @@ await fails(order([{ itemId: fantaDish, name: 'Fanta', quantity: 2 }]), /Sold ou
 await tx((t) => linkMenuItem(t, branchCtx, fantaDish, { itemId: fanta.id, allowWhenOut: true }));
 const o3 = await order([{ itemId: fantaDish, name: 'Fanta', quantity: 2 }]);
 await serve(o3);
-eq(await onHand(fanta.id), -1, 'override lets service continue; balance shows the gap to count');
+// 013 (agreed rule INV: stop at zero, log the shortfall): serving never takes a balance below 0; the gap becomes a stock exception.
+const stopsAtZero = extra.some((name) => name.includes('013_inventory_recipes'));
+eq(await onHand(fanta.id), stopsAtZero ? 0 : -1, stopsAtZero ? 'override lets service continue; balance floors at 0 (013), the gap is a stock exception' : 'override lets service continue; balance shows the gap to count');
 await tx((t) => linkMenuItem(t, branchCtx, fantaDish, { itemId: fanta.id }));
 
 // Cancelling an unserved order releases the hold; nothing to restock.

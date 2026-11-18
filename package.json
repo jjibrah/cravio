@@ -19,7 +19,7 @@
     "db:migrate": "npm run db:migrate --workspace backend",
     "compare": "node scripts/compare.js --shared-db",
     "test:inv": "node backend/tests/inv/run-all.js",
-    "test:inv:compat": "INV_EXTRA_MIGRATIONS=proposed/012_inventory_catalogue.sql node backend/tests/inventory-v2.js",
+    "test:inv:compat": "INV_EXTRA_MIGRATIONS=proposed/012_inventory_catalogue.sql,proposed/013_inventory_recipes.sql node backend/tests/inventory-v2.js",
     "test:v2": "node backend/tests/access.js && node backend/tests/migration-008.js && node backend/tests/business.js && node backend/tests/access-mapping.js && node backend/tests/inventory-v2.js && node backend/tests/admin-business.js && node backend/tests/legal.js && node backend/tests/table-sessions.js",
     "test:v2-ui": "npm exec --workspace frontend -- playwright test -c playwright.v2.config.js",
     "audit:accounts": "node backend/scripts/audit-accounts.js"
