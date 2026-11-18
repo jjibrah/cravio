@@ -30,7 +30,7 @@ begin
   select count(*) into n from public.stock_movements
    where reason not in ('count', 'added', 'waste', 'served', 'order_correction', 'dispatched', 'received', 'lost_in_transit', 'dispatch_cancelled')
       or unit_cost is not null or value is not null or ref_type is not null or ref_id is not null or counterparty_location_id is not null
-      or batch_id is not null or idempotency_key is not null or entered_quantity is not null or entered_unit is not null;
+      or batch_id is not null or idempotency_key is not null or entered_quantity is not null or entered_unit is not null or reverses_movement_id is not null;
   if n > 0 then problems := problems || format('%s stock movement(s) use new reasons or columns', n); end if;
   select count(*) into n from public.stock_balances where reserved <> 0; if n > 0 then problems := problems || format('%s reserved balances', n); end if;
 
@@ -61,14 +61,14 @@ drop table if exists public.stock_exceptions, public.inventory_events, public.in
   public.stock_item_barcodes, public.stock_item_units, public.units;
 
 -- Ledger: drop new columns (their indexes and the idempotency index go with them), restore the 009 reason check.
-drop index if exists public.stock_movements_idempotency, public.stock_movements_ref_idx, public.stock_movements_occurred_idx;
+drop index if exists public.stock_movements_idempotency, public.stock_movements_reversed_once, public.stock_movements_ref_idx, public.stock_movements_occurred_idx;
 alter table public.stock_movements drop constraint if exists stock_movements_reason_check;
 alter table public.stock_movements add constraint stock_movements_reason_check check (reason in ('count', 'added', 'waste', 'served',
   'order_correction', 'dispatched', 'received', 'lost_in_transit', 'dispatch_cancelled'));
 alter table public.stock_movements
   drop column if exists unit_cost, drop column if exists value, drop column if exists ref_type, drop column if exists ref_id,
   drop column if exists counterparty_location_id, drop column if exists batch_id, drop column if exists idempotency_key,
-  drop column if exists occurred_at, drop column if exists entered_quantity, drop column if exists entered_unit;
+  drop column if exists occurred_at, drop column if exists entered_quantity, drop column if exists entered_unit, drop column if exists reverses_movement_id;
 
 alter table public.stock_balances drop column if exists reserved;
 alter table public.stock_items alter column low_level type numeric(12, 3);

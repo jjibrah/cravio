@@ -83,6 +83,7 @@ Suggested **de-risk spike on day 2**: a throwaway PGlite script proving the orde
 **P1-08 Catalogue & locations service + owner API** · 2 d
 - `catalogue.js`, `locations.js`; routes `backend/src/routes/inventory-owner.js` under `/api/owner/inventory/:biz/…`: items (list/create/edit/archive), item units, barcodes, categories (seed defaults on first use), levels per location, warehouses (create/rename/suspend/archive — archive only at zero stock, ORG-4).
 - Every write: one transaction + `once()` idempotency (reuse pattern from `routes/stock.js`) + audit event.
+- **Authorize before opening the write transaction** (`inventoryScope` + `authorize` on the pool), so a refused attempt's `denied` audit row is not rolled back. A DB guard error aborts the transaction: map it to HttpError and let the route roll back (no savepoints needed).
 - Tests: duplicate SKU/barcode refused, base-unit change after history refused, archive rules, operations manager read-only.
 
 ### M2 — Orders use recipes

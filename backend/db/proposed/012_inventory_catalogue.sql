@@ -200,7 +200,9 @@ alter table public.stock_movements
   add column if not exists batch_id uuid,
   add column if not exists idempotency_key text check (char_length(idempotency_key) <= 120),
   add column if not exists entered_quantity numeric(18, 4),
-  add column if not exists entered_unit text check (char_length(entered_unit) <= 30);
+  add column if not exists entered_unit text check (char_length(entered_unit) <= 30),
+  -- Set only on a 'reversal': the movement it undoes. The unique index below means a movement can be reversed once.
+  add column if not exists reverses_movement_id bigint references public.stock_movements(id);
 
 -- occurred_at: when it happened (back-dated counts). Existing rows take their created_at, not the migration time.
 do $$
@@ -223,6 +225,7 @@ alter table public.stock_movements add constraint stock_movements_reason_check c
   'transfer_discrepancy', 'transfer_cancelled', 'pos_consumption', 'production_input', 'production_output', 'wastage',
   'adjustment_gain', 'adjustment_loss', 'count_correction', 'staff_meal', 'complimentary', 'reversal'));
 create unique index if not exists stock_movements_idempotency on public.stock_movements (idempotency_key, reason) where idempotency_key is not null;
+create unique index if not exists stock_movements_reversed_once on public.stock_movements (reverses_movement_id) where reverses_movement_id is not null;
 create index if not exists stock_movements_ref_idx on public.stock_movements (ref_type, ref_id) where ref_id is not null;
 create index if not exists stock_movements_occurred_idx on public.stock_movements (location_id, occurred_at desc);
 -- The 009 append-only trigger (stock_movements_no_change) is untouched.
