@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { createUser, freshDatabase, readSql } from './support/pg.js';
-import { resolveProposed } from './inv/migrations.js';
+import { BASE_MIGRATIONS, resolveProposed } from './inv/migrations.js';
 import {
   adjust, availability, branchLocation, branchSnapshot, businessSnapshot, cancelDispatch, cancelRequest, centerLocation, correctOrder,
   createItem, dispatch, findByCode, linkMenuItem, once, receive, reviewRequest, submitRequest,
@@ -17,13 +17,14 @@ const fails = async (promise, test, m) => {
   checks++;
 };
 
-// INV_EXTRA_MIGRATIONS runs this same suite with proposed migrations applied on top of 009 (npm run test:inv:compat): proof
-// that the code on `main` keeps working against the widened schema. Default: none.
-//   INV_EXTRA_MIGRATIONS=all                                  every proposed migration, in order (backend/tests/inv/migrations.js)
-//   INV_EXTRA_MIGRATIONS=proposed/012_x.sql,proposed/013_y.sql   an explicit list
+// The plain run uses BASE_MIGRATIONS only (001-010: `main`'s 009 behaviour, NOT the later inventory migrations that are now in
+// backend/db/migrations). INV_EXTRA_MIGRATIONS runs this same suite with the inventory migrations applied on top of that base
+// (npm run test:inv:compat): proof that the code on `main` keeps working against the widened schema. Default: none.
+//   INV_EXTRA_MIGRATIONS=all                                  every inventory migration (012+), in order (backend/tests/inv/migrations.js)
+//   INV_EXTRA_MIGRATIONS=migrations/012_x.sql,migrations/013_y.sql   an explicit list
 const extra = resolveProposed(process.env.INV_EXTRA_MIGRATIONS);
-if (extra.length) console.log(`inventory-v2: proposed migrations applied: ${extra.join(', ')}`);
-const db = await freshDatabase({ extra });
+if (extra.length) console.log(`inventory-v2: inventory migrations applied: ${extra.join(', ')}`);
+const db = await freshDatabase({ migrations: [...BASE_MIGRATIONS], extra });
 const one = async (sql, p) => (await db.query(sql, p)).rows[0];
 const tx = (fn) => db.transaction(fn);
 

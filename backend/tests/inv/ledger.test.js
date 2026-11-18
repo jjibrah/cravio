@@ -9,7 +9,7 @@ let checks = 0;
 const eq = (a, b, m) => { assert.deepEqual(a, b, m); checks++; };
 const ok = (v, m) => { assert.ok(v, m); checks++; };
 
-const { db, ids, users, helpers } = await inventoryFixture({ extra: ['proposed/012_inventory_catalogue.sql'] });
+const { db, ids, users, helpers } = await inventoryFixture({ extra: ['migrations/012_inventory_catalogue.sql'] });
 const { tx, one } = helpers;
 const { businessId, centerLocationId: center, branchLocationId: branchLoc } = ids;
 const actorId = users.owner;

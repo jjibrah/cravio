@@ -20,7 +20,7 @@ const throwsSync = (fn, status, code, m) => {
   checks++;
 };
 
-const f = await inventoryFixture({ extra: ['proposed/012_inventory_catalogue.sql'] });
+const f = await inventoryFixture({ extra: ['migrations/012_inventory_catalogue.sql'] });
 const { db, ids, users } = f;
 const { businessId, branchId, centerLocationId, branchLocationId } = ids;
 

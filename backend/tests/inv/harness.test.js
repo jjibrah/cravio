@@ -1,7 +1,7 @@
 // The Phase 2 harness itself (P2-02): fixture defaults, rig(), shared helpers, fake clock and fake storage.
 // Usage: node backend/tests/inv/harness.test.js
 import { inventoryFixture, rig } from './fixture.js';
-import { PROPOSED_MIGRATIONS } from './migrations.js';
+import { ALL_INVENTORY_MIGRATIONS } from './migrations.js';
 import { makeAsserts, keyGen, makeItem, receive, fakeClock, fakeStorage } from './helpers.js';
 import { inventoryScope } from '../../src/inventory/permissions.js';
 import { balance, reconcile } from '../../src/inventory/ledger.js';
@@ -9,17 +9,17 @@ import { setSetting } from '../../src/inventory/policies.js';
 
 const { eq, ok, refuses, count } = makeAsserts();
 
-// ---- fixture defaults: ALL proposed migrations unless the test opts out ----
+// ---- fixture defaults: ALL inventory migrations unless the test opts out ----
 const has = async (db, table) => (await db.query(`select to_regclass($1) as r`, [`public.${table}`])).rows[0].r !== null;
 const plain = await inventoryFixture({ extra: [] });
-eq(await has(plain.db, 'recipes'), false, 'extra: [] = committed migrations only (no 013 tables)');
+eq(await has(plain.db, 'recipes'), false, 'extra: [] = base migrations only (no 013 tables)');
 eq(await has(plain.db, 'stock_item_units'), false, 'extra: [] = no 012 tables');
 await plain.db.close();
-const some = await inventoryFixture({ extra: [PROPOSED_MIGRATIONS[0]] });
+const some = await inventoryFixture({ extra: [ALL_INVENTORY_MIGRATIONS[0]] });
 eq([await has(some.db, 'stock_item_units'), await has(some.db, 'recipes')], [true, false], 'explicit list = exactly those migrations');
 await some.db.close();
 const all = await inventoryFixture();
-eq([await has(all.db, 'stock_item_units'), await has(all.db, 'recipes')], [true, true], 'default = every proposed migration');
+eq([await has(all.db, 'stock_item_units'), await has(all.db, 'recipes')], [true, true], 'default = every inventory migration');
 await all.db.close();
 
 // ---- rig(): the people, branch and items Phase 2 suites share ----

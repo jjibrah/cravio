@@ -5,7 +5,7 @@ import { inventoryFixture } from '../../../../backend/tests/inv/fixture.js';
 import * as L from './ledger_spike.js';
 
 const HERE = new URL('./', import.meta.url).pathname;
-const { db, ids, users, helpers } = await inventoryFixture({ extra: ['proposed/012_inventory_catalogue.sql', 'proposed/013_inventory_recipes.sql', HERE + 'spike_018.sql'] });
+const { db, ids, users, helpers } = await inventoryFixture({ extra: ['migrations/012_inventory_catalogue.sql', 'migrations/013_inventory_recipes.sql', HERE + 'spike_018.sql'] });
 const { tx, one } = helpers;
 const { businessId, centerLocationId: WH, branchLocationId: BR, branchId } = ids;
 const actorId = users.owner;

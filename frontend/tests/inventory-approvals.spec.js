@@ -75,6 +75,10 @@ test.describe('approvals inbox', () => {
     await expect(ep).toContainText('Chicken ran out, 30 covers booked');
     await expect(ep).toContainText('Mama Njeri Market (new, details missing)');
     await expect(ep.getByRole('img', { name: 'goods.gif' })).toBeVisible();
+    // The detail tiles are as tall as their text, and the item line reads with separators.
+    for (const tile of await ep.locator('.rcv-facts > div').all()) expect((await tile.boundingBox()).height).toBeLessThan(120);
+    await expect(ep.getByRole('list', { name: 'Items' }).getByRole('listitem')).toHaveText('Chicken — 2 kg · about Ksh 1,600 each · Ksh 3,200');
+    for (const tile of await waiting(page).getByRole('listitem').filter({ hasText: 'PO-2026-0007' }).locator('.rcv-facts > div').all()) expect((await tile.boundingBox()).height).toBeLessThan(120);
     await expect(ep).toContainText('No limit is set for Abdis Test Restaurant');
     // Anything else: a plain generic card.
     await expect(waiting(page).getByRole('listitem').filter({ hasText: 'Wastage · Ksh 1,800' })).toContainText('More than Ksh 1,000 per record.');

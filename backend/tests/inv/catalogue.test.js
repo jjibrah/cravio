@@ -28,7 +28,7 @@ const refuses = async (promise, status, code, pattern, m) => {
   checks++;
 };
 
-const f = await inventoryFixture({ extra: ['proposed/012_inventory_catalogue.sql'] });
+const f = await inventoryFixture({ extra: ['migrations/012_inventory_catalogue.sql'] });
 const { db, ids, users } = f;
 const { businessId, branchId, centerLocationId, branchLocationId } = ids;
 const tx = (fn) => db.transaction(fn);

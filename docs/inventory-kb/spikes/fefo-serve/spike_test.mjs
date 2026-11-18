@@ -9,7 +9,7 @@ const HERE = dirname(fileURLToPath(import.meta.url)) + '/';
 // Inside the repo (docs/inventory-kb/spikes/<name>/) the root is four levels up; set REPO to run a copy from elsewhere.
 const REPO = process.env.REPO || resolve(HERE, '../../../..');
 const { inventoryFixture } = await import(`${REPO}/backend/tests/inv/fixture.js`);
-const { PROPOSED_MIGRATIONS } = await import(`${REPO}/backend/tests/inv/migrations.js`);
+const { ALL_INVENTORY_MIGRATIONS } = await import(`${REPO}/backend/tests/inv/migrations.js`);
 let checks = 0;
 const eq = (a, b, m) => { assert.deepEqual(a, b, m); checks++; };
 const ok = (v, m) => { assert.ok(v, m); checks++; };
@@ -17,7 +17,7 @@ const say = (s) => console.log(s);
 const section = (s) => say(`\n== ${s}`);
 
 async function world(withSpike = true) {
-  const f = await inventoryFixture({ extra: [...PROPOSED_MIGRATIONS, ...(withSpike ? [HERE + 'spike_022.sql'] : [])] });
+  const f = await inventoryFixture({ extra: [...ALL_INVENTORY_MIGRATIONS, ...(withSpike ? [HERE + 'spike_022.sql'] : [])] });
   const { db, ids, users, helpers } = f;
   const q = async (sql, p) => (await db.query(sql, p)).rows;
   const one = async (sql, p) => (await q(sql, p))[0];

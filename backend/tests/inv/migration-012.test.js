@@ -7,7 +7,7 @@ import { inventoryFixture } from './fixture.js';
 import { DEFAULT_UNITS } from '../../src/inventory/units.js';
 import { adjust, createItem, dispatch, receive, reviewRequest, submitRequest, linkMenuItem, centerLocation, branchLocation } from '../../src/stock/service.js';
 
-const UP = 'proposed/012_inventory_catalogue.sql';
+const UP = 'migrations/012_inventory_catalogue.sql';
 const DOWN = 'proposed/012_inventory_catalogue.down.sql';
 let checks = 0;
 const eq = (a, b, m) => { assert.deepEqual(a, b, m); checks++; };

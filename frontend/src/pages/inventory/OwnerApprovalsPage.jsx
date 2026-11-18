@@ -11,6 +11,7 @@ import { EmergencyDetail } from './EmergencyParts';
 import { EmptyState, ErrorState, FormError, OwnerFrame, Panel, SkeletonRows } from './parts';
 import { Segmented } from '../../components/owner/ui';
 import { Facts } from './ReceivingParts';
+import './purchasing.css';
 import './receiving.css';
 
 /** What a purchase order, an emergency buy or any other request is, in a few plain lines. */
@@ -52,7 +53,7 @@ function Card({ approval, ctx, onDecided }) {
     return undefined;
   }
 
-  return <li className="rcv-card" style={{ alignItems: 'stretch', flexDirection: 'column' }}>
+  return <li className="rcv-card rcv-approval">
     <div className="rcv-card-side" style={{ justifyContent: 'space-between' }}>
       <div className="rcv-card-main"><strong>{label}{amount ? ` · ${amount}` : ''}</strong>
         <small>Asked by {approval.requestedByName || 'someone'}{approval.locationName ? ` · ${approval.locationName}` : ''} · {formatStamp(approval.requestedAt)}</small></div>

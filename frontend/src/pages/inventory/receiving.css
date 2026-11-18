@@ -2,6 +2,9 @@
 .rcv-cards { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; }
 .rcv-card { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; padding: 14px 16px; border-top: 1px solid var(--line); font-size: 14px; }
 .rcv-card:first-child { border-top: 0; }
+.rcv-card.rcv-approval { display: flex; flex-direction: column; flex-wrap: nowrap; align-items: stretch; justify-content: flex-start; gap: 10px; }
+.rcv-approval > * { margin: 0; }
+.rcv-facts { align-items: start; align-content: start; }
 .rcv-card-main { flex: 1 1 240px; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .rcv-card-main strong { font-weight: 600; font-size: 15px; overflow-wrap: anywhere; }
 .rcv-card-main small { color: var(--muted); font-size: 13px; }
@@ -64,3 +67,6 @@
   .rcv-decide { padding: 12px; }
   .rcv-decide .biz-form-actions .o-btn { flex: 1 1 100%; justify-content: center; }
 }
+
+.rcv-items { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 4px; font-size: 14px; }
+.rcv-items strong { font-weight: 600; }

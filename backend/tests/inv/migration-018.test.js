@@ -7,11 +7,11 @@
 import assert from 'node:assert/strict';
 import { readSql } from '../support/pg.js';
 import { inventoryFixture } from './fixture.js';
-import { proposedBefore } from './migrations.js';
+import { inventoryBefore } from './migrations.js';
 import * as stock from '../../src/stock/service.js';
 import * as ledger from '../../src/inventory/ledger.js';
 
-const UP = 'proposed/018_distribution.sql';
+const UP = 'migrations/018_distribution.sql';
 const DOWN = 'proposed/018_distribution.down.sql';
 let checks = 0;
 const eq = (a, b, m) => { assert.deepEqual(a, b, m); checks++; };
@@ -21,7 +21,7 @@ const fails = async (promise, re, m) => {
   checks++;
 };
 
-const f = await inventoryFixture({ extra: proposedBefore(18) });
+const f = await inventoryFixture({ extra: inventoryBefore(18) });
 const { db, ids, users, helpers } = f;
 const { tx } = helpers;
 const biz = ids.businessId;

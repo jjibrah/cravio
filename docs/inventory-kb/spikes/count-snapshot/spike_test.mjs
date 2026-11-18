@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 const HERE = dirname(fileURLToPath(import.meta.url)) + '/';
 const REPO = process.env.REPO || resolve(HERE, '../../../..');
 const { inventoryFixture } = await import(`${REPO}/backend/tests/inv/fixture.js`);
-const { PROPOSED_MIGRATIONS } = await import(`${REPO}/backend/tests/inv/migrations.js`);
+const { ALL_INVENTORY_MIGRATIONS } = await import(`${REPO}/backend/tests/inv/migrations.js`);
 const { makeItem, receive, keyGen } = await import(`${REPO}/backend/tests/inv/helpers.js`);
 const { post, reconcile } = await import(`${REPO}/backend/src/inventory/ledger.js`);
 const { makeCounts } = await import(HERE + 'counts_spike.js');
@@ -17,7 +17,7 @@ const ok = (v, m) => { assert.ok(v, m); checks++; };
 const say = (s) => console.log(s);
 const section = (s) => say(`\n== ${s}`);
 
-const f = await inventoryFixture({ extra: [...PROPOSED_MIGRATIONS, HERE + 'spike_020.sql'] });
+const f = await inventoryFixture({ extra: [...ALL_INVENTORY_MIGRATIONS, HERE + 'spike_020.sql'] });
 const { db, ids, users } = f;
 const { businessId: biz, branchLocationId: loc } = ids;
 const key = keyGen('sp');

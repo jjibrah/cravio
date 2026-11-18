@@ -1,6 +1,6 @@
 // LOCAL DEMO API for the new inventory screens. Nothing here touches the shared database or Supabase.
 //
-//   * An in-memory PGlite database with every committed migration plus every proposed inventory migration (012..020).
+//   * An in-memory PGlite database with every committed migration, including the inventory migrations 012..020.
 //   * The golden dataset (Golden Eats: Westlands, Karen, Warehouse; a week of orders, receipts, transfers, wastage, counts).
 //   * Extra demo rows made through the REAL route handlers so every screen has something to show.
 //   * The REAL route modules (createRoutes) on 127.0.0.1:5189, with a fake `authenticate` that maps a demo token to a context built from the DB.

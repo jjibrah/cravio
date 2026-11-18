@@ -2,6 +2,7 @@
 // who it is from, what it costs, the invoice and the photos.
 import { EMERGENCY_STATUS, INVOICE_LABEL, PAYMENT_LABEL, formatStamp, formatStockMoney, unitName } from '../../lib/inventory';
 import { Evidence, Facts } from './ReceivingParts';
+import './purchasing.css';
 
 export function EmergencyStatus({ status }) {
   const info = EMERGENCY_STATUS[status] || { label: status, tone: 'off' };
@@ -10,10 +11,9 @@ export function EmergencyStatus({ status }) {
 
 /** The items: "Cooking oil: 2 jerrycans at Ksh 3,200 each". Once bought it shows what was really paid; once received, what arrived. */
 export function EmergencyLines({ purchase }) {
-  return <ul className="pur-list" aria-label="Items">{(purchase.lines || []).map((l) => <li key={l.id}>
-    <span className="pur-main"><strong>{l.itemName}</strong>
-      <small>{l.qty} {unitName(l.unit, l.qty)} · {l.actualUnitPrice ? `paid ${formatStockMoney(l.actualUnitPrice)}` : `about ${formatStockMoney(l.estimatedUnitPrice)}`} each{l.received ? ` · ${l.received.qty} ${unitName(l.received.unit, l.received.qty)} arrived` : ''}</small></span>
-    <span>{formatStockMoney(l.actualTotal ?? l.estimatedTotal)}</span>
+  return <ul className="rcv-items" aria-label="Items">{(purchase.lines || []).map((l) => <li key={l.id}>
+    <strong>{l.itemName}</strong> — {l.qty} {unitName(l.unit, l.qty)} · {l.actualUnitPrice ? `paid ${formatStockMoney(l.actualUnitPrice)}` : `about ${formatStockMoney(l.estimatedUnitPrice)}`} each
+    {l.received ? ` · ${l.received.qty} ${unitName(l.received.unit, l.received.qty)} arrived` : ''} · {formatStockMoney(l.actualTotal ?? l.estimatedTotal)}
   </li>)}</ul>;
 }
 

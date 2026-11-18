@@ -4,10 +4,10 @@
 import assert from 'node:assert/strict';
 import { asUser, readSql } from '../support/pg.js';
 import { inventoryFixture } from './fixture.js';
-import { proposedBefore } from './migrations.js';
+import { inventoryBefore } from './migrations.js';
 import { makeItem } from './helpers.js';
 
-const UP = 'proposed/015_suppliers.sql';
+const UP = 'migrations/015_suppliers.sql';
 const DOWN = 'proposed/015_suppliers.down.sql';
 let checks = 0;
 const eq = (a, b, m) => { assert.deepEqual(a, b, m); checks++; };
@@ -20,7 +20,7 @@ const fails = async (promise, re, m) => {
 // ---------------------------------------------------------------------------------------------------------------
 // Rehearsal: a database shaped like production after 012-014 (items, stock, movements, settings), then 015 on top.
 // ---------------------------------------------------------------------------------------------------------------
-const f = await inventoryFixture({ extra: proposedBefore(15) });
+const f = await inventoryFixture({ extra: inventoryBefore(15) });
 const { db, ids, users } = f;
 const biz = ids.businessId;
 const q = async (sql, p) => (await db.query(sql, p)).rows;

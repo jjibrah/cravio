@@ -2,6 +2,7 @@
 // Usage: node backend/tests/inv/admin-toggle.test.js
 import assert from 'node:assert/strict';
 import { createUser, freshDatabase } from '../support/pg.js';
+import { BASE_MIGRATIONS } from './migrations.js';
 import { inventoryFixture } from './fixture.js';
 import { activity, businessDetail, listBusinesses, setInventoryEnabled } from '../../src/lib/admin-business.js';
 import { inventoryScope } from '../../src/inventory/permissions.js';
@@ -10,7 +11,7 @@ let checks = 0;
 const eq = (a, b, m) => { assert.deepEqual(a, b, m); checks++; };
 const fails = async (promise, status, m) => { await assert.rejects(promise, (e) => { assert.equal(e.status, status, `${m}: ${e.status} ${e.message}`); return true; }); checks++; };
 
-const { db, ids, users } = await inventoryFixture({ extra: ['proposed/012_inventory_catalogue.sql'] });
+const { db, ids, users } = await inventoryFixture({ extra: ['migrations/012_inventory_catalogue.sql'] });
 const { businessId } = ids;
 const adminId = await createUser(db, 'admin@example.test', { role: 'admin' });
 const ctx = (id, role, extra = {}) => ({ user: { id }, profile: { role }, memberships: [], grants: [], ...extra });
@@ -61,7 +62,7 @@ eq([feed[0].text, feed[1].text, feed[1].note, feed[1].viaAdmin], ['switched Inve
 eq(Object.keys((await businessDetail(db, businessId)).stock).sort(), ['inTransit', 'items', 'out', 'requestsWaiting', 'shortDeliveries30d', 'trackedDishes'], 'detail exposes counts only');
 
 // Without 012 the column is missing: nulls on read, plain 503 on write
-const old = await freshDatabase();
+const old = await freshDatabase({ migrations: [...BASE_MIGRATIONS] });
 const oldAdmin = await createUser(old, 'admin@example.test', { role: 'admin' });
 const oldOwner = await createUser(old, 'o@example.test', { role: 'owner' });
 const oldBranch = (await old.query(`insert into public.restaurants (owner_id, name, status) values ($1, 'B', 'live') returning business_id`, [oldOwner])).rows[0];

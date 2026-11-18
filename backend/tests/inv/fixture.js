@@ -1,20 +1,20 @@
-// Shared fixture for the inventory suites: a fresh PGlite database (all committed migrations, plus the proposed ones)
+// Shared fixture for the inventory suites: a fresh PGlite database (the base migrations 001-010, plus the inventory ones)
 // seeded with one business, one live branch, stock locations, users, a small menu, an extra and a deal.
 // Nothing here touches the shared database.
 //
-// Which proposed migrations are applied (backend/tests/inv/migrations.js holds the ordered list):
-//   inventoryFixture()                    -> ALL of them (the default: tests run against the schema we are about to ship)
-//   inventoryFixture({ extra: [] })       -> none (committed migrations only: migration rehearsal tests start from here)
-//   inventoryFixture({ extra: [paths] })  -> exactly those paths, in that order (e.g. proposedUpTo(13), or [...proposedBefore(16)])
+// Which inventory migrations (012+) are applied on top of BASE_MIGRATIONS (backend/tests/inv/migrations.js holds the ordered lists):
+//   inventoryFixture()                    -> ALL of them (the default: tests run against the schema we ship)
+//   inventoryFixture({ extra: [] })       -> none (base 001-010 only, the pre-012 state: migration rehearsal tests start from here)
+//   inventoryFixture({ extra: [paths] })  -> exactly those paths, in that order (e.g. inventoryUpTo(13), or inventoryBefore(16))
 // rig() (below) is inventoryFixture() plus the people, branch and items most Phase 2 suites need.
 import { createUser, freshDatabase } from '../support/pg.js';
 import { branchLocation, centerLocation } from '../../src/stock/service.js';
 import { setSetting } from '../../src/inventory/policies.js';
-import { PROPOSED_MIGRATIONS } from './migrations.js';
+import { ALL_INVENTORY_MIGRATIONS, BASE_MIGRATIONS, resolveProposed } from './migrations.js';
 import { makeItem } from './helpers.js';
 
 export async function inventoryFixture({ extra } = {}) {
-  const db = await freshDatabase({ extra: extra === undefined ? [...PROPOSED_MIGRATIONS] : extra });
+  const db = await freshDatabase({ migrations: [...BASE_MIGRATIONS], extra: extra === undefined ? [...ALL_INVENTORY_MIGRATIONS] : resolveProposed(extra) });
   const one = async (sql, params) => (await db.query(sql, params)).rows[0];
   const tx = (fn) => db.transaction(fn);
 

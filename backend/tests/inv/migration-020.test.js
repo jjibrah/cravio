@@ -5,12 +5,12 @@
 import assert from 'node:assert/strict';
 import { asUser, readSql } from '../support/pg.js';
 import { inventoryFixture } from './fixture.js';
-import { proposedBefore } from './migrations.js';
+import { inventoryBefore } from './migrations.js';
 import { makeItem, receive } from './helpers.js';
 import { post } from '../../src/inventory/ledger.js';
 import { enter, lineOf, settleAndPost, startCount, varianceOf } from './count-watermark.js';
 
-const UP = 'proposed/020_counts.sql';
+const UP = 'migrations/020_counts.sql';
 const DOWN = 'proposed/020_counts.down.sql';
 let checks = 0;
 const eq = (a, b, m) => { assert.deepEqual(a, b, m); checks++; };
@@ -20,7 +20,7 @@ const fails = async (promise, re, m) => {
   checks++;
 };
 
-const f = await inventoryFixture({ extra: proposedBefore(20) });
+const f = await inventoryFixture({ extra: inventoryBefore(20) });
 const { db, ids, users } = f;
 const biz = ids.businessId;
 const loc = ids.branchLocationId;

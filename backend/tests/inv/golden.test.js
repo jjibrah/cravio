@@ -182,9 +182,9 @@ ok(early && /migration 022/.test(early.message), 'makeBatch says plainly that mi
 // ...and works once batches exist (the spike's schema stands in for 022 until P3-16 lands; revisit this block then).
 {
   const { inventoryFixture } = await import('./fixture.js');
-  const { PROPOSED_MIGRATIONS } = await import('./migrations.js');
+  const { ALL_INVENTORY_MIGRATIONS } = await import('./migrations.js');
   const spike = fileURLToPath(new URL('../../../docs/inventory-kb/spikes/fefo-serve/spike_022.sql', import.meta.url));
-  const f = await inventoryFixture({ extra: [...PROPOSED_MIGRATIONS, spike] });
+  const f = await inventoryFixture({ extra: [...ALL_INVENTORY_MIGRATIONS, spike] });
   const { makeItem } = await import('./helpers.js');
   const item = await makeItem(f.db, f.ids.businessId, 'Milk');
   const batchId = await makeBatch(f.db, { businessId: f.ids.businessId, locationId: f.ids.branchLocationId, itemId: item, batchNo: 'M1', qty: '5000', expiryInDays: 3, unitCost: '0.1' });

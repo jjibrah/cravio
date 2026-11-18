@@ -2,10 +2,10 @@
 // Usage: node backend/tests/inv/reservations.test.js   (nothing here touches the shared database)
 import assert from 'node:assert/strict';
 import { inventoryFixture } from './fixture.js';
-import { proposedUpTo } from './migrations.js';
+import { inventoryUpTo } from './migrations.js';
 import * as L from '../../src/inventory/ledger.js';
 
-const { db, ids, users, helpers } = await inventoryFixture({ extra: proposedUpTo(18) });
+const { db, ids, users, helpers } = await inventoryFixture({ extra: inventoryUpTo(18) });
 const { tx, one } = helpers;
 const { businessId, centerLocationId: WH, branchLocationId: BR, branchId } = ids;
 const actorId = users.owner;

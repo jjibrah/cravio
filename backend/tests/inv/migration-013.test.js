@@ -6,8 +6,8 @@ import assert from 'node:assert/strict';
 import { asUser, createUser, freshDatabase, readSql } from '../support/pg.js';
 import { inventoryFixture } from './fixture.js';
 
-const U012 = 'proposed/012_inventory_catalogue.sql';
-const UP = 'proposed/013_inventory_recipes.sql';
+const U012 = 'migrations/012_inventory_catalogue.sql';
+const UP = 'migrations/013_inventory_recipes.sql';
 const DOWN = 'proposed/013_inventory_recipes.down.sql';
 let checks = 0;
 const eq = (a, b, m) => { assert.deepEqual(a, b, m); checks++; };

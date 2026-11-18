@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 const HERE = dirname(fileURLToPath(import.meta.url)) + '/';
 const REPO = process.env.REPO || resolve(HERE, '../../../..');
 const { inventoryFixture } = await import(`${REPO}/backend/tests/inv/fixture.js`);
-const { PROPOSED_MIGRATIONS } = await import(`${REPO}/backend/tests/inv/migrations.js`);
+const { ALL_INVENTORY_MIGRATIONS } = await import(`${REPO}/backend/tests/inv/migrations.js`);
 const { createUser } = await import(`${REPO}/backend/tests/support/pg.js`);
 const { notify } = await import(`${REPO}/backend/src/inventory/notifications.js`);
 const jobs = await import(HERE + 'jobs_spike.js');
@@ -18,7 +18,7 @@ const ok = (v, m) => { assert.ok(v, m); checks++; };
 const say = (s) => console.log(s);
 const section = (s) => say(`\n== ${s}`);
 
-const f = await inventoryFixture({ extra: [...PROPOSED_MIGRATIONS, HERE + 'spike_023.sql'] });
+const f = await inventoryFixture({ extra: [...ALL_INVENTORY_MIGRATIONS, HERE + 'spike_023.sql'] });
 const { db, ids, users } = f;
 const q = async (sql, p) => (await db.query(sql, p)).rows;
 const one = async (sql, p) => (await q(sql, p))[0];
