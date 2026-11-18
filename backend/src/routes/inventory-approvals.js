@@ -17,7 +17,7 @@ import { database } from '../lib/pool.js';
 import { requestedBranch, selectMembership, STAFF_ROLES } from '../lib/access.js';
 import { once } from '../inventory/commands.js';
 import { authorize, denyAndAudit, inventoryScope } from '../inventory/permissions.js';
-import { decide, deleteRule, getApproval, history, inbox, listRules, mine, setRule } from '../inventory/approvals.js';
+import { attachSummaries, decide, deleteRule, getApproval, history, inbox, listRules, mine, setRule } from '../inventory/approvals.js';
 
 const ID = '[0-9a-fA-F-]{36}';
 const base = `/api/owner/inventory/(?<businessId>${ID})`;
@@ -64,6 +64,7 @@ export function createRoutes({ authenticate = requireUser, pool = () => database
     { method: 'GET', path: path(`/approvals/(?<id>${ID})`), handler: read(async (db, scope, params) => {
       const approval = await getApproval(db, scope.businessId, params.id);
       await authorize(db, scope, approval.approverCapability, { locationId: approval.locationId, entity: 'approval' });
+      await attachSummaries(db, [approval]);
       return { approval, history: (await history(db, scope, { subject: approval.subject, subjectId: approval.subjectId })).approvals };
     }) },
     { method: 'POST', path: path(`/approvals/(?<id>${ID})/decide`), handler: withBody(async ({ request, params, body }) => {

@@ -10,7 +10,9 @@ import { HttpError } from '../../src/lib/http.js';
 import { createRoutes } from '../../src/routes/inventory-purchasing.js';
 import { inventoryScope } from '../../src/inventory/permissions.js';
 import { setSetting } from '../../src/inventory/policies.js';
-import { configureApprovals, lineAmounts, resetApprovals, totals, getPo } from '../../src/inventory/purchasing.js';
+import { lineAmounts, totals, getPo } from '../../src/inventory/purchasing.js';
+import { createRoutes as createApprovalRoutes } from '../../src/routes/inventory-approvals.js';
+import { onDecided } from '../../src/inventory/approvals.js';
 import { nairobiYear } from '../../src/inventory/numbers.js';
 import * as ledger from '../../src/inventory/ledger.js';
 
@@ -32,8 +34,12 @@ const routes = createRoutes({
   },
   pool: () => db, transact: (fn) => db.transaction(fn), now: () => clock.now(),
 });
-const call = async (as, method, pathname, body, query = '', branch = null) => {
-  for (const route of routes) {
+const approvalRoutes = createApprovalRoutes({
+  authenticate: async (request) => contexts[request.headers.authorization.replace(/^Bearer /, '')],
+  pool: () => db, transact: (fn) => db.transaction(fn),
+});
+const call = async (as, method, pathname, body, query = '', branch = null, list = routes) => {
+  for (const route of list) {
     if (route.method !== method) continue;
     const m = route.path.exec(pathname);
     if (!m) continue;
@@ -45,6 +51,7 @@ const call = async (as, method, pathname, body, query = '', branch = null) => {
 };
 const base = `/api/owner/inventory/${biz}`;
 const api = (as, method, path, body, query) => call(as, method, `${base}${path}`, body, query);
+const inboxApi = (as, method, path, body, query) => call(as, method, `${base}${path}`, body, query, null, approvalRoutes);
 const scopeOf = (who) => inventoryScope(db, contexts[who], biz);
 const bal = async (loc, item) => (await ledger.balance(db, loc, item)).onHand;
 const notes = async (kind, user) => (await one(`select count(*)::int as n from public.notifications where kind = $1 and recipient_id = $2`, [kind, user])).n;
@@ -300,25 +307,80 @@ let grn1; let grn2;
 }
 
 // =============================================================================================================
-// 7. The approval hook (P2-10 plugs in here)
+// 7. Purchase orders go through the real approvals engine (P2-10)
 // =============================================================================================================
 {
-  const calls = [];
-  configureApprovals({ request: async ({ po }) => { calls.push(po.number); return { decision: 'pending', selfApproved: false, approvalId: null }; }, approverAvailable: async () => false });
+  const newPo = async (as = 'owner', qty = 2) => (await api(as, 'POST', '/purchase-orders', { supplierId: supplierA, lines: [{ itemId: rice, qty, unit: 'kg' }] })).order;
+  const approvalOf = (poId) => q(`select * from public.approvals where subject_type = 'purchase_order' and subject_id = $1 order by requested_at, id`, [poId]);
+  const askedCount = (poId) => one(`select count(*)::int as n from public.notifications where kind = 'approval_needed' and entity_id = $1`, [poId]).then((x) => x.n);
+  const decidedNotes = async (user) => notes('approval_decided', user);
+
+  // Sole owner: the engine records the self-approval (approvals row + audit), nobody is asked.
   await db.query(`delete from public.business_members where business_id = $1 and user_id = $2`, [biz, people.owner2]);
-  const made = await api('owner', 'POST', '/purchase-orders', { supplierId: supplierA, lines: [{ itemId: rice, qty: 2, unit: 'kg' }] });
-  const sub = await api('owner', 'POST', `/purchase-orders/${made.order.id}/submit`, {});
-  eq([calls, sub.order.status], [[made.order.number], 'pending_approval'], 'a configured engine decides (here: always pending), even for a sole owner');
-  const self = await api('owner', 'POST', `/purchase-orders/${made.order.id}/approve`, {});
-  eq([self.order.status, self.order.selfApproved], ['approved', true], 'no other approver per the hook: own approval allowed and flagged');
-  resetApprovals();
+  const solo = await newPo();
+  const soloSub = await api('owner', 'POST', `/purchase-orders/${solo.id}/submit`, {});
+  const [soloRow] = await approvalOf(solo.id);
+  eq([soloSub.order.status, soloSub.order.selfApproved, soloRow.status, soloRow.self_approved, soloRow.decided_by, soloRow.requested_by], ['approved', true, 'approved', true, people.owner, people.owner], 'sole owner: the engine holds the self-approval and the order shows it');
+  eq(await askedCount(soloRow.id), 0, 'nobody else is asked when the only approver self-approves');
+  eq((await one(`select count(*)::int as n from public.inventory_events where entity = 'approval' and entity_id = $1 and action = 'self_approved'`, [soloRow.id])).n, 1, 'the approval has a self_approved audit event');
+  eq(soloRow.amount_kes, soloSub.order.totals.total, 'the approval carries the order total');
+
+  // A second owner: pending, the maker can't decide (T-SEC-2), the other owner decides from the inbox.
   await db.query(`insert into public.business_members (business_id, user_id, role) values ($1, $2, 'owner')`, [biz, people.owner2]);
-  // Per-call override through the routes' dependency is exercised by createRoutes({ requestApproval }) in P2-10's tests.
-  const { applyPoDecision } = await import('../../src/inventory/purchasing.js');
-  const again = await api('owner', 'POST', '/purchase-orders', { supplierId: supplierA, lines: [{ itemId: rice, qty: 2, unit: 'kg' }] });
-  await api('owner', 'POST', `/purchase-orders/${again.order.id}/submit`, {});
-  const decided = await db.transaction(async (t) => applyPoDecision(t, await inventoryScope(t, contexts.owner2, biz), again.order.id, { decision: 'approved', note: 'from the inbox' }));
-  eq([decided.order.status, decided.order.approvedBy, decided.order.selfApproved], ['approved', people.owner2, false], 'applyPoDecision is what the Approvals inbox calls');
+  const po = await newPo();
+  const sub = await api('owner', 'POST', `/purchase-orders/${po.id}/submit`, {});
+  const [pend] = await approvalOf(po.id);
+  eq([sub.order.status, pend.status, pend.subject_type], ['pending_approval', 'pending', 'purchase_order'], 'with another approver: pending approval');
+  eq(await askedCount(pend.id), 1, 'exactly one approval_needed notification (no double from the hook)');
+  await refuses(inboxApi('owner', 'POST', `/approvals/${pend.id}/decide`, { decision: 'approve' }), 403, 'maker_checker', null, 'the creator cannot approve their own order from the inbox');
+  const box = await inboxApi('owner2', 'GET', '/approvals', null, '?subject=purchase_order');
+  const item = box.approvals.find((x) => x.id === pend.id);
+  eq(item.summary, { kind: 'purchase_order', number: po.number, status: 'pending_approval', supplierName: 'Farm Fresh', total: sub.order.totals.total, lineCount: 1, deliverTo: 'Warehouse', expectedDate: null }, 'the inbox row carries a compact PO summary');
+  const done = await inboxApi('owner2', 'POST', `/approvals/${pend.id}/decide`, { decision: 'approve', note: 'ok' });
+  const after = (await api('owner', 'GET', `/purchase-orders/${po.id}`)).order;
+  eq([done.status, after.status, after.approvedBy, after.selfApproved], ['approved', 'approved', people.owner2, false], 'the other owner approves in the inbox and the order follows');
+  const doneAgain = await inboxApi('owner2', 'POST', `/approvals/${pend.id}/decide`, { decision: 'approve' });
+  eq([doneAgain.replayed, (await api('owner', 'GET', `/purchase-orders/${po.id}`)).order.status], [true, 'approved'], 'replaying the decision is idempotent');
+  eq([await decidedNotes(people.owner), (await one(`select count(*)::int as n from public.notifications where kind = 'approval_decided' and entity_id = $1`, [pend.id])).n], [await decidedNotes(people.owner), 1], 'the maker is told once');
+  await refuses(inboxApi('owner2', 'POST', `/approvals/${pend.id}/decide`, { decision: 'reject', note: 'too late' }), 409, 'already_decided', null, 'the opposite decision after the fact is refused');
+
+  // Rejection from the inbox sends it back to draft with the reason; resubmitting opens a new request.
+  const rej = await newPo();
+  await api('owner', 'POST', `/purchase-orders/${rej.id}/submit`, {});
+  const [rejA] = await approvalOf(rej.id);
+  await refuses(inboxApi('owner2', 'POST', `/approvals/${rejA.id}/decide`, { decision: 'reject' }), 400, 'reason_required', null, 'a rejection needs a reason');
+  await inboxApi('owner2', 'POST', `/approvals/${rejA.id}/decide`, { decision: 'reject', note: 'Wrong supplier' });
+  const back = (await api('owner', 'GET', `/purchase-orders/${rej.id}`)).order;
+  eq(back.status, 'draft', 'reject -> back to draft');
+  eq((await one(`select decision_note, status from public.approvals where id = $1`, [rejA.id])), { decision_note: 'Wrong supplier', status: 'rejected' }, 'the reason is stored on the approval');
+  eq((await one(`select after from public.inventory_events where entity = 'purchase_order' and entity_id = $1 and action = 'reject'`, [rej.id])).after.note, 'Wrong supplier', 'and in the order audit');
+  await api('owner', 'POST', `/purchase-orders/${rej.id}/submit`, {});
+  eq((await approvalOf(rej.id)).map((a) => a.status), ['rejected', 'pending'], 'a resubmit is a new request; the history keeps both');
+
+  // The purchasing endpoints delegate to the same engine.
+  await api('owner2', 'POST', `/purchase-orders/${rej.id}/approve`, {});
+  eq([(await approvalOf(rej.id))[1].status, (await approvalOf(rej.id))[1].decided_by], ['approved', people.owner2], 'POST /approve decides through approvals.decide');
+
+  // Withdraw (the maker "rejects") and cancel while pending both close the approval.
+  const wd = await newPo();
+  await api('owner', 'POST', `/purchase-orders/${wd.id}/submit`, {});
+  const w = await api('owner', 'POST', `/purchase-orders/${wd.id}/reject`, { reason: 'not needed' });
+  eq([w.order.status, (await approvalOf(wd.id))[0].status], ['draft', 'cancelled'], 'the maker withdrawing returns it to draft and cancels the approval');
+  const cn = await newPo();
+  await api('owner', 'POST', `/purchase-orders/${cn.id}/submit`, {});
+  const c = await api('owner', 'POST', `/purchase-orders/${cn.id}/cancel`, { reason: 'Changed my mind' });
+  eq([c.order.status, (await approvalOf(cn.id))[0].status], ['cancelled', 'cancelled'], 'cancelling a pending order cancels its approval');
+  await refuses(inboxApi('owner2', 'POST', `/approvals/${(await approvalOf(cn.id))[0].id}/decide`, { decision: 'approve' }), 409, 'already_decided', /withdrawn/, 'nothing left to decide');
+
+  // A failing callback rolls the decision back (order and approval stay pending).
+  const boom = await newPo();
+  await api('owner', 'POST', `/purchase-orders/${boom.id}/submit`, {});
+  const off = onDecided('purchase_order', () => { throw new Error('boom'); });
+  let failed = false;
+  try { await inboxApi('owner2', 'POST', `/approvals/${(await approvalOf(boom.id))[0].id}/decide`, { decision: 'approve' }); } catch { failed = true; }
+  off();
+  eq([failed, (await approvalOf(boom.id))[0].status, (await api('owner', 'GET', `/purchase-orders/${boom.id}`)).order.status], [true, 'pending', 'pending_approval'], 'a throw in the callback rolls the decision back');
+  await api('owner2', 'POST', `/purchase-orders/${boom.id}/approve`, {});
 }
 
 // =============================================================================================================

@@ -1,0 +1,16 @@
+== C1 the plan example: snapshot 100, 20 sold during the count, counter counts 70 -> variance -10 (not -30)
+{"expectedAtSnapshot":100,"entries":[{"entryId":"e8fb8a06-8bd3-4eda-9f96-697d3ba127fb","counted":70,"expectedAtCount":80,"movementsSince":-20,"variance":-10}]}
+== C2 sales AFTER the counter counted but before posting: plan wording (posting-time) vs watermark per entry
+system after posting: watermark method 65, "movements since snapshot at posting time" 70; the shelf holds 65
+== C3 a delivery and sales during the count
+== C4 a back-dated receipt posted during the count is still "since the snapshot" (ids, not timestamps)
+== C5 blind sheet never carries expected; non-blind does
+[{"line_id":"f6915a7f-5a6a-4a72-a5b4-25cb0b8c1b92","name":"Flour","status":"uncounted"},{"line_id":"6889810d-4839-4ce3-a192-d3ac9b5dcff5","name":"Oil","status":"uncounted"},{"line_id":"7843f322-608d-4
+== C6 two counters disagree (70 vs 69): both stored; the reviewer picks, variance follows the picked entry
+[[70,80,-10],[69,77,-8]]
+== C7 replay, and numbers frozen between review and posting
+== C8 frozen snapshot + append-only entries (DB triggers)
+== C9 zero-stock item and an item counted at zero
+== C10 property test: 150 random sessions (sales, deliveries, an unrecorded loss, one count, more movements) vs a physical-stock model
+150 sessions: all variances matched the model (largest |variance| 19)
+328 checks passed

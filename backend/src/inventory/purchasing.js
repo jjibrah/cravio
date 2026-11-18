@@ -5,10 +5,10 @@
 // write transaction. Each change appends an audit event in the same transaction. Money is exact (decimal.js): prices are KES per ONE
 // entered unit (a crate, a kg); price_per_base is KES per base unit at 6 dp, so prices in different units compare.
 //
-// Approvals (hook for P2-10): submit() asks `approvals.request`; approve()/reject() ask `approvals.approverAvailable`. The defaults below
-// need nothing else (D2-5): the only person who can approve approves their own order, flagged self_approved; otherwise someone else must.
-// P2-10 plugs the real engine in with configureApprovals({ request, approverAvailable }) (or passes `requestApproval` to submitPo) and
-// calls applyPoDecision() when a decision is made in the Approvals inbox. Callers of this module do not change.
+// Approvals (P2-10): the real engine (approvals.js) is the only path. submit() evaluates the 'purchase_order' rules and opens an approval request in
+// the same transaction that moves the order to pending_approval; a sole approver's own order is decided through the engine too (self_approved,
+// audited), never bypassed. Decisions (the Approvals inbox, or the approve/reject endpoints here, which delegate to approvals.decide) reach the
+// order through onDecided('purchase_order') -> applyPoDecision, inside the decision's transaction.
 import { HttpError } from '../lib/http.js';
 import { isId } from '../lib/business.js';
 import { QTY, COST, MONEY, dec, add, sub, mul, div, cmp, isZero, isNeg } from './decimal.js';
@@ -17,6 +17,7 @@ import { loadUnits } from './catalogue.js';
 import { can, locationsWith, requireCan } from './permissions.js';
 import { diff, record } from './audit.js';
 import { notify } from './notifications.js';
+import * as approvals from './approvals.js';
 import { nextNumber } from './numbers.js';
 import { oversees, priceFor, todayNairobi } from './suppliers.js';
 
@@ -105,31 +106,6 @@ export function totals(lines, pct = 16) {
   }
   return { subtotal: subtotal.toString(MONEY), vat: vat.toString(MONEY), total: add(subtotal, vat, MONEY).toString(MONEY) };
 }
-
-/* ---------- approvals hook ---------- */
-
-/** Owners other than `userId`: the people who could approve (inv.purchase.approve is an owner capability today). */
-async function defaultApproverAvailable(db, businessId, userId) {
-  const { rows } = await db.query(`select count(*)::int as n from public.business_members where business_id = $1 and role = 'owner' and user_id <> $2::uuid`, [businessId, userId]);
-  return rows[0].n > 0;
-}
-
-/**
- * Default request (D2-5): when the requester holds inv.purchase.approve and nobody else does, the order is approved on the spot and flagged
- * self_approved; otherwise it waits (pending) for another approver. Returns { decision: 'approved' | 'pending', selfApproved, approvalId? }.
- */
-async function defaultRequest({ db, scope, po }) {
-  const others = await approvals.approverAvailable(db, scope.businessId, scope.userId, { subject: 'po', locationId: po.locationId });
-  const mayApprove = can(scope, 'inv.purchase.approve', { locationId: po.locationId });
-  if (mayApprove && !others) return { decision: 'approved', selfApproved: true, approvalId: null };
-  return { decision: 'pending', selfApproved: false, approvalId: null };
-}
-
-/** The pluggable engine. request({ db, scope, po: { id, number, total, locationId, supplierId, createdBy } }) -> { decision, selfApproved, approvalId? };
- *  approverAvailable(db, businessId, requesterId, { subject, locationId }) -> boolean (is there ANOTHER person who can approve?). */
-const approvals = { request: defaultRequest, approverAvailable: defaultApproverAvailable };
-export function configureApprovals(custom = {}) { Object.assign(approvals, custom); }
-export function resetApprovals() { approvals.request = defaultRequest; approvals.approverAvailable = defaultApproverAvailable; }
 
 /* ---------- loading ---------- */
 
@@ -369,13 +345,16 @@ async function setStatus(db, row, status, sets = '', params = []) {
 }
 
 /**
- * Applies a decision (also the entry point for P2-10's inbox): approved -> status approved (+ who, when, self_approved flag, audit, notifications);
- * rejected -> back to draft with the reason. No maker-checker here: the caller already decided who may decide.
+ * Applies a decision: approved -> status approved (+ who, when, self_approved flag, audit, self-approval notice); rejected -> back to draft with
+ * the reason. Called by the engine's onDecided('purchase_order') callback (below), once per decision, in the decision's transaction. Maker-checker
+ * is the engine's job. The requester's "approved / sent back" notice is the engine's approval_decided, so none is sent here.
+ * Replaying an approval on an already approved order is a no-op.
  */
 export async function applyPoDecision(db, scope, id, { decision, selfApproved = false, note = null } = {}) {
   const row = await loadPo(db, scope, id, { lock: true });
   const loc = row.deliver_to_location_id;
   if (!['approved', 'rejected'].includes(decision)) throw new TypeError('applyPoDecision: decision must be approved or rejected.');
+  if (decision === 'approved' && row.status === 'approved') return getPo(db, scope, row.id);
   if (!['pending_approval', 'draft'].includes(row.status) || (row.status === 'draft' && decision === 'rejected')) {
     throw fail(409, `This order is ${row.status.replace(/_/g, ' ')}, so it can’t be ${decision} now.`, 'po_not_pending');
   }
@@ -387,72 +366,98 @@ export async function applyPoDecision(db, scope, id, { decision, selfApproved = 
       await notify(db, { businessId: scope.businessId, recipients: 'owners', kind: 'po_self_approved', title: `Purchase order ${row.number} was self-approved`,
         body: 'The person who made this order was the only one who could approve it, so they approved it themselves. It is marked “Self-approved”.', link: `/owner/inventory/purchase-orders/${row.id}`,
         entity: { type: 'po', id: row.id }, locationId: loc, dedupeKey: `po-self:${row.id}` });
-    } else if (row.created_by && row.created_by !== scope.userId) {
-      await notify(db, { businessId: scope.businessId, recipients: [row.created_by], kind: 'approval_decided', title: `Purchase order ${row.number} was approved`,
-        link: `/owner/inventory/purchase-orders/${row.id}`, entity: { type: 'po', id: row.id }, locationId: loc });
     }
   } else {
     await setStatus(db, row, 'draft');
     await record(db, { businessId: scope.businessId, locationId: loc, actorId: scope.userId, actorRole: scope.role, entity: 'purchase_order', entityId: row.id, action: 'reject',
       before: { status: row.status }, after: { status: 'draft', note } });
-    if (row.created_by && row.created_by !== scope.userId) {
-      await notify(db, { businessId: scope.businessId, recipients: [row.created_by], kind: 'approval_decided', title: `Purchase order ${row.number} was sent back`,
-        body: note, link: `/owner/inventory/purchase-orders/${row.id}`, entity: { type: 'po', id: row.id }, locationId: loc });
-    }
   }
   return getPo(db, scope, row.id);
 }
 
+/** The engine calls this when a purchase-order approval is decided. Safe to call again (the engine itself fires once per decision). */
+export function registerPurchasingApprovals() {
+  return approvals.onDecided('purchase_order', (db, approval, { scope }) => applyPoDecision(db, scope, approval.subjectId,
+    { decision: approval.status === 'approved' ? 'approved' : 'rejected', selfApproved: approval.selfApproved, note: approval.decisionNote }));
+}
+let unregister = null;
+/** Registers the callback once per process (tests that clear the engine's handlers can call registerPurchasingApprovals() again). */
+export function ensurePurchasingApprovals() { if (!unregister) unregister = registerPurchasingApprovals(); }
+ensurePurchasingApprovals();
+
+/** Opens (or returns) the approval for an order that is pending: evaluate the rules for its total and request, in the caller's transaction. */
+async function openApproval(db, scope, row, requestedBy) {
+  const lines = (await db.query(`select i.category_id, l.line_total::numeric + l.vat_amount::numeric as amount from public.po_lines l join public.stock_items i on i.id = l.item_id where l.po_id = $1`, [row.id])).rows;
+  const evaluation = await approvals.evaluate(db, { businessId: scope.businessId, subject: 'purchase_order', locationId: row.deliver_to_location_id, amountKes: row.total,
+    lines: lines.map((l) => ({ categoryId: l.category_id, amountKes: String(l.amount) })) });
+  const approval = await approvals.request(db, { businessId: scope.businessId, subject: 'purchase_order', subjectId: row.id, locationId: row.deliver_to_location_id,
+    requestedBy, requestedByRole: scope.role, amountKes: row.total, evaluation });
+  return { approval, evaluation };
+}
+
 /**
- * Submits a draft. Asks the approval hook: approved on the spot (a sole owner approving their own order is flagged self_approved), or pending
- * for someone else. `requestApproval` overrides the configured hook for this call.
+ * Submits a draft: the order moves to pending_approval and an approval is requested (approvers are notified once) in the same transaction. When the
+ * submitter is the only person who can approve, the engine decides it as self_approved right here (D2-5): the approvals table and audit keep the record.
  */
-export async function submitPo(db, scope, id, { requestApproval } = {}) {
+export async function submitPo(db, scope, id) {
   const row = await loadPo(db, scope, id, { lock: true });
   requireCan(scope, 'inv.purchase.create', { locationId: row.deliver_to_location_id });
   if (row.status !== 'draft') throw fail(409, `This order is ${row.status.replace(/_/g, ' ')}; only a draft can be submitted.`, 'po_not_draft');
   const lines = await loadPoLines(db, row.id);
   if (!lines.length) throw fail(400, 'Add at least one item before you submit the order.', 'lines_required');
-  const info = { id: row.id, number: row.number, total: row.total, locationId: row.deliver_to_location_id, supplierId: row.supplier_id, createdBy: row.created_by };
-  const answer = await (requestApproval || approvals.request)({ db, scope, po: info });
-  if (!answer || !['approved', 'pending'].includes(answer.decision)) throw new TypeError('The approval hook must return { decision: "approved" | "pending" }.');
-  if (answer.decision === 'approved') {
-    await setStatus(db, row, 'pending_approval');
-    await record(db, { businessId: scope.businessId, locationId: info.locationId, actorId: scope.userId, actorRole: scope.role, entity: 'purchase_order', entityId: row.id, action: 'submit',
-      before: { status: 'draft' }, after: { status: 'pending_approval', total: row.total } });
-    return applyPoDecision(db, scope, id, { decision: 'approved', selfApproved: Boolean(answer.selfApproved), note: answer.note || null });
-  }
+  const loc = row.deliver_to_location_id;
   await setStatus(db, row, 'pending_approval');
-  await record(db, { businessId: scope.businessId, locationId: info.locationId, actorId: scope.userId, actorRole: scope.role, entity: 'purchase_order', entityId: row.id, action: 'submit',
-    before: { status: 'draft' }, after: { status: 'pending_approval', total: row.total, approvalId: answer.approvalId || null } });
-  await notify(db, { businessId: scope.businessId, recipients: 'owners', kind: 'approval_needed', title: `Purchase order ${row.number} needs approval`,
-    body: 'Open it and approve or send it back.', link: `/owner/inventory/purchase-orders/${row.id}`, entity: { type: 'po', id: row.id }, locationId: info.locationId, exclude: [scope.userId] });
+  const { approval, evaluation } = await openApproval(db, scope, row, scope.userId);
+  await record(db, { businessId: scope.businessId, locationId: loc, actorId: scope.userId, actorRole: scope.role, entity: 'purchase_order', entityId: row.id, action: 'submit',
+    before: { status: 'draft' }, after: { status: 'pending_approval', total: row.total, approvalId: approval.id } });
+  const capability = evaluation.approverCapability;
+  if (can(scope, capability, { locationId: loc }) && !(await approvals.approverAvailable(db, scope.businessId, scope.userId, capability, loc))) {
+    await approvals.decide(db, scope, approval.id, { decision: 'approve' });
+  }
   return getPo(db, scope, row.id);
 }
 
-/** Approve a pending order. Someone else must approve while another approver exists (maker-checker); the only approver approves their own, flagged self_approved. */
+const pendingApproval = async (db, scope, row) => {
+  const found = (await db.query(`select id, requested_by from public.approvals where business_id = $1 and subject_type = 'purchase_order' and subject_id = $2 and status = 'pending'`, [scope.businessId, row.id])).rows[0];
+  if (found) return found;
+  return { id: (await openApproval(db, scope, row, row.created_by || scope.userId)).approval.id, requested_by: row.created_by };   // an order that went pending before approvals existed
+};
+
+/** Approve a pending order: delegates to approvals.decide, so maker-checker is the engine's (another approver, or the only approver's own, flagged self_approved). */
 export async function approvePo(db, scope, id, { note } = {}) {
   const row = await loadPo(db, scope, id, { lock: true });
   requireCan(scope, 'inv.purchase.approve', { locationId: row.deliver_to_location_id });
   if (row.status !== 'pending_approval') throw fail(409, `This order is ${row.status.replace(/_/g, ' ')}; only an order waiting for approval can be approved.`, 'po_not_pending');
-  let selfApproved = false;
-  if (row.created_by && row.created_by === scope.userId) {
-    if (await approvals.approverAvailable(db, scope.businessId, scope.userId, { subject: 'po', locationId: row.deliver_to_location_id })) {
-      throw fail(403, 'You can’t approve something you created. Ask another approver.', 'maker_checker');
-    }
-    selfApproved = true;
-  }
-  return applyPoDecision(db, scope, id, { decision: 'approved', selfApproved, note: readText(note, 300, 'the note') });
+  const approval = await pendingApproval(db, scope, row);
+  await approvals.decide(db, scope, approval.id, { decision: 'approve', note: readText(note, 300, 'the note') });
+  return getPo(db, scope, row.id);
 }
 
-/** Send a pending order back to draft with a reason (the approver, or the person who made it). */
+/**
+ * Send a pending order back to draft with a reason. An approver rejects through approvals.decide; the person who made it can't reject their own
+ * request in the engine, so for them it is a withdrawal (approvals.cancel) that returns the order to draft.
+ */
 export async function rejectPo(db, scope, id, { reason } = {}) {
   const row = await loadPo(db, scope, id, { lock: true });
-  if (!can(scope, 'inv.purchase.approve', { locationId: row.deliver_to_location_id })) requireCan(scope, 'inv.purchase.create', { locationId: row.deliver_to_location_id });
+  const canApprove = can(scope, 'inv.purchase.approve', { locationId: row.deliver_to_location_id });
+  if (!canApprove) requireCan(scope, 'inv.purchase.create', { locationId: row.deliver_to_location_id });
   const text = readText(reason, 300, 'the reason');
   if (!text) throw fail(400, 'Say why you are sending it back, so the person can fix it.', 'reason_required');
   if (row.status !== 'pending_approval') throw fail(409, `This order is ${row.status.replace(/_/g, ' ')}; only an order waiting for approval can be sent back.`, 'po_not_pending');
-  return applyPoDecision(db, scope, id, { decision: 'rejected', note: text });
+  const approval = await pendingApproval(db, scope, row);
+  if (canApprove && String(approval.requested_by).toLowerCase() !== String(scope.userId).toLowerCase()) {
+    await approvals.decide(db, scope, approval.id, { decision: 'reject', note: text });
+    return getPo(db, scope, row.id);
+  }
+  await approvals.cancel(db, scope, approval.id, { note: text });
+  return withdrawToDraft(db, scope, row, text);
+}
+
+async function withdrawToDraft(db, scope, row, note) {
+  await setStatus(db, row, 'draft');
+  await record(db, { businessId: scope.businessId, locationId: row.deliver_to_location_id, actorId: scope.userId, actorRole: scope.role, entity: 'purchase_order', entityId: row.id, action: 'withdraw',
+    before: { status: row.status }, after: { status: 'draft', note } });
+  return getPo(db, scope, row.id);
 }
 
 /* ---------- send, cancel, close ---------- */
@@ -484,6 +489,7 @@ export async function cancelPo(db, scope, id, { reason } = {}) {
     throw fail(409, ['partially_received', 'received'].includes(row.status) ? 'Stock has already been received on this order, so it can’t be cancelled. Close it instead.' : `This order is ${row.status}, so it can’t be cancelled.`, 'po_not_cancellable');
   }
   if ((await loadPoLines(db, row.id)).some((l) => !isZero(l.received_base))) throw fail(409, 'Stock has already been received on this order, so it can’t be cancelled. Close it instead.', 'po_has_receipts');
+  if (row.status === 'pending_approval') await approvals.cancel(db, scope, { subject: 'purchase_order', subjectId: row.id }, { note: text });
   await setStatus(db, row, 'cancelled', 'cancelled_by = $4, cancelled_at = now(), cancel_reason = $5', [scope.userId, text]);
   await record(db, { businessId: scope.businessId, locationId: row.deliver_to_location_id, actorId: scope.userId, actorRole: scope.role, entity: 'purchase_order', entityId: row.id, action: 'cancel',
     before: { status: row.status }, after: { status: 'cancelled', reason: text } });

@@ -56,7 +56,7 @@ const reset = () => { fetchCalls = 0; sentBodies = []; gateway.clearCache(); };
 let n = 0;
 const ask = (script, extra = {}) => gateway.call(db, { businessId, feature: 'recipe_draft', actorId: users.owner, system: 'Be brief.', user: `Question ${++n}`, maxTokens: 50,
   env, now, sleep, fetchImpl: provider(script), ...extra });
-const usageRows = () => q('select feature, status, model, prompt_tokens, completion_tokens, cost_kes::float as kes, error_code, user_id from public.ai_usage order by created_at, id');
+const usageRows = () => q("select feature, status, model, prompt_tokens, completion_tokens, cost_kes::float as kes, error_code, user_id from public.ai_usage where feature <> 'x' order by created_at, id");
 const month = () => usageThisMonth(db, businessId, { now: now() });
 
 // ===== 1. Off by default: no row = AI off, nothing leaves the building =====

@@ -1,0 +1,14 @@
+== J1 enqueue -> claim -> run with progress -> result stored -> requester notified
+{"status":"done","rows":5000,"progress_done":5000,"progress_total":5000,"bytes":173923,"head":"id,reason,delta,value_kes\r\n1,purchase_r","keeps_30_days":true}  (26 ms for 5,000 rows, 3 chunks)
+== J2 two workers taking turns over 9 jobs in 3 businesses: each job runs once, never two running jobs in one business
+claims in order: A:1  B:2  A:3  -  -
+== J3 failure -> retry with back-off -> failed with plain words after the last attempt; requester told once
+attempt 1: queued
+attempt 2: queued
+attempt 3: failed
+== J4 crashed worker: lease expires -> swept -> another worker finishes; the zombie cannot overwrite
+== J5 dedupe and the DB backstop for "one running job per business"
+== J6 download rules and the 30-day expiry
+== J7 size: 20,000 rows in 2,000-row keyset chunks (what a "long range" job looks like)
+{"status":"done","rows":20000,"bytes":708924} in 107 ms, 10 heartbeats (progress updates)
+43 checks passed

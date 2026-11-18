@@ -6,7 +6,7 @@
 //   Branch side, /api/inventory/ (X-Cravio-Branch names the branch): a branch manager sees the orders on their way to THEIR branch and receives them
 //     (goods-receipts create / edit / post), never any other branch's or the warehouse's.
 // Pattern for every write: requireUser -> inventoryScope (pool) -> authorize (pool) -> one transaction -> once(commandId) -> service (which audits).
-// createRoutes() takes its dependencies so tests can run the real handlers against an in-memory database; `requestApproval` is the P2-10 hook.
+// createRoutes() takes its dependencies so tests can run the real handlers against an in-memory database. Approve/reject here delegate to the approvals engine (same rules as the Approvals inbox).
 import { requireUser } from '../lib/auth.js';
 import { HttpError } from '../lib/http.js';
 import { withDb } from '../lib/db.js';
@@ -36,7 +36,7 @@ const NOT_FOUND_PO = () => new HttpError(404, 'That purchase order isn’t in th
 const NOT_FOUND_GRN = () => new HttpError(404, 'That goods receipt isn’t in this business.', { code: 'grn_not_found' });
 const empty = (v) => v === undefined || v === null || v === '';
 
-export function createRoutes({ authenticate = requireUser, pool = () => database(), transact = (fn) => withDb(fn, { transaction: true, feature: 'stock' }), now = () => new Date(), requestApproval } = {}) {
+export function createRoutes({ authenticate = requireUser, pool = () => database(), transact = (fn) => withDb(fn, { transaction: true, feature: 'stock' }), now = () => new Date() } = {}) {
   const safely = async (fn) => {
     try { return await fn(); } catch (error) {
       if (MISSING_CODES.includes(error?.code)) throw MISSING_SCHEMA;
@@ -139,7 +139,7 @@ export function createRoutes({ authenticate = requireUser, pool = () => database
     { method: 'POST', path: path('/purchase-orders'), handler: write('po_create', 'inv.purchase.create', newPoAt, (tx, scope, _p, body) => createPo(tx, scope, strip(body), { today: today() })) },
     { method: 'GET', path: path(`/purchase-orders/(?<id>${ID})`), handler: read((db, scope, params) => getPo(db, scope, params.id)) },
     { method: 'PATCH', path: path(`/purchase-orders/(?<id>${ID})`), handler: write('po_edit', 'inv.purchase.create', poAt, (tx, scope, params, body) => updatePo(tx, scope, params.id, strip(body), { today: today() })) },
-    { method: 'POST', path: path(`/purchase-orders/(?<id>${ID})/submit`), handler: write('po_submit', 'inv.purchase.create', poAt, (tx, scope, params) => submitPo(tx, scope, params.id, { requestApproval })) },
+    { method: 'POST', path: path(`/purchase-orders/(?<id>${ID})/submit`), handler: write('po_submit', 'inv.purchase.create', poAt, (tx, scope, params) => submitPo(tx, scope, params.id)) },
     { method: 'POST', path: path(`/purchase-orders/(?<id>${ID})/approve`), handler: write('po_approve', 'inv.purchase.approve', poAt, (tx, scope, params, body) => approvePo(tx, scope, params.id, { note: body.note })) },
     { method: 'POST', path: path(`/purchase-orders/(?<id>${ID})/reject`), handler: write('po_reject', rejectCap, poAt, (tx, scope, params, body) => rejectPo(tx, scope, params.id, { reason: body.reason })) },
     { method: 'POST', path: path(`/purchase-orders/(?<id>${ID})/send`), handler: write('po_send', 'inv.purchase.create', poAt, (tx, scope, params, body) => sendPo(tx, scope, params.id, { via: body.via })) },

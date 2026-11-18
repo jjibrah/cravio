@@ -360,6 +360,26 @@ export async function getApproval(db, businessId, id) {
   return shape(await load(db, businessId, id));
 }
 
+/**
+ * Adds `summary` to approvals the screen would otherwise have to fetch separately. Purchase orders: { kind, number, supplierName, total, lineCount, deliverTo,
+ * expectedDate, status } so the inbox row reads "PO-2026-0007 · Farm Fresh · KES 11,600.00 · 3 lines · Warehouse". Mutates and returns the list.
+ */
+export async function attachSummaries(db, items) {
+  const ids = items.filter((a) => a.subject === 'purchase_order').map((a) => a.subjectId);
+  if (!ids.length) return items;
+  const { rows } = await db.query(`select po.id, po.number, po.status, po.total::text as total, po.expected_date::text as expected_date, s.name as supplier_name,
+      coalesce(r.name, l.name) as place, l.kind as place_kind, (select count(*)::int from public.po_lines x where x.po_id = po.id) as line_count
+    from public.purchase_orders po join public.suppliers s on s.id = po.supplier_id join public.stock_locations l on l.id = po.deliver_to_location_id
+    left join public.restaurants r on r.id = l.restaurant_id where po.id = any($1::uuid[])`, [ids]);
+  const byId = new Map(rows.map((r) => [r.id, r]));
+  for (const a of items) {
+    const r = a.subject === 'purchase_order' ? byId.get(a.subjectId) : null;
+    if (r) a.summary = { kind: 'purchase_order', number: r.number, status: r.status, supplierName: r.supplier_name, total: str(r.total), lineCount: r.line_count,
+      deliverTo: r.place_kind === 'branch' ? r.place : 'Warehouse', expectedDate: r.expected_date };
+  }
+  return items;
+}
+
 /** Everyone who may be asked: approvers at the location, minus the requester. */
 const bodyOf = (a) => [a.amount_kes !== null && a.amount_kes !== undefined ? kes(a.amount_kes) : null, ...(a.rule_snapshot?.reasons || [])].filter(Boolean).join(' ');
 
@@ -515,6 +535,7 @@ export async function inbox(db, scope, options = {}) {
     }
     approvals.push(item);
   }
+  await attachSummaries(db, approvals);
   return { approvals, pending: statuses.includes('pending') ? visible.filter((r) => r.status === 'pending').length : undefined };
 }
 
@@ -523,7 +544,7 @@ export async function mine(db, scope, options = {}) {
   const { statuses, subject, size } = listArgs({ status: 'all', ...options });
   const { rows } = await db.query(`${APPROVAL_SELECT} where a.business_id = $1 and a.requested_by = $2 and a.status = any($3::text[]) and ($4::text is null or a.subject_type = $4)
     and ($6::uuid is null or a.location_id = $6) order by a.requested_at desc, a.id desc limit $5`, [scope.businessId, scope.userId, statuses, subject, size, lc(options.locationId)]);
-  return { approvals: rows.map(shape) };
+  return { approvals: await attachSummaries(db, rows.map(shape)) };
 }
 
 /** Every request ever made for one subject, oldest first (requests, rejections, the final approval). Visible to whoever asked or may decide it. */
@@ -531,7 +552,7 @@ export async function history(db, scope, { subject, subjectId } = {}) {
   if (!APPROVAL_SUBJECTS.includes(subject) || !isId(subjectId)) throw fail(400, 'Say which record to show the approval history of.', 'bad_request');
   const { rows } = await db.query(`${APPROVAL_SELECT} where a.business_id = $1 and a.subject_type = $2 and a.subject_id = $3 order by a.requested_at, a.id`, [scope.businessId, subject, subjectId.toLowerCase()]);
   const allowed = rows.filter((r) => lc(r.requested_by) === lc(scope.userId) || (r.location_id ? can(scope, r.approver_capability, { locationId: r.location_id }) : scope.roles.includes('owner')));
-  return { approvals: allowed.map(shape) };
+  return { approvals: await attachSummaries(db, allowed.map(shape)) };
 }
 
 /* ---------- rules (owner only) ---------- */

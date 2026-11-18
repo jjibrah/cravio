@@ -1,0 +1,18 @@
+== S1 FEFO across 3 batches: expiries +3, +5, +9 days (5 each); serve 12
+[{"batch":"A","qty":"5.0000","unit_cost":"430.000000","value":"2150.00"},{"batch":"B","qty":"5.0000","unit_cost":"430.000000","value":"2150.00"},{"batch":"C","qty":"2.0000","unit_cost":"430.000000","value":"860.00"}]
+== S2 expired batches are skipped and block the sale; override brings one back
+order for 1 with only expired stock left -> P0001 stock_sold_out: Sold out: Wing (not enough servings left).
+== S3 stop at zero + exception still works (expired stock is not sold)
+== S4 replay: serve fired 5 times deducts once
+== S5 no-batch bucket is used LAST; batches with no expiry date come after dated ones
+[{"batch":"Y-dated","qty":"4.0000","unit_cost":"100.000000","value":"400.00"},{"batch":"X-nodate","qty":"4.0000","unit_cost":"100.000000","value":"400.00"},{"batch":"(no batch)","qty":"4.0000","unit_cost":"100.000000","value":"400.00"}]
+== S6 quarantined batch is never sold
+== S7 cost: weighted average (default) vs batch cost (D3-1)
+== S8 untracked item and untracked dish are unaffected; tracked + untracked in one order
+[{"name":"Buns","batch":"-","qty":"3.0000"},{"name":"Chicken","batch":"P","qty":"3.0000"},{"name":"Chicken","batch":"Q","qty":"3.0000"}]
+== S9 one order, two lines of the same tracked item: allocated line by line, no batch unit used twice
+[["R1","5.0000"],["R2","1.0000"],["R2","4.0000"]]
+== S9b availability: an expired-only dish shows sold out in stock_menu_availability
+== S10 regression drill: 60 random orders, untracked items, 013 function vs the spike function -> identical movements
+refused 35 of 60; exceptions {"n":0,"s":"0"}; end 1,52,88
+35 checks passed

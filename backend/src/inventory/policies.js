@@ -45,8 +45,34 @@ export const SETTINGS = {
   branch_to_branch_enabled: { default: true, type: 'boolean', validate: bool('Transfers between branches') },
   emergency_repeat_alert_count: { default: 3, type: 'number', validate: number('The repeated emergency-buy count', { min: 1, max: 50, integer: true }) },
   emergency_repeat_alert_days: { default: 7, type: 'number', validate: number('The repeated emergency-buy window in days', { min: 1, max: 90, integer: true }) },
+  // An emergency buy that cost more than this % over what was authorised goes to the owner for review (P2-11). A percentage, not an amount.
+  emergency_over_estimate_alert_pct: { default: 10, type: 'number', validate: number('The emergency over-estimate alert', { min: 0, max: 1000 }) },
   // KES per US dollar for the AI usage meter. Set by the Cravio admin; null until set (AI cost is then shown in dollars only).
   ai_usd_to_kes: { default: null, type: 'number|null', validate: number('The dollar-to-shilling rate', { min: 1, max: 10000, nullable: true }) },
+
+  // ---- Phase 3 (controls, counts, batches, reports; 10 P3-02). Every money amount and limit starts as NOT SET (null), D2-16 / D3-4 / D3-5:
+  // nothing here is a built-in KES figure. Until the owner sets them: wastage posts at once, every adjustment needs approval, any count
+  // with a non-zero variance needs one approval, allowances are off, no period close day. The approval limits themselves live in
+  // approval rules (017, edited in Settings -> Inventory); count_variance_* are the read-as-fallback pair for a business that has not made a rule.
+  count_variance_value_kes: { default: null, type: 'number|null', validate: number('The count variance value', { min: 0, max: 1e9, nullable: true }) },
+  count_variance_pct: { default: null, type: 'number|null', validate: number('The count variance percentage', { min: 0, max: 100, nullable: true }) },
+  // A report highlight (variance rows outside it turn amber), NOT an approval limit. A percentage, not money.
+  variance_tolerance_pct: { default: 5, type: 'number', validate: number('The variance tolerance', { min: 0, max: 100 }) },
+  // Unusual wastage: this week's value for an item at a branch vs its 4-week weekly average (a ratio, not money); the optional floor hides trivial amounts.
+  unusual_wastage_factor: { default: 2, type: 'number', validate: number('The unusual-wastage factor', { min: 1, max: 100 }) },
+  unusual_wastage_floor_kes: { default: null, type: 'number|null', validate: number('The unusual-wastage floor', { min: 0, max: 1e9, nullable: true }) },
+  expiry_alert_days: { default: 3, type: 'number', validate: number('The expiry alert lead time in days', { min: 0, max: 365, integer: true }) },
+  expired_override_hours: { default: 24, type: 'number', validate: number('How long an expired-batch override lasts, in hours', { min: 1, max: 168, integer: true }) },
+  // Staff meals and complimentaries (D3-6): per branch per day, off until set (null). Over the allowance goes to approval.
+  staff_meal_allowance_portions: { default: null, type: 'number|null', validate: number('The staff-meal allowance in portions', { min: 0, max: 100000, integer: true, nullable: true }) },
+  complimentary_allowance_kes: { default: null, type: 'number|null', validate: number('The complimentary allowance', { min: 0, max: 1e9, nullable: true }) },
+  // Period close (D3-11): the day of the month the owner is reminded to close the previous month; null = no reminder.
+  period_close_day: { default: null, type: 'number|null', validate: number('The period-close day', { min: 1, max: 28, integer: true, nullable: true }) },
+  // Menu engineering (P3-25): ratios, not money.
+  price_change_alert_pct: { default: 10, type: 'number', validate: number('The ingredient price-change alert', { min: 0, max: 1000 }) },
+  food_cost_target_pct: { default: 35, type: 'number', validate: number('The food-cost target', { min: 1, max: 100 }) },
+  // Standard VAT rate used when a supplier document does not state one (purchasing.js already reads this key and assumes 16 until set).
+  vat_standard_pct: { default: 16, type: 'number', validate: number('The standard VAT rate', { min: 0, max: 100 }) },
 };
 
 const known = (key) => {

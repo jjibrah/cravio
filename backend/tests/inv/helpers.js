@@ -118,3 +118,68 @@ export function fakeStorage({ clock = fakeClock(), maxBytes = 8 * 1024 * 1024, a
     async remove(path) { objects.delete(path); },
   };
 }
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Phase 3 additions (P3-02). Additive: nothing above changes.
+// ---------------------------------------------------------------------------------------------------------------------
+
+/** The reason codes P3-03 seeds on first use (10 P3-03): handy for tests of wastage/adjustments before that service exists. */
+export const DEFAULT_REASON_CODES = Object.freeze({
+  wastage: ['burned', 'spoiled', 'expired', 'prep_error', 'spill', 'damaged', 'customer_return', 'over_production', 'theft_suspected'],
+  adjustment: ['found', 'recount', 'damaged', 'theft_suspected'],
+});
+
+/** A prepared (made in-house) item: makeItem plus kind = 'prepared' (012 column). Recipes for it arrive with P3-12/13. Returns the item id. */
+export async function makePrepared(db, businessId, name, options = {}) {
+  const id = await makeItem(db, businessId, name, options);
+  await db.query(`update public.stock_items set kind = 'prepared' where id = $1`, [id]);
+  return id;
+}
+
+/**
+ * A batch of a tracked item at a location (needs migration 022, P3-16; the columns follow 10 P3-16 and the fefo-serve spike, revisit when
+ * 022 lands). Writes the batch, its balance and an inbound movement that carries batch_id, in one transaction. Returns the batch id.
+ *   makeBatch(db, { businessId, locationId, itemId, batchNo: 'A', qty: '5000', expiryInDays: 3, unitCost: '0.4' })
+ */
+export async function makeBatch(db, { businessId, locationId, itemId, batchNo, qty, expiryInDays = null, expiryDate = null, unitCost = null, receivedAt = null, key = null }) {
+  const present = (await db.query(`select to_regclass('public.batches') is not null as ok`)).rows[0].ok;
+  if (!present) throw new Error('makeBatch needs migration 022 (batches), which is not applied in this database.');
+  return db.transaction(async (t) => {
+    const batchId = (await t.query(`insert into public.batches (business_id, item_id, batch_no, received_at, expiry_date, unit_cost)
+      values ($1, $2, $3, coalesce($4::timestamptz, now()), coalesce($5::date, case when $6::int is null then null else (now() at time zone 'Africa/Nairobi')::date + $6::int end), $7) returning id`,
+    [businessId, itemId, batchNo, receivedAt, expiryDate, expiryInDays, unitCost])).rows[0].id;
+    await t.query(`insert into public.batch_balances (location_id, item_id, batch_id, on_hand) values ($1, $2, $3, $4)`, [locationId, itemId, batchId, qty]);
+    await t.query(`insert into public.stock_balances (location_id, item_id, on_hand) values ($1, $2, $3)
+      on conflict (location_id, item_id) do update set on_hand = public.stock_balances.on_hand + excluded.on_hand`, [locationId, itemId, qty]);
+    const after = (await t.query(`select on_hand from public.stock_balances where location_id = $1 and item_id = $2`, [locationId, itemId])).rows[0].on_hand;
+    await t.query(`insert into public.stock_movements (business_id, location_id, item_id, delta, balance_after, reason, unit_cost, value, batch_id, idempotency_key)
+      values ($1, $2, $3, $4, $5, 'purchase_receipt', $6, case when $6::numeric is null then null else round($4::numeric * $6::numeric, 2) end, $7, $8)`,
+    [businessId, locationId, itemId, qty, after, unitCost, batchId, key || `helper-batch-${batchNo}-${itemId}-${locationId}`]);
+    return batchId;
+  });
+}
+
+let staffSeq = 0;
+/**
+ * Extra people on a branch, e.g. several counters for a stock count: addStaff(db, f, { restaurantId, role: 'manager' | 'waiter', n: 3 }).
+ * `f` is what inventoryFixture()/rig() returned (needs f.helpers.ctx). Returns [{ userId, ctx }] with contexts ready for inventoryScope().
+ */
+export async function addStaff(db, f, { restaurantId, role = 'manager', n = 1, prefix = role } = {}) {
+  const { createUser } = await import('../support/pg.js');
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    const userId = await createUser(db, `${prefix}${++staffSeq}@example.test`, { role: role === 'waiter' ? 'waiter' : 'owner' });
+    await db.query(`insert into public.restaurant_members (restaurant_id, user_id, role) values ($1, $2, $3)`, [restaurantId, userId, role]);
+    out.push({ userId, ctx: f.helpers.ctx(userId, { role: role === 'waiter' ? 'waiter' : 'owner', memberships: [[restaurantId, role]] }) });
+  }
+  return out;
+}
+
+/**
+ * Posts through the ledger at a fixed moment (fake clock or ISO string) in its own transaction: the way the golden dataset and the
+ * report tests date their movements. `input` is ledger.post's input; occurredAt is set from `at`; a key is generated when missing.
+ */
+export function postAt(db, at, input) {
+  const when = typeof at === 'string' ? at : at.now ? at.now().toISOString() : new Date(at).toISOString();
+  return db.transaction((t) => post(t, { idempotencyKey: input.idempotencyKey || `helper-at-${++receiveSeq}`, ...input, occurredAt: when }));
+}

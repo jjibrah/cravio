@@ -16,4 +16,5 @@ assert.ok(matches(`/api/admin/businesses/${biz}/ai`) && matches(`/api/owner/inve
 assert.ok(matches(`/api/owner/inventory/${biz}/attachments`) && matches('/api/inventory/attachments'), 'attachment routes are registered');
 assert.ok(matches(`/api/owner/inventory/${biz}/purchase-orders`) && matches('/api/inventory/goods-receipts'), 'purchasing routes are registered');
 assert.ok(matches(`/api/owner/inventory/${biz}/approvals`) && matches('/api/inventory/approvals'), 'approval routes are registered');
-console.log(`Server load: 11 checks passed (${routes.length} routes).`);
+assert.ok(matches(`/api/owner/inventory/${biz}/emergency`) && matches('/api/inventory/emergency'), 'emergency purchase routes are registered');
+console.log(`Server load: 12 checks passed (${routes.length} routes).`);
