@@ -14,6 +14,7 @@ import { loadUnits, getItem } from './catalogue.js';
 import { post } from './ledger.js';
 import { getSetting } from './policies.js';
 import { record as audit } from './audit.js';
+import { record as recordWastage } from './wastage.js';
 
 const fail = (status, message, code, extra = {}) => new HttpError(status, message, { code, ...extra });
 
@@ -223,7 +224,7 @@ async function loadItem(db, businessId, itemId) {
 /** The amount a typical entry at this location is (base units), or null when nothing is known. */
 async function typicalAmount(db, locationId, itemId) {
   const lv = (await db.query('select reorder::text as reorder, par::text as par from public.stock_item_levels where location_id = $1 and item_id = $2', [locationId, itemId])).rows[0];
-  const avg = (await db.query(`select coalesce(avg(abs(delta)), 0)::text as avg from public.stock_movements
+  const avg = (await db.query(`select round(coalesce(avg(abs(delta)), 0), 4)::text as avg from public.stock_movements
     where location_id = $1 and item_id = $2 and occurred_at > now() - interval '30 days'
       and reason not in ('opening', 'count_correction', 'count', 'reversal')`, [locationId, itemId])).rows[0].avg;
   let best = null;
@@ -313,6 +314,25 @@ export async function record(db, scope, { locationId, kind, itemId, quantity, un
   const key = `branch:${kind}:${commandId ? String(commandId).toLowerCase() : randomUUID()}`;
   const show = (v) => display(absolute(v).toString(QTY), item, units);
   const before = (await db.query('select on_hand::text as on_hand from public.stock_balances where location_id = $1 and item_id = $2 for update', [loc.id, id])).rows[0]?.on_hand ?? '0';
+  // With migration 019 applied, waste is the reason-coded wastage flow (P3-04: approval rules, cost, alerts). The route and the response keep their shape;
+  // a reasonCode that isn't in the owner's list is kept as free text, as before.
+  if (kind === 'waste' && (await db.query(`select to_regclass('public.wastage_records') is not null as ok`)).rows[0].ok) {
+    const done = await recordWastage(db, scope, { locationId: loc.id, itemId: id, quantity: entered.toString(), unit: unitText, reasonCode: code, note: text,
+      commandId: isId(commandId) ? commandId : null }, { allowFreeText: true, requireNote: true });
+    const base = { kind, changed: true, replayed: done.replayed === true, itemId: id, itemName: row.name, wastage: { id: done.wastage.id, number: done.wastage.number, status: done.wastage.status,
+      valueKes: done.wastage.valueKes }, pendingApproval: done.pendingApproval, warnings: [] };
+    if (done.pendingApproval) {
+      return { ...base, movement: null, onHand: q4(before), display: { onHand: show(before), change: '0' },
+        message: `Sent for approval: ${show(baseQty)} of ${row.name}. Stock changes once it is approved.`, approvalReasons: done.evaluation?.reasons || [] };
+    }
+    const m = done.movements[0] || (done.replayed ? { id: done.wastage.movementIds[0] } : null);
+    const after = done.balance?.onHand ?? (await db.query('select on_hand::text as on_hand from public.stock_balances where location_id = $1 and item_id = $2', [loc.id, id])).rows[0]?.on_hand ?? '0';
+    const moved = m && m.delta !== undefined ? m : (await db.query(`select id, delta::text as delta, entered_quantity::text as eq, entered_unit as eu, note from public.stock_movements where id = $1`, [m?.id])).rows[0];
+    return { ...base,
+      movement: moved ? { id: moved.id, reason: 'wastage', reasonLabel: reasonLabel('wastage'), delta: moved.delta, entered: moved.entered ?? (moved.eq ? { quantity: moved.eq, unit: moved.eu } : null), note: moved.note } : null,
+      onHand: q4(after), available: done.balance?.available, display: { onHand: show(after), change: `-${show(baseQty)}` },
+      message: `Wrote off ${show(baseQty)} of ${row.name}. Now ${show(after)}.` };
+  }
   const warnings = [];
   let qty;
   let reason;

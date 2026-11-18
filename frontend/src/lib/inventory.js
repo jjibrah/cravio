@@ -100,6 +100,26 @@ export const ownerPaths = (businessId) => {
     importCommit: `${base}/import`,
     recipes: (branchId) => `${base}/recipes${query({ branch: branchId })}`,
     recipe: (menuItemId) => `${base}/recipes/${menuItemId}`,
+    // Suppliers and their price lists (P2-13)
+    suppliers: ({ search, type, status, incomplete } = {}) => `${base}/suppliers${query({ search, type, status, incomplete })}`,
+    supplier: (id) => `${base}/suppliers/${id}`,
+    supplierAction: (id, action) => `${base}/suppliers/${id}/${action}`, // deactivate | activate | complete
+    supplierItems: (id) => `${base}/suppliers/${id}/items`,
+    supplierPrices: (id, { item, unit } = {}) => `${base}/suppliers/${id}/prices${query({ item, unit })}`,
+    bestPrice: (itemId, date) => `${base}/suppliers/best-price${query({ item: itemId, date })}`,
+    // Purchasing (P2-14)
+    reorderSuggestions: (locationId) => `${base}/reorder-suggestions${query({ location: locationId })}`,
+    createFromSuggestions: `${base}/reorder-suggestions/create-orders`,
+    purchaseOrders: ({ status, supplier, location, search, limit, before } = {}) => `${base}/purchase-orders${query({ status, supplier, location, search, limit, before })}`,
+    purchaseOrder: (id) => `${base}/purchase-orders/${id}`,
+    purchaseOrderAction: (id, action) => `${base}/purchase-orders/${id}/${action}`, // submit | approve | reject | send | cancel | close
+    purchaseOrderDocument: (id) => `${base}/purchase-orders/${id}/document`,
+    // Approvals inbox (P2-16) and evidence files (P2-06)
+    approvals: ({ status, subject, limit } = {}) => `${base}/approvals${query({ status, subject, limit })}`,
+    approval: (id) => `${base}/approvals/${id}`,
+    approvalDecide: (id) => `${base}/approvals/${id}/decide`,
+    attachments: ({ entityType, entityId } = {}) => `${base}/attachments${query({ entityType, entityId })}`,
+    attachmentUrl: (id) => `${base}/attachments/${id}/url`,
   };
 };
 
@@ -159,6 +179,40 @@ export const owner = {
   importDryRun: (businessId, csv) => api(ownerPaths(businessId).importDryRun, { method: 'POST', body: { csv } }).catch((error) => { throw withCode(error); }),
   importCommit: (businessId, csv, options) => send('POST', ownerPaths(businessId).importCommit, { csv }, options),
   recipes: (businessId, branchId) => api(ownerPaths(businessId).recipes(branchId)),
+};
+
+/** Purchasing calls (suppliers, orders, approvals, evidence files). Writes take an optional { commandId } to retry safely. */
+export const purchasing = {
+  suppliers: (businessId, options) => api(ownerPaths(businessId).suppliers(options)),
+  supplier: (businessId, id) => api(ownerPaths(businessId).supplier(id)),
+  createSupplier: (businessId, body, options) => send('POST', ownerPaths(businessId).suppliers(), body, options),
+  updateSupplier: (businessId, id, patch, options) => send('PATCH', ownerPaths(businessId).supplier(id), patch, options),
+  setSupplierActive: (businessId, id, active, options) => send('POST', ownerPaths(businessId).supplierAction(id, active ? 'activate' : 'deactivate'), {}, options),
+  completeSupplier: (businessId, id, options) => send('POST', ownerPaths(businessId).supplierAction(id, 'complete'), {}, options),
+  addPrice: (businessId, id, price, options) => send('POST', ownerPaths(businessId).supplierPrices(id), price, options),
+  bestPrice: (businessId, itemId, date) => api(ownerPaths(businessId).bestPrice(itemId, date)),
+  suggestions: (businessId, locationId) => api(ownerPaths(businessId).reorderSuggestions(locationId)),
+  createFromSuggestions: (businessId, body, options) => send('POST', ownerPaths(businessId).createFromSuggestions, body, options),
+  orders: (businessId, options) => api(ownerPaths(businessId).purchaseOrders(options)),
+  order: (businessId, id) => api(ownerPaths(businessId).purchaseOrder(id)),
+  createOrder: (businessId, body, options) => send('POST', ownerPaths(businessId).purchaseOrders(), body, options),
+  updateOrder: (businessId, id, patch, options) => send('PATCH', ownerPaths(businessId).purchaseOrder(id), patch, options),
+  orderAction: (businessId, id, action, body, options) => send('POST', ownerPaths(businessId).purchaseOrderAction(id, action), body, options),
+  document: (businessId, id) => api(ownerPaths(businessId).purchaseOrderDocument(id)),
+  approvals: (businessId, options) => api(ownerPaths(businessId).approvals(options)),
+  decide: (businessId, id, body, options) => send('POST', ownerPaths(businessId).approvalDecide(id), body, options),
+  attachments: (businessId, options) => api(ownerPaths(businessId).attachments(options)),
+  attachmentUrl: (businessId, id) => api(ownerPaths(businessId).attachmentUrl(id)),
+  /** Uploads a picked file as evidence: { entityType, entityId, locationId? }. The server accepts JSON with base64 (up to 8 MB). */
+  async upload(businessId, { entityType, entityId, locationId, file }, options) {
+    const base64 = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result).split(',')[1] || '');
+      reader.onerror = () => reject(new Error('That file could not be read. Try another one.'));
+      reader.readAsDataURL(file);
+    });
+    return send('POST', ownerPaths(businessId).attachments(), { entityType, entityId, locationId, file: { name: file.name, type: file.type, base64 } }, options);
+  },
 };
 
 export const branch = {
@@ -284,3 +338,94 @@ export function formatStockMoney(value) {
   const n = Number(value) || 0;
   return `Ksh ${Number.isInteger(Math.round(n * 100) / 100) ? stockKesWhole.format(n) : stockKes.format(n)}`;
 }
+
+/* ---------- purchasing helpers (P2-12 to P2-14): display only; the server does the real arithmetic ---------- */
+
+/** 0712 345 678, +254 712 345 678, 254712345678 or 712345678 -> '254712345678'; null when it isn't a Kenyan mobile number. */
+export function normalisePhone(value) {
+  const digits = String(value ?? '').trim().replace(/[\s\-().]/g, '');
+  const match = /^(?:\+?254|0)?([17][0-9]{8})$/.exec(digits);
+  return match ? `254${match[1]}` : null;
+}
+/** A KRA PIN in its usual shape (A123456789B) or null. */
+export function normalisePin(value) {
+  const pin = String(value ?? '').trim().replace(/[\s-]/g, '').toUpperCase();
+  return /^[AP][0-9]{9}[A-Z]$/.test(pin) ? pin : null;
+}
+/** '254712345678' -> '0712 345 678' for reading. */
+export const showPhone = (phone) => { const m = /^254([17]\d{2})(\d{3})(\d{3})$/.exec(String(phone || '')); return m ? `0${m[1]} ${m[2]} ${m[3]}` : phone || ''; };
+
+/** Today's date in Nairobi as YYYY-MM-DD. */
+export const todayNairobi = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Nairobi', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+
+const DAY = new Intl.DateTimeFormat('en-GB', { timeZone: 'UTC', weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+/** '2026-11-20' -> 'Fri 20 Nov 2026'. */
+export function formatDay(isoDate) {
+  const d = isoDate ? new Date(`${String(isoDate).slice(0, 10)}T00:00:00Z`) : null;
+  return d && !Number.isNaN(d.getTime()) ? DAY.format(d).replace(',', '') : '';
+}
+
+export const SUPPLIER_TYPE_LABEL = { formal: 'Formal', informal: 'Informal', one_off: 'One-off' };
+export const SUPPLIER_TYPE_HELP = {
+  formal: 'A registered business that gives invoices and has a KRA PIN.',
+  informal: 'A market trader or small seller you buy from regularly.',
+  one_off: 'Someone you bought from once, for example in an emergency.',
+};
+export const PAYMENT_METHOD_LABEL = { cash: 'Cash', mpesa: 'M-Pesa', bank: 'Bank transfer', credit: 'On credit' };
+export const termsText = (days) => (!Number(days) ? 'Pay on delivery' : `Pay within ${days} days`);
+
+const round2 = (n) => Math.round((Number(n) + Number.EPSILON) * 100) / 100;
+export const moneyOrDash = (value) => (value === null || value === undefined || value === '' ? '–' : formatStockMoney(value));
+
+/**
+ * How a supplier price reads: { main: 'Ksh 6,500 per crate', pack: '10 kg', perUnit: 'Ksh 650/kg' }.
+ * `price` is a price row (unit, unitFactor, price, pricePerBase); `item` needs baseUnit, displayUnit and its own units.
+ */
+export function describePrice(price, item, units = []) {
+  const unit = String(price.unit || '').toLowerCase();
+  const out = { main: `${formatStockMoney(price.price)} per ${unit}`, pack: null, perUnit: null };
+  const shown = item?.displayUnit || item?.baseUnit;
+  const factor = shown ? factorOf(shown, item, units) : null;
+  if (!shown || !factor || unit === String(shown).toLowerCase()) return out;
+  const size = Number(price.unitFactor) / factor;
+  if (Number.isFinite(size) && size > 0 && size !== 1) out.pack = sayAmount(round2(size * 1000) / 1000, shown, units);
+  const per = Number(price.pricePerBase) * factor;
+  if (Number.isFinite(per) && per > 0) out.perUnit = `${formatStockMoney(round2(per))}/${unitWord(shown, 1, units)}`;
+  return out;
+}
+/** 'Ksh 6,500 per crate (10 kg) · Ksh 650/kg' */
+export function priceSentence(price, item, units = []) {
+  const d = describePrice(price, item, units);
+  return `${d.main}${d.pack ? ` (${d.pack})` : ''}${d.perUnit ? ` · ${d.perUnit}` : ''}`;
+}
+/** Percent change between two price rows' per-base prices, rounded to 1 decimal: 12 or -3.5; null when unknown. */
+export function priceChange(now, before) {
+  const a = Number(now?.pricePerBase); const b = Number(before?.pricePerBase);
+  if (!(a > 0) || !(b > 0)) return null;
+  return Math.round(((a - b) / b) * 1000) / 10;
+}
+
+/** The plain-words purchase order statuses: label and badge tone (see inv-badge). */
+export const PO_STATUS = {
+  draft: { label: 'Draft', tone: 'off' },
+  pending_approval: { label: 'Waiting for approval', tone: 'low' },
+  approved: { label: 'Approved', tone: 'ok' },
+  sent: { label: 'Sent', tone: 'ok' },
+  partially_received: { label: 'Part received', tone: 'low' },
+  received: { label: 'Received', tone: 'ok' },
+  closed: { label: 'Closed', tone: 'off' },
+  cancelled: { label: 'Cancelled', tone: 'out' },
+};
+export const PO_STATUS_ORDER = ['draft', 'pending_approval', 'approved', 'sent', 'partially_received', 'received', 'closed', 'cancelled'];
+
+/** Order totals as the screen estimates them (the server's numbers win once saved): each line to the cent, then summed. */
+export function estimateTotals(lines, vatPct = 16) {
+  let subtotal = 0; let vat = 0;
+  for (const line of lines) {
+    const amount = round2((Number(line.qty) || 0) * (Number(line.price) || 0));
+    subtotal = round2(subtotal + amount);
+    if ((line.vatClass || 'standard') === 'standard') vat = round2(vat + round2((amount * vatPct) / 100));
+  }
+  return { subtotal, vat, total: round2(subtotal + vat) };
+}
+export { round2 };

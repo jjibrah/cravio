@@ -77,6 +77,11 @@ const BranchStockPage = page(chunks.branchStock);
 const BranchHistoryPage = page(chunks.branchHistory);
 const BranchRecipesPage = page(chunks.branchRecipes);
 const OwnerHistoryPage = page(chunks.ownerHistory);
+const OwnerSuppliersPage = page(chunks.ownerSuppliers);
+const OwnerPurchaseOrdersPage = page(chunks.ownerPurchaseOrders);
+const OwnerReceivePage = page(chunks.ownerReceive, 'OwnerReceivePage');
+const OwnerApprovalsPage = page(chunks.ownerApprovals, 'OwnerApprovalsPage');
+const BranchPurchasesPage = page(chunks.branchPurchases, 'BranchPurchasesPage');
 const ReceiveCodePage = page(chunks.receiveCode);
 const TermsPage = page(chunks.terms);
 const TermsAcceptPage = page(chunks.termsAccept);
@@ -101,10 +106,15 @@ const INVENTORY_PAGES = {
     'inventory/items': { on: OwnerItemsPage },
     'inventory/recipes': { on: OwnerRecipesPage },
     'inventory/history': { on: OwnerHistoryPage },
+    'inventory/suppliers': { on: OwnerSuppliersPage },
+    'inventory/purchase-orders': { on: OwnerPurchaseOrdersPage },
+    'inventory/receive': { on: OwnerReceivePage },
+    'inventory/approvals': { on: OwnerApprovalsPage },
   },
   branch: {
     inventory: { on: BranchStockPage, off: BranchInventoryPage },
     'inventory/history': { on: BranchHistoryPage },
+    'inventory/purchases': { on: BranchPurchasesPage },
     recipes: { on: BranchRecipesPage },
   },
 };
@@ -131,6 +141,12 @@ function DashboardPage({ section, area }) {
   else if (area === 'branch' && BRANCH_PAGES[section.path]) Page = BRANCH_PAGES[section.path];
   else if (area === 'owner' && OWNER_PAGES[section.path]) Page = OWNER_PAGES[section.path];
   return <Page section={section} />;
+}
+
+/** Links from notifications (/owner/inventory/purchase-orders/<id>) open that order on the Purchase orders page. */
+function PurchaseOrderLink() {
+  const { id } = useParams();
+  return <Navigate to={`/owner/inventory/purchase-orders?po=${encodeURIComponent(id || '')}`} replace />;
 }
 
 /** Unknown page inside a branch workspace: back to that branch's overview. */
@@ -163,6 +179,7 @@ function SignedInApp() {
       {routeSections(area).map((section) => section.path
         ? <Route key={section.path} path={section.path} element={inShell(<DashboardPage section={section} area={area} />)} />
         : <Route key="overview" index element={inShell(<DashboardPage section={section} area={area} />)} />)}
+      {area === 'owner' && <Route path="inventory/purchase-orders/:id" element={<PurchaseOrderLink />} />}
       {area === 'owner' && <Route path="branches/:id" element={inShell(<BranchDetailPage />)} />}
       {area === 'admin' && <Route path="businesses/:id" element={inShell(<BusinessAdminPage />)} />}
       {area === 'admin' && <Route path="restaurants" element={<Navigate to="/admin/businesses" replace />} />}
