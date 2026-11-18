@@ -366,17 +366,25 @@ let third;
   const ev = await q(`select action from public.inventory_events where entity = 'supplier' and entity_id = $1 and action in ('deactivate', 'activate') order by id`, [wholesaler]);
   eq(ev.map((e) => e.action), ['deactivate', 'activate'], 'audited');
 
-  // Open purchase orders block deactivation (the table arrives with migration 016; this stands in for it).
-  await db.query(`create table public.purchase_orders (id uuid primary key default gen_random_uuid(), supplier_id uuid not null, status text not null)`);
-  await db.query(`insert into public.purchase_orders (supplier_id, status) values ($1, 'received'), ($1, 'cancelled'), ($1, 'closed')`, [wholesaler]);
+  // Open purchase orders block deactivation (the real table from migration 016; its status guard is bypassed here to seed finished orders directly).
+  let poSeq = 0;
+  const seedPo = async (status) => {
+    await db.exec('set session_replication_role = replica');
+    await db.query(`insert into public.purchase_orders (business_id, number, supplier_id, deliver_to_location_id, status, approved_at, cancelled_at, cancel_reason)
+      values ($1, $2, $3, $4, $5, now(), now(), 'test')`, [biz, `PO-2026-${String(++poSeq).padStart(4, '0')}`, wholesaler, ids.centerLocationId, status]);
+    await db.exec('set session_replication_role = origin');
+  };
+  for (const status of ['received', 'cancelled', 'closed']) await seedPo(status);
   eq((await api('owner', 'POST', `/${wholesaler}/deactivate`, {})).supplier.status, 'inactive', 'finished and cancelled orders do not block');
   await api('owner', 'POST', `/${wholesaler}/activate`, {});
-  await db.query(`insert into public.purchase_orders (supplier_id, status) values ($1, 'approved'), ($1, 'partially_received')`, [wholesaler]);
+  await seedPo('approved'); await seedPo('partially_received');
   const blocked = await refuses(api('owner', 'POST', `/${wholesaler}/deactivate`, {}), 409, 'open_orders', /2 purchase orders with Unga Wholesalers Ltd are still open/, 'open orders block deactivation');
   eq(blocked.details.openOrders, 2, 'with the count');
   eq((await api('owner', 'GET', `/${wholesaler}`)).openOrders, 2, 'the profile shows the open orders');
   eq((await one(`select status from public.suppliers where id = $1`, [wholesaler])).status, 'active', 'still active');
-  await db.query('drop table public.purchase_orders');
+  await db.exec('set session_replication_role = replica');
+  await db.query('delete from public.purchase_orders');
+  await db.exec('set session_replication_role = origin');
 }
 
 // =============================================================================================================
