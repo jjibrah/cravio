@@ -26,7 +26,7 @@ async function handle(request, response, url) {
   const found = findRoute(request.method, url.pathname);
   if (!found) { await sendJson(response, 404, { error: 'Not found' }); return; }
   try {
-    const body = ['POST', 'PATCH', 'PUT', 'DELETE'].includes(request.method) ? await readJson(request) : undefined;
+    const body = ['POST', 'PATCH', 'PUT', 'DELETE'].includes(request.method) ? await readJson(request, found.route.bodyLimit) : undefined;  // a route may raise the 1 MB default (evidence uploads)
     const result = await found.route.handler({ request, response, url, params: found.params, body });
     if (!response.writableEnded && !response.headersSent) {
       await sendJson(response, response.statusCode !== 200 ? response.statusCode : result === undefined ? 204 : 200, result, request);

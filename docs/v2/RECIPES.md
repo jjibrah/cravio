@@ -1,3 +1,5 @@
+> **Withdrawn 18 Nov 2026.** The proposed migration 012 described below (`backend/db/proposed/012_recipes_units.sql`) was withdrawn and its files deleted. It is superseded by `docs/inventory-kb/07-implementation-plan.md`. The rest of this document is kept as history.
+
 # Recipes, units and packs (migration 012) — review pack
 
 Status: **proposed, NOT applied.** File: `backend/db/proposed/012_recipes_units.sql` (rollback: `012_recipes_units.down.sql`). Requires 009. Rehearsed on disposable PGlite only (`node backend/tests/recipes.js`; `inventory-v2.js` also passes with 012 applied on top).

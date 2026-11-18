@@ -1,7 +1,20 @@
-import { routes as inventory } from './inventory.js';
 import { routes as me } from './me.js';
 import { routes as owner } from './owner.js';
 import { routes as stock } from './stock.js';
+import { routes as inventoryOwner } from './inventory-owner.js';
+import { routes as inventoryRecipes } from './inventory-recipes.js';
+import { routes as inventoryBranch } from './inventory-branch.js';
+import { routes as notifications } from './notifications.js';
+import { routes as inventorySuppliers } from './inventory-suppliers.js';
+import { routes as ai } from './ai.js';
+import { routes as inventoryAttachments } from './inventory-attachments.js';
+import { routes as inventoryPurchasing } from './inventory-purchasing.js';
+import { routes as inventoryApprovals } from './inventory-approvals.js';
+import { routes as inventoryEmergency } from './inventory-emergency.js';
+import { routes as inventoryWastage } from './inventory-wastage.js';
+import { routes as inventoryDistribution } from './inventory-distribution.js';
+import { routes as inventoryAdjustments } from './inventory-adjustments.js';
+import { routes as inventoryCounts } from './inventory-counts.js';
 import { routes as legal } from './legal.js';
 import { routes as restaurant } from './restaurant.js';
 import { routes as menuMerch } from './menu-merch.js';
@@ -15,4 +28,4 @@ import { routes as adminPlatform } from './admin-platform.js';
 import { routes as adminBusiness } from './admin-business.js';
 import { routes as settings } from './settings.js';
 
-export const routes = [...inventory, ...me, ...legal, ...owner, ...stock, ...settings, ...menuMerch, ...restaurant, ...adminBusiness, ...adminPlatform, ...adminUsers, ...publicMenu, ...publicGuest, ...publicTable, ...operations, ...support];
+export const routes = [...me, ...legal, ...owner, ...stock, ...inventoryOwner, ...inventoryRecipes, ...inventoryBranch, ...notifications, ...inventorySuppliers, ...ai, ...inventoryAttachments, ...inventoryPurchasing, ...inventoryApprovals, ...inventoryEmergency, ...inventoryWastage, ...inventoryDistribution, ...inventoryAdjustments, ...inventoryCounts, ...settings, ...menuMerch, ...restaurant, ...adminBusiness, ...adminPlatform, ...adminUsers, ...publicMenu, ...publicGuest, ...publicTable, ...operations, ...support];

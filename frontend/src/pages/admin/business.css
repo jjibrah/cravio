@@ -63,3 +63,9 @@
 .ab-body-table thead th { text-align: left; }
 .ab-body-table thead th.is-num { text-align: right; }
 @media (max-width: 640px) { .ab-body { padding: 0 14px 14px; } }
+
+.ab-switch { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.ab-switch-text { display: grid; gap: 4px; max-width: 62ch; }
+.ab-switch-text p { margin: 0; }
+.ab-chip { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; line-height: 1.5; white-space: nowrap; background: var(--surface-2, #eee); color: var(--muted); }
+.ab-chip.is-on { background: #e3f4e8; color: #17653a; }

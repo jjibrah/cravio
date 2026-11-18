@@ -1,0 +1,55 @@
+/* Recipe-inventory prototype. Builds on the owner/stock styles; only the new pieces live here. */
+.rp-banner { display: flex; gap: 10px; align-items: flex-start; padding: 10px 14px; border-radius: var(--r-card);
+  background: var(--warning-soft); color: #5c3c05; font-size: 13px; line-height: 1.45; }
+.rp-banner svg { flex: none; margin-top: 1px; }
+
+.rp-chip { display: inline-flex; align-items: center; margin-left: 8px; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 550;
+  background: var(--success-soft); color: var(--success); vertical-align: 1px; white-space: nowrap; }
+.rp-chip.is-low { background: var(--warning-soft); color: var(--warning); }
+.rp-chip.is-out { background: var(--danger-soft); color: var(--danger); }
+.rp-chip.is-muted { background: var(--selected); color: var(--muted); }
+
+.rp-input-unit { display: inline-flex; align-items: center; gap: 8px; }
+.rp-input-unit > span { color: var(--muted); font-size: 13px; min-width: 32px; }
+.rp-unit-select { width: auto; min-width: 72px; }
+.rp-line-wrap { width: 100%; }
+.rp-line-note { margin: 4px 0 0; font-size: 12px; color: var(--muted); }
+
+.rp-describe { padding: 12px; margin-bottom: 12px; border-radius: var(--r-row); background: var(--paper); box-shadow: 0 0 0 1px var(--line); }
+.rp-describe .o-label { display: flex; align-items: center; gap: 6px; }
+.rp-describe textarea { width: 100%; resize: vertical; min-height: 56px; }
+.rp-describe-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 8px; }
+.rp-describe-actions .o-field-hint { margin: 0; flex: 1; min-width: 180px; }
+
+.rp-summary { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 8px 0 12px; }
+.rp-summary > div { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border-radius: var(--r-row); background: var(--paper); box-shadow: 0 0 0 1px var(--line); }
+.rp-summary span, .rp-summary small { font-size: 12px; color: var(--muted); }
+.rp-summary strong { font-size: 18px; font-variant-numeric: tabular-nums; }
+
+.rp-scan { display: flex; gap: 6px; align-items: center; }
+.rp-warn { color: var(--warning); }
+
+/* Purchase invoice: header fields, a line per ingredient, then the total. */
+.o-drawer.is-wide:has(.rp-invoice) { width: min(760px, calc(100vw - 16px)); }
+.rp-invoice { gap: 12px; }
+.rp-inv-meta { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 12px; }
+.rp-inv-meta .o-field { margin: 0; }
+.rp-inv-table { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; padding: 12px; border-radius: var(--r-row); box-shadow: 0 0 0 1px var(--line); }
+.rp-inv-line { width: 100%; }
+.rp-inv-grid { display: grid; grid-template-columns: minmax(0, 2fr) 90px 84px minmax(0, 1fr) 36px; gap: 8px; align-items: center; width: 100%; }
+.rp-inv-grid .o-input, .rp-inv-grid .o-select { width: 100%; min-width: 0; max-width: none; }
+.rp-inv-grid .o-select[aria-invalid="true"], .rp-inv-grid .o-input[aria-invalid="true"] { border-color: var(--danger); box-shadow: 0 0 0 1px var(--danger); }
+.rp-invoice .o-input[aria-invalid="true"] { box-shadow: 0 0 0 1px var(--danger); }
+.rp-inv-head { font-size: 12px; font-weight: 550; color: var(--muted); }
+.rp-inv-grid .o-select:disabled { color: var(--field); background-color: var(--surface); opacity: 1; cursor: default; }
+.rp-inv-total { display: grid; grid-template-columns: 1fr 2fr; gap: 8px; }
+.rp-inv-total > div { display: flex; flex-direction: column; gap: 2px; padding: 12px 14px; border-radius: var(--r-row); background: var(--paper); box-shadow: 0 0 0 1px var(--line); }
+.rp-inv-total span, .rp-inv-total small { font-size: 12px; color: var(--muted); }
+.rp-inv-total strong { font-size: 22px; font-variant-numeric: tabular-nums; }
+.rp-inv-cell { display: block; }
+@media (max-width: 640px) {
+  .rp-inv-meta { grid-template-columns: minmax(0, 1fr); }
+  .rp-inv-head { display: none; }
+  .rp-inv-grid { grid-template-columns: minmax(0, 1fr) 76px minmax(0, 1fr) 36px; }
+  .rp-inv-item { grid-column: 1 / -1; }
+}

@@ -112,7 +112,7 @@ export default function BusinessesPage({ section }) {
                       <td className="is-num">{formatWhole(row.staff)}</td>
                       <td className="is-num">{formatWhole(row.orders30d)}</td>
                       <td className="is-num">{formatKsh(row.paid30d)}</td>
-                      <td><span className={`ab-stock is-${stock.tone}`}>{stock.text}</span></td>
+                      <td>{row.inventoryEnabled && <span className="ab-chip is-on">Inventory on</span>} <span className={`ab-stock is-${stock.tone}`}>{stock.text}</span></td>
                       <td className="is-num">{row.lastOrderAt ? timeAgo(row.lastOrderAt) : 'Never'}</td>
                     </tr>;
                   })}</tbody>
@@ -126,7 +126,7 @@ export default function BusinessesPage({ section }) {
                     <dl>
                       <div><dt>Orders 30d</dt><dd>{formatWhole(row.orders30d)}</dd></div>
                       <div><dt>Paid 30d</dt><dd>{formatKsh(row.paid30d)}</dd></div>
-                      <div><dt>Inventory</dt><dd>{stockSummary(row.stock).text}</dd></div>
+                      <div><dt>Inventory</dt><dd>{row.inventoryEnabled && <span className="ab-chip is-on">Inventory on</span>} {stockSummary(row.stock).text}</dd></div>
                     </dl>
                   </Link>
                 </li>)}

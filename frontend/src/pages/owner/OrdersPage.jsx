@@ -9,6 +9,7 @@ import { EmptyState, ErrorState, LiveBadge, OIcon, Segmented, SkeletonRows } fro
 import '../../components/owner/orders.css';
 import { formatKes, nairobiDate, opsApi, plural, useLive, useNewArrivals, useNow } from '../../lib/ops';
 import { branchPath } from '../../lib/branch';
+import { useNotifications } from '../../components/notifications/NotificationProvider';
 
 const VIEWS = [{ value: 'tables', label: 'By table' }, { value: 'all', label: 'All orders' }];
 const STATUSES = [
@@ -40,6 +41,20 @@ export default function OrdersPage({ section }) {
   const [orderId, openOrder, closeOrder, preview] = useOrderParam();
   const [state, setState] = useState({ orders: null, total: 0, hasMore: false, error: null, loading: true, more: false });
   const request = useRef(null);
+
+  // ?order=<short code> (the 6 characters after # on a bill, as stock history links use) becomes the full order id, then opens as usual.
+  const { notify } = useNotifications();
+  const shortCode = orderId && /^[0-9a-f]{1,6}$/i.test(orderId) ? orderId.toLowerCase() : null;
+  useEffect(() => {
+    if (!shortCode) return undefined;
+    const controller = new AbortController();
+    const swap = (id) => setParams((current) => { const next = new URLSearchParams(current); if (id) next.set('order', id); else next.delete('order'); return next; }, { replace: true });
+    opsApi.orders({ q: shortCode, limit: 1 }, controller.signal).then((result) => {
+      if (result.orders[0]) swap(result.orders[0].id);
+      else { swap(null); notify(`We couldn’t find order #${shortCode}.`, { type: 'error' }); }
+    }).catch((error) => { if (error.name !== 'AbortError') { swap(null); notify(`We couldn’t open order #${shortCode}. ${error.message}`, { type: 'error' }); } });
+    return () => controller.abort();
+  }, [shortCode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const filters = useMemo(() => ({
     status: status === 'all' ? undefined : STATUSES.find((option) => option.value === status).api || status,
@@ -174,6 +189,6 @@ export default function OrdersPage({ section }) {
       <button type="button" className="o-btn" onClick={() => load({ append: true })} disabled={state.more}>{state.more ? 'Loading…' : `Show more (${state.total - state.orders.length} left)`}</button>
     </div>}
 
-    <OrderDrawer orderId={orderId} preview={preview} onClose={closeOrder} onChanged={() => { load({ quiet: true }); live.reload(); }} />
+    <OrderDrawer orderId={shortCode ? null : orderId} preview={preview} onClose={closeOrder} onChanged={() => { load({ quiet: true }); live.reload(); }} />
   </>;
 }

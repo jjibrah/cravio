@@ -11,10 +11,14 @@ import { withDb } from '../lib/db.js';
 import { MANAGER_ROLES } from '../lib/access.js';
 import { managerContext, staffContext, withBody } from '../lib/operations.js';
 import {
-  adjust, availability, branchLocation, branchSnapshot, businessSnapshot, cancelDispatch, cancelRequest, centerLocation,
-  correctOrder, createItem, dispatch, findByCode, linkMenuItem, once, receive, reviewRequest, submitRequest, updateItem,
+  adjust, availability, branchLocation, branchSnapshot, businessSnapshot, centerLocation,
+  correctOrder, createItem, findByCode, linkMenuItem, once, updateItem,
 } from '../stock/service.js';
-import { saveRecipe, suggest, suggestionInput } from '../stock/recipes.js';
+import { flowRoutes } from './stock-flow.js';
+import { legacyTransferStatus, legacyView } from '../inventory/legacy-bridge.js';
+import { saveRecipe, suggestionInput } from '../stock/recipes.js';
+import { suggestLegacy } from '../ai/legacy-recipe.js';
+import { database } from '../lib/pool.js';
 
 const ID = '[0-9a-fA-F-]{36}';
 const stockDb = (fn, transaction = true) => withDb(fn, { transaction, feature: 'stock' });
@@ -60,10 +64,12 @@ function ownerWrite(kind, fn) {
 }
 
 export const routes = [
+  // Request / review / dispatch / receive (009 or, for a switched-on business, the new engine): routes/stock-flow.js.
+  ...flowRoutes,
   // ----- Branch -----
   { method: 'GET', path: '/api/stock', async handler({ request }) {
     const { restaurantId } = await branch(request);
-    return stockDb((db) => branchSnapshot(db, restaurantId), false);
+    return legacyView(await stockDb((db) => branchSnapshot(db, restaurantId), false));
   } },
   { method: 'GET', path: '/api/stock/availability', async handler({ request }) {
     const { restaurantId } = await staffContext(request);
@@ -76,30 +82,31 @@ export const routes = [
   { method: 'PUT', path: new RegExp(`^/api/stock/recipes/(?<id>${ID})$`), handler: branchWrite('recipe', (db, ctx, params, body) => saveRecipe(db, ctx, params.id, body)) },
   // AI draft of a recipe (OpenRouter). Returns a draft only; nothing is saved. 503 when OPENROUTER_API_KEY isn't set.
   { method: 'POST', path: '/api/stock/recipes/suggest', handler: withBody(async ({ request, body }) => {
-    const { restaurantId } = await branch(request);
+    const { restaurantId, user } = await branch(request);
+    let businessId;
     const input = await stockDb(async (db) => {
       const { rows } = await db.query('select business_id from public.restaurants where id = $1', [restaurantId]);
-      return suggestionInput(db, { businessId: rows[0].business_id, restaurantId }, String(body.menuItemId || ''));
+      businessId = rows[0].business_id;
+      return suggestionInput(db, { businessId, restaurantId }, String(body.menuItemId || ''));
     }, false);
-    return suggest(input);
+    // Metered and limited like every AI call (ai/gateway.js): no allowance row = off.
+    return suggestLegacy(database(), { businessId, actorId: user?.id || null }, input);
   }) },
   { method: 'PUT', path: new RegExp(`^/api/stock/links/(?<id>${ID})$`), handler: branchWrite('link', (db, ctx, params, body) => linkMenuItem(db, ctx, params.id, body)) },
   { method: 'POST', path: new RegExp(`^/api/stock/orders/(?<id>${ID})/correction$`), handler: branchWrite('correction', (db, ctx, params, body) => correctOrder(db, ctx, params.id, body)) },
-  { method: 'POST', path: '/api/stock/requests', handler: branchWrite('request', (db, ctx, _p, body) => submitRequest(db, ctx, body), { menuChanges: false }) },
-  { method: 'POST', path: new RegExp(`^/api/stock/requests/(?<id>${ID})/cancel$`), handler: branchWrite('request_cancel', (db, ctx, params) => cancelRequest(db, ctx, params.id), { menuChanges: false }) },
-  { method: 'POST', path: new RegExp(`^/api/stock/transfers/(?<id>${ID})/receive$`), handler: branchWrite('receive', (db, ctx, params, body) => receive(db, ctx, params.id, body)) },
   // A dispatch code (typed or scanned from the QR) → which of the caller's branches it is going to.
   { method: 'GET', path: /^\/api\/stock\/receive\/(?<code>[A-Za-z0-9]{1,20})$/, async handler({ request, params }) {
     const { memberships } = await requireUser(request);
     const managed = (memberships || []).filter((row) => row.restaurant && MANAGER_ROLES.includes(row.role)).map((row) => row.restaurant.id);
     if (!managed.length) throw new HttpError(403, 'Only branch managers receive dispatches.');
-    return stockDb((db) => findByCode(db, params.code, managed), false);
+    const found = await stockDb((db) => findByCode(db, params.code, managed), false);
+    return { ...found, status: legacyTransferStatus(found.status) ?? found.status };
   } },
 
   // ----- Owner / main center -----
   { method: 'GET', path: new RegExp(`^/api/owner/stock/(?<businessId>${ID})$`), async handler({ request, params }) {
     const { grant } = await business(request, params.businessId);
-    const snapshot = await stockDb((db) => businessSnapshot(db, grant.businessId), false);
+    const snapshot = legacyView(await stockDb((db) => businessSnapshot(db, grant.businessId), false));
     if (grant.role === 'owner') return { ...snapshot, role: 'owner' };
     // Operations managers see only their assigned branches.
     const mine = new Set(grant.branchIds || []);
@@ -111,7 +118,4 @@ export const routes = [
   { method: 'POST', path: new RegExp(`^/api/owner/stock/(?<businessId>${ID})/items$`), handler: ownerWrite('item', (db, ctx, _p, body) => createItem(db, ctx, body)) },
   { method: 'PATCH', path: new RegExp(`^/api/owner/stock/(?<businessId>${ID})/items/(?<id>${ID})$`), handler: ownerWrite('item_edit', (db, ctx, params, body) => updateItem(db, ctx, params.id, body)) },
   { method: 'POST', path: new RegExp(`^/api/owner/stock/(?<businessId>${ID})/adjust$`), handler: ownerWrite('adjust', async (db, ctx, _p, body) => adjust(db, { ...ctx, locationId: await centerLocation(db, ctx.businessId) }, body)) },
-  { method: 'POST', path: new RegExp(`^/api/owner/stock/(?<businessId>${ID})/requests/(?<id>${ID})/review$`), handler: ownerWrite('review', (db, ctx, params, body) => reviewRequest(db, ctx, params.id, body)) },
-  { method: 'POST', path: new RegExp(`^/api/owner/stock/(?<businessId>${ID})/dispatches$`), handler: ownerWrite('dispatch', (db, ctx, _p, body) => dispatch(db, ctx, body)) },
-  { method: 'POST', path: new RegExp(`^/api/owner/stock/(?<businessId>${ID})/dispatches/(?<id>${ID})/cancel$`), handler: ownerWrite('dispatch_cancel', (db, ctx, params) => cancelDispatch(db, ctx, params.id)) },
 ];

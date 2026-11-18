@@ -1,0 +1,4 @@
+name,code,category,measured_by,display_unit,pack_name,pack_size,pack_unit,kind,storage,low_level,yield_pct,opening_qty,opening_unit,opening_cost_per_unit,location
+Chicken,CHK-001,Meat and poultry,weight,kg,crate,10,kg,raw,frozen,20,85,40,kg,650,warehouse
+Eggs,EGG-001,Dairy,count,piece,tray,30,piece,raw,chilled,60,100,20,tray,420,warehouse
+Cooking oil,OIL-001,Cooking ingredients and spices,volume,L,jerrican,20,L,raw,ambient,40,100,5,jerrican,4200,warehouse

@@ -4,6 +4,7 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { createUser, freshDatabase, readSql } from './support/pg.js';
+import { BASE_MIGRATIONS, resolveProposed } from './inv/migrations.js';
 import {
   adjust, availability, branchLocation, branchSnapshot, businessSnapshot, cancelDispatch, cancelRequest, centerLocation, correctOrder,
   createItem, dispatch, findByCode, linkMenuItem, once, receive, reviewRequest, submitRequest,
@@ -16,7 +17,14 @@ const fails = async (promise, test, m) => {
   checks++;
 };
 
-const db = await freshDatabase();
+// The plain run uses BASE_MIGRATIONS only (001-010: `main`'s 009 behaviour, NOT the later inventory migrations that are now in
+// backend/db/migrations). INV_EXTRA_MIGRATIONS runs this same suite with the inventory migrations applied on top of that base
+// (npm run test:inv:compat): proof that the code on `main` keeps working against the widened schema. Default: none.
+//   INV_EXTRA_MIGRATIONS=all                                  every inventory migration (012+), in order (backend/tests/inv/migrations.js)
+//   INV_EXTRA_MIGRATIONS=migrations/012_x.sql,migrations/013_y.sql   an explicit list
+const extra = resolveProposed(process.env.INV_EXTRA_MIGRATIONS);
+if (extra.length) console.log(`inventory-v2: inventory migrations applied: ${extra.join(', ')}`);
+const db = await freshDatabase({ migrations: [...BASE_MIGRATIONS], extra });
 const one = async (sql, p) => (await db.query(sql, p)).rows[0];
 const tx = (fn) => db.transaction(fn);
 
@@ -96,7 +104,9 @@ await fails(order([{ itemId: fantaDish, name: 'Fanta', quantity: 2 }]), /Sold ou
 await tx((t) => linkMenuItem(t, branchCtx, fantaDish, { itemId: fanta.id, allowWhenOut: true }));
 const o3 = await order([{ itemId: fantaDish, name: 'Fanta', quantity: 2 }]);
 await serve(o3);
-eq(await onHand(fanta.id), -1, 'override lets service continue; balance shows the gap to count');
+// 013 (agreed rule INV: stop at zero, log the shortfall): serving never takes a balance below 0; the gap becomes a stock exception.
+const stopsAtZero = extra.some((name) => name.includes('013_inventory_recipes'));
+eq(await onHand(fanta.id), stopsAtZero ? 0 : -1, stopsAtZero ? 'override lets service continue; balance floors at 0 (013), the gap is a stock exception' : 'override lets service continue; balance shows the gap to count');
 await tx((t) => linkMenuItem(t, branchCtx, fantaDish, { itemId: fanta.id }));
 
 // Cancelling an unserved order releases the hold; nothing to restock.
@@ -182,17 +192,22 @@ const brief = await briefing(db, { id: owner });
 eq(brief.answers.stock.includes('Coke 300ml at Main (0 servings)'), true, 'briefing lists out-of-stock items per branch');
 eq(brief.attention.some((a) => a.kind === 'stock' && a.tone === 'urgent'), true, 'out-of-stock is urgent in the briefing');
 
-// Rollback: refused while history exists; after a deliberate clear it removes everything and orders keep working.
-await fails(db.exec(readSql('proposed/009_inventory.down.sql')), /Refusing rollback/, 'rollback refuses while stock history exists');
-await db.exec(`alter table public.stock_movements disable trigger stock_movements_no_change; delete from public.order_stock_effects; delete from public.stock_movements;
-  delete from public.stock_transfers; delete from public.stock_requests;`);
-await db.exec(readSql('proposed/009_inventory.down.sql'));
-eq((await one(`select to_regclass('public.stock_items') is null as gone`)).gone, true, 'rollback removes inventory tables');
-const after = await order([{ itemId: fantaDish, name: 'Fanta', quantity: 50 }]);
-await serve(after);
-eq((await one('select status from public.orders where id = $1', [after])).status, 'served', 'orders work without inventory after rollback');
-await db.exec(readSql('migrations/009_inventory.sql'));
-eq((await one(`select to_regclass('public.stock_items') is not null as back`)).back, true, 're-apply after rollback works');
+if (extra.length) {
+  // The 009 rollback drops 009's tables, which later migrations reference; each proposed migration has its own down script and test.
+  console.log(`(skipped the 009 rollback section: extra migrations applied: ${extra.join(', ')})`);
+} else {
+  // Rollback: refused while history exists; after a deliberate clear it removes everything and orders keep working.
+  await fails(db.exec(readSql('proposed/009_inventory.down.sql')), /Refusing rollback/, 'rollback refuses while stock history exists');
+  await db.exec(`alter table public.stock_movements disable trigger stock_movements_no_change; delete from public.order_stock_effects; delete from public.stock_movements;
+    delete from public.stock_transfers; delete from public.stock_requests;`);
+  await db.exec(readSql('proposed/009_inventory.down.sql'));
+  eq((await one(`select to_regclass('public.stock_items') is null as gone`)).gone, true, 'rollback removes inventory tables');
+  const after = await order([{ itemId: fantaDish, name: 'Fanta', quantity: 50 }]);
+  await serve(after);
+  eq((await one('select status from public.orders where id = $1', [after])).status, 'served', 'orders work without inventory after rollback');
+  await db.exec(readSql('migrations/009_inventory.sql'));
+  eq((await one(`select to_regclass('public.stock_items') is not null as back`)).back, true, 're-apply after rollback works');
+}
 
-console.log(`Inventory: ${checks} checks passed (disposable PGlite database).`);
+console.log(`Inventory: ${checks} checks passed (disposable PGlite database${extra.length ? `, with ${extra.join(', ')} applied` : ''}).`);
 await db.close();

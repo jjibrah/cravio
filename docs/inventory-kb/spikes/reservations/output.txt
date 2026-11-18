@@ -1,0 +1,51 @@
+S1  Two approvals race for the last 10 kg at the Warehouse
+    start: on_hand=10000.0000 reserved=0.0000 available=10000.0000
+    after A approved: on_hand=10000.0000 reserved=10000.0000 available=0.0000
+    refused: Only 0 kg of Beef is free at the Warehouse; you asked to hold 10 kg. Approve a smaller amount.
+    allSettled -> fulfilled / rejected; on_hand=10000.0000 reserved=10000.0000 available=0.0000
+S2  Partial approval: asks 20 kg, only 15 kg free
+    refused: Only 15 kg of Rice is free at the Warehouse; you asked to hold 20 kg. Approve a smaller amount.
+    approved 15 kg: on_hand=15000.0000 reserved=15000.0000 available=0.0000
+S3  Dispatch consumes its reservation (reserved and on_hand fall together)
+    before: on_hand=15000.0000 reserved=15000.0000 available=0.0000
+    dispatched 15 kg: on_hand=0.0000 reserved=0.0000 available=0.0000  consumedFromReservation=15000.0000
+S4  Nothing else can dip into reserved stock
+    on_hand=10000.0000 reserved=8000.0000 available=2000.0000  (8 kg held for D)
+    refused: Only 2 kg of Oil is free here (8 kg is held for open requests); you tried to take 3 kg. Take less or release the hold first.
+    refused: Only 2 kg of Oil is free here (8 kg is held for open requests); you tried to take 3 kg. Take less or release the hold first.
+    refused: wastage can’t use up a held reservation.
+    refused: That reservation is not for this item at this location.
+    free 2 kg wasted: on_hand=8000.0000 reserved=8000.0000 available=0.0000
+    refused: Stock is only held at the Warehouse. Branches check availability when they dispatch.
+    refused by DB: direct UPDATE of on_hand below reserved (check stock_balances_reserved_within_on_hand)
+S5  Cancel releases; replays are idempotent; over-release refused
+    after cancel: on_hand=8000.0000 reserved=0.0000 available=8000.0000
+    refused: Only 0.0000 is still held on this request line; you tried to release 1.0000.
+S6  Partial dispatch: consumed part leaves, remainder STAYS reserved (decision); cancel releases only the remainder
+    dispatched 5 of 8: on_hand=5000.0000 reserved=3000.0000 available=2000.0000  reservation active consumed=5000.0000
+    refused: Only 7 kg of Flour left here; you tried to take 8 kg. Take less, or receive more stock first.
+    refused: Only 7 kg of Flour left here; you tried to take 7.5 kg. Take less, or receive more stock first.
+    refused: Only 7 kg of Flour left here; you tried to take 7.001 kg. Take less, or receive more stock first.
+    free stock down to 1 kg: on_hand=4000.0000 reserved=3000.0000 available=1000.0000
+    refused: Only 4 kg of Flour left here; you tried to take 4.5 kg. Take less, or receive more stock first.
+    dispatch 4 kg (3 reserved + 1 free): on_hand=0.0000 reserved=0.0000 available=0.0000 consumedFromReservation=3000.0000
+    X and Y each hold 4 kg: on_hand=10000.0000 reserved=8000.0000 available=2000.0000
+    refused: Only 2 kg of Pepper is free here (8 kg is held for open requests); you tried to take 7 kg. Take less or release the hold first.
+    X dispatches 6 kg (4 reserved + 2 free): on_hand=4000.0000 reserved=4000.0000 available=0.0000
+    dispatch 2 of 6 then cancel: on_hand=8000.0000 reserved=0.0000 available=8000.0000 reservation consumed consumed=2000.0000 released=4000.0000
+S7  Reserve idempotency and one-active-per-line
+    refused: The request id “res-40” was already used for a different hold. Start again so it gets a new id.
+    refused: This request line already holds stock. Release it first to change the amount.
+S8  Order holds (013 snapshots) combine: available = on_hand - reserved - held
+    branch: {"onHand":"10000.0000","reserved":"0.0000","held":"3000.0000","available":"7000.0000"}
+    warehouse: {"onHand":"20000.0000","reserved":"12000.0000","held":"0.0000","available":"8000.0000"}
+    refused: 3 kg of Chicken is held for open orders; only 7 kg can leave this branch. Take less.
+    branch dispatch of 7 kg allowed: on_hand=3000.0000 reserved=0.0000 available=3000.0000
+    new order after the dispatch: Sold out: Chicken burger (not enough servings left).
+    DB check does not block branch overdraw (reserved = 0 rows are exempt)
+S9  Randomised ledger (seeded): reserve / release / dispatch / waste / receive, invariants after every step
+    400 random steps: 307 applied, 93 refused; reserved = sum of active remainders and on_hand = ledger after EVERY step
+S10 Table-level guards
+    refused by DB: consumed > reserved; status out of step with the remainder
+
+Reservation spike: 56 checks passed.

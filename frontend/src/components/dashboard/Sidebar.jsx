@@ -1,16 +1,20 @@
 import { useEffect, useRef, useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { dashboards, groupSections, settingsSection } from '../../config/dashboards';
+import { dashboards, groupSections, settingsSection, visibleSections } from '../../config/dashboards';
+import { useApi } from '../../lib/api';
+import { ownerPaths, useInventoryEnabled } from '../../lib/inventory';
 import Brand from '../Brand';
 import Icon from '../Icon';
 import ProfileMenu from './ProfileMenu';
 import PlaceSummary from './PlaceSummary';
 import BranchSwitcher from './BranchSwitcher';
 
-function SidebarLink({ to, icon, label, onNavigate }) {
-  // Only the overview link needs an exact match; others stay active on their detail pages.
-  return <NavLink end={to.split('/').length <= 2} to={to} onClick={onNavigate} className={({ isActive }) => `sidebar-link${isActive ? ' is-active' : ''}`}>
+function SidebarLink({ to, icon, label, onNavigate, exact = false, badge = 0 }) {
+  // Only the overview link needs an exact match; others stay active on their detail pages
+  // (unless another entry lives under them: Stock at /inventory beside Items at /inventory/items).
+  return <NavLink end={exact || to.split('/').length <= 2} to={to} onClick={onNavigate} className={({ isActive }) => `sidebar-link${isActive ? ' is-active' : ''}`}>
     <span className="nav-icon"><Icon name={icon} size={16} /></span><span>{label}</span>
+    {badge > 0 && <span className="sidebar-badge" aria-label={`, ${badge} waiting`}>{badge}</span>}
   </NavLink>;
 }
 
@@ -18,6 +22,13 @@ function SidebarContent({ account, scope, onNavigate, mobile, onClose }) {
   const config = dashboards[scope.area];
   const { base } = scope;
   const branchArea = scope.area === 'branch';
+  const inventory = useInventoryEnabled(scope.area).enabled;
+  const sections = visibleSections(config.sections, { inventory });
+  // The Approvals entry shows how many decisions are waiting (read quietly; no badge when it can't be read).
+  const wantsApprovals = inventory && scope.area === 'owner' && sections.some((section) => section.badge === 'approvals');
+  const businessId = account?.businesses?.[0]?.id;
+  const approvals = useApi(wantsApprovals && businessId ? ownerPaths(businessId).approvals({ status: 'pending' }) : null, { ttl: 60000 });
+  const badges = { approvals: Number(approvals.data?.pending) || 0 };
   return <>
     <div className="sidebar-brand">
       <Brand to={base} onClick={onNavigate} label={`Cravio ${config.label.toLowerCase()} home`} />
@@ -25,10 +36,11 @@ function SidebarContent({ account, scope, onNavigate, mobile, onClose }) {
     </div>
     {branchArea && <PlaceSummary place={scope.place} settingsPath={`${base}/settings`} onNavigate={onNavigate} />}
     <nav className="sidebar-navigation" aria-label={`${config.label} navigation`}>
-      {groupSections(config.sections).map((group, index) => <div className="sidebar-group" key={group.label || index}>
+      {groupSections(sections).map((group, index) => <div className="sidebar-group" key={group.label || index}>
         {group.label && <p className="sidebar-group-label">{group.label}</p>}
         {group.sections.map((section) => <SidebarLink key={section.path} to={`${base}${section.path ? `/${section.path}` : ''}`}
-          icon={section.icon} label={section.label} onNavigate={onNavigate} />)}
+          icon={section.icon} label={section.label} onNavigate={onNavigate} badge={badges[section.badge] || 0}
+          exact={sections.some((other) => other.path.startsWith(`${section.path}/`))} />)}
         {branchArea && group.label === 'Menu' && <a className="sidebar-link guest-menu-link" href={`/guest-menu?r=${scope.place.id}`} target="_blank" rel="noopener noreferrer" onClick={onNavigate}>
           <span className="nav-icon"><Icon name="qr" size={16} /></span><span>Guest menu</span><Icon name="external" size={13} className="guest-menu-external" />
         </a>}

@@ -3,7 +3,8 @@ import { BrowserRouter, Navigate, Route, Routes, useLocation, useParams } from '
 import { NotificationProvider } from './components/notifications/NotificationProvider';
 import LoadingScreen from './components/loading/LoadingScreen';
 import PageSkeleton from './components/loading/PageSkeleton';
-import { LEGACY_BRANCH_PAGES, sectionsFor } from './config/dashboards';
+import { LEGACY_BRANCH_PAGES, routeSections, sectionsFor } from './config/dashboards';
+import { useInventoryEnabled } from './lib/inventory';
 import { waiterSections } from './config/waiter';
 import { chunks, listenForIntent, prefetchArea } from './lib/prefetch';
 
@@ -69,6 +70,20 @@ const BranchDetailPage = page(chunks.ownerBranch);
 const BranchChooserPage = page(chunks.branchChooser);
 const BranchInventoryPage = page(chunks.branchInventory);
 const OwnerInventoryPage = page(chunks.ownerInventory);
+const OwnerStockPage = page(chunks.ownerStock);
+const OwnerItemsPage = page(chunks.ownerItems);
+const OwnerRecipesPage = page(chunks.ownerRecipes);
+const BranchStockPage = page(chunks.branchStock);
+const BranchHistoryPage = page(chunks.branchHistory);
+const BranchRecipesPage = page(chunks.branchRecipes);
+const OwnerHistoryPage = page(chunks.ownerHistory);
+const OwnerSuppliersPage = page(chunks.ownerSuppliers);
+const OwnerPurchaseOrdersPage = page(chunks.ownerPurchaseOrders);
+const OwnerReceivePage = page(chunks.ownerReceive);
+const OwnerApprovalsPage = page(chunks.ownerApprovals);
+const BranchPurchasesPage = page(chunks.branchPurchases);
+const OwnerRequestsPage = page(chunks.ownerRequests);
+const BranchRequestsPage = page(chunks.branchRequests);
 const ReceiveCodePage = page(chunks.receiveCode);
 const TermsPage = page(chunks.terms);
 const TermsAcceptPage = page(chunks.termsAccept);
@@ -81,14 +96,62 @@ const waiterPages = { '': WaiterTablesPage, services: WaiterServicesPage, menu: 
 const ADMIN_PAGES = { '': AdminOverviewPage, businesses: BusinessesPage, activity: ActivityPage, terms: AdminTermsPage, performance: PerformancePage, money: MoneyPage, 'leads-requests': RequestsPage, complaints: RequestsPage };
 const BRANCH_PAGES = { '': OverviewPage, orders: OrdersPage, tables: TablesPage, products: ProductsPage, menu: MenuConfigPage, insights: InsightsPage, 'contact-cravio': ContactPage, settings: SettingsPage, inventory: BranchInventoryPage };
 const OWNER_PAGES = { '': OwnerOverviewPage, locations: LocationsPage, people: PeoplePage, inventory: OwnerInventoryPage };
+
+/*
+ * Inventory pages behind the feature switch (lib/inventory.js useInventoryEnabled). `on` is the new screen, `off` is today's page.
+ * A path with no `off` has no old page: owners get the new page, which says inventory isn't switched on; branch pages go back to Inventory.
+ * EXTENSION POINTS: P1-15 replaces the branch `on` entries (Stock, History) and P1-16 the Recipes ones (branch and owner).
+ */
+const INVENTORY_PAGES = {
+  owner: {
+    inventory: { on: OwnerStockPage, off: OwnerInventoryPage },
+    'inventory/items': { on: OwnerItemsPage },
+    'inventory/recipes': { on: OwnerRecipesPage },
+    'inventory/history': { on: OwnerHistoryPage },
+    'inventory/suppliers': { on: OwnerSuppliersPage },
+    'inventory/purchase-orders': { on: OwnerPurchaseOrdersPage },
+    'inventory/receive': { on: OwnerReceivePage },
+    'inventory/approvals': { on: OwnerApprovalsPage },
+    'inventory/requests': { on: OwnerRequestsPage },
+  },
+  branch: {
+    inventory: { on: BranchStockPage, off: BranchInventoryPage },
+    'inventory/history': { on: BranchHistoryPage },
+    'inventory/purchases': { on: BranchPurchasesPage },
+    'inventory/requests': { on: BranchRequestsPage },
+    recipes: { on: BranchRecipesPage },
+  },
+};
+
+function InventoryRoute({ area, section }) {
+  const { branchId } = useParams();
+  const { search } = useLocation();
+  const { enabled, loading } = useInventoryEnabled(area);
+  const entry = INVENTORY_PAGES[area][section.path];
+  // The page shown for a path is the new section's (its label and description), not the old "Inventory" one.
+  const shown = sectionsFor(area).find((other) => other.path === section.path && other.feature) || section;
+  const needsSwitch = Boolean(entry.off) || area === 'branch';
+  if (needsSwitch && loading) return <PageSkeleton />;
+  if (!needsSwitch || enabled) { const On = entry.on; return <On section={shown} area={area} />; }
+  if (entry.off) { const Off = entry.off; return <Off section={section} area={area} />; }
+  return <Navigate to={`/branch/${branchId}/inventory${search}`} replace />;
+}
+
 function DashboardPage({ section, area }) {
   let Page = PageFrame;
+  if (INVENTORY_PAGES[area]?.[section.path]) return <InventoryRoute area={area} section={section} />;
   if (section.kind === 'settings') Page = SettingsPage;
   else if (section.kind === 'users') Page = UsersPage;
   else if (area === 'admin' && ADMIN_PAGES[section.path]) Page = ADMIN_PAGES[section.path];
   else if (area === 'branch' && BRANCH_PAGES[section.path]) Page = BRANCH_PAGES[section.path];
   else if (area === 'owner' && OWNER_PAGES[section.path]) Page = OWNER_PAGES[section.path];
   return <Page section={section} />;
+}
+
+/** Links from notifications (/owner/inventory/purchase-orders/<id>) open that order on the Purchase orders page. */
+function PurchaseOrderLink() {
+  const { id } = useParams();
+  return <Navigate to={`/owner/inventory/purchase-orders?po=${encodeURIComponent(id || '')}`} replace />;
 }
 
 /** Unknown page inside a branch workspace: back to that branch's overview. */
@@ -106,7 +169,7 @@ function SignedInApp() {
     <Route path="/reset-password" element={<ResetPasswordPage />} />
     {/* Branch manager workspace (the former owner dashboard), one per branch. */}
     <Route path="/branch/:branchId" element={<DashboardLayout role="branch" />}>
-      {sectionsFor('branch').map((section) => section.path
+      {routeSections('branch').map((section) => section.path
         ? <Route key={section.path} path={section.path} element={inShell(<DashboardPage section={section} area="branch" />)} />
         : <Route key="overview" index element={inShell(<DashboardPage section={section} area="branch" />)} />)}
       <Route path="tables/:number" element={inShell(<TableDetailPage />)} />
@@ -118,9 +181,10 @@ function SignedInApp() {
     {/* Legacy owner links (/owner/orders, /owner/tables/12, …) now belong to the branch workspace. */}
     {LEGACY_BRANCH_PAGES.map((path) => <Route key={path} path={`/owner/${path}/*`} element={<BranchChooserPage legacyPage={path} />} />)}
     {['admin', 'owner'].map((area) => <Route key={area} path={`/${area}`} element={<DashboardLayout role={area} />}>
-      {sectionsFor(area).map((section) => section.path
+      {routeSections(area).map((section) => section.path
         ? <Route key={section.path} path={section.path} element={inShell(<DashboardPage section={section} area={area} />)} />
         : <Route key="overview" index element={inShell(<DashboardPage section={section} area={area} />)} />)}
+      {area === 'owner' && <Route path="inventory/purchase-orders/:id" element={<PurchaseOrderLink />} />}
       {area === 'owner' && <Route path="branches/:id" element={inShell(<BranchDetailPage />)} />}
       {area === 'admin' && <Route path="businesses/:id" element={inShell(<BusinessAdminPage />)} />}
       {area === 'admin' && <Route path="restaurants" element={<Navigate to="/admin/businesses" replace />} />}

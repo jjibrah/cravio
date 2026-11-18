@@ -13,13 +13,20 @@ export default function ReceiveCodePage() {
   useEffect(() => {
     if (!session) return undefined;
     let live = true;
-    api(`/api/stock/receive/${encodeURIComponent(code)}`)
+    // The new engine first (returns the delivery with its destination); the old stock endpoint when inventory is off.
+    api(`/api/inventory/receive/${encodeURIComponent(code)}`)
+      .then(({ transfer }) => ({ transfer: true, branchId: transfer.toBranchId, id: transfer.id }), () => api(`/api/stock/receive/${encodeURIComponent(code)}`))
       .then((found) => live && setState({ status: 'found', found }), (error) => live && setState({ status: 'error', message: error.message }));
     return () => { live = false; };
   }, [session, code]);
   if (initializing) return <Loading />;
   if (!session) return <Navigate to="/login" replace />;
   if (state.status === 'loading') return <Loading />;
-  if (state.status === 'found') return <Navigate to={`/branch/${state.found.branchId}/inventory?receive=${state.found.id}`} replace />;
+  if (state.status === 'found') {
+    const { found } = state;
+    // A delivery to the Warehouse (a return) is received by the owner; the branch page redirects to the old Inventory page when the module is off.
+    if (found.transfer && !found.branchId) return <Navigate to={`/owner/inventory/requests?receive=${found.id}`} replace />;
+    return <Navigate to={`/branch/${found.branchId}/inventory/requests?receive=${found.id}`} replace />;
+  }
   return <PageShell><h1>We couldn’t open that delivery</h1><p>{state.message}</p><p><Link to="/branch">Go to your branch</Link></p></PageShell>;
 }

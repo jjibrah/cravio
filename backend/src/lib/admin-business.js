@@ -13,6 +13,18 @@ async function hasStock(db) {
   return (await db.query(`select to_regclass('public.stock_items') is not null as ok`)).rows[0].ok;
 }
 
+/** True once migration 012 has added businesses.inventory_enabled. */
+async function hasInventoryFlag(db) {
+  return (await db.query(`select exists (select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'businesses' and column_name = 'inventory_enabled') as ok`)).rows[0].ok;
+}
+
+async function inventoryFlags(db, businessIds) {
+  if (!businessIds.length || !(await hasInventoryFlag(db))) return null;
+  const { rows } = await db.query('select id, inventory_enabled from public.businesses where id = any($1::uuid[])', [businessIds]);
+  return new Map(rows.map((row) => [row.id, row.inventory_enabled === true]));
+}
+
 async function audit(db, { businessId, restaurantId = null, actorId, subjectId = null, action, detail = {} }) {
   await db.query(`insert into public.access_events (business_id, restaurant_id, actor_id, subject_id, action, detail)
     values ($1, $2, $3, $4, $5, $6)`, [businessId, restaurantId, actorId, subjectId, action, JSON.stringify({ ...detail, by: 'platform_admin' })]);
@@ -63,7 +75,7 @@ export async function listBusinesses(db) {
     db.query(`select m.business_id, m.user_id, m.role, p.name, u.email from public.business_members m
       left join public.profiles p on p.id = m.user_id left join auth.users u on u.id = m.user_id order by p.name`),
   ]);
-  const [figures, stock] = await Promise.all([branchFigures(db, branches.map((b) => b.id)), stockCounts(db, businesses.map((b) => b.id))]);
+  const [figures, stock, flags] = await Promise.all([branchFigures(db, branches.map((b) => b.id)), stockCounts(db, businesses.map((b) => b.id)), inventoryFlags(db, businesses.map((b) => b.id))]);
   const rows = businesses.map((business) => {
     const own = branches.filter((b) => b.business_id === business.id);
     const f = own.map((b) => figures.get(b.id));
@@ -78,6 +90,7 @@ export async function listBusinesses(db) {
       paid30d: Math.round(f.reduce((sum, x) => sum + (x?.paid30 || 0), 0) * 100) / 100,
       lastOrderAt: f.reduce((latest, x) => (x?.last_order_at && (!latest || x.last_order_at > latest) ? x.last_order_at : latest), null),
       stock: stock?.get(business.id) || null,
+      inventoryEnabled: flags ? flags.get(business.id) === true : null,
     };
   });
   const counts = { all: rows.length, live: rows.filter((r) => r.status === 'live').length, onboarding: rows.filter((r) => r.status === 'onboarding').length,
@@ -101,9 +114,10 @@ export async function businessDetail(db, id) {
     db.query('select user_id, restaurant_id from public.business_member_branches where business_id = $1', [business.id]),
   ]);
   const ids = branches.map((b) => b.id);
-  const [figures, stock, { rows: staff }, history] = await Promise.all([
+  const [figures, stock, flags, { rows: staff }, history] = await Promise.all([
     branchFigures(db, ids),
     stockCounts(db, [business.id]),
+    inventoryFlags(db, [business.id]),
     db.query(`select m.restaurant_id, m.user_id, m.role, p.name, u.email, u.last_sign_in_at from public.restaurant_members m
       left join public.profiles p on p.id = m.user_id left join auth.users u on u.id = m.user_id
       where m.restaurant_id = any($1::uuid[]) order by m.role, p.name`, [ids]),
@@ -123,6 +137,7 @@ export async function businessDetail(db, id) {
     access: grants.map((g) => ({ ...person(g), role: g.role, since: g.created_at, lastSignInAt: g.last_sign_in_at,
       branchIds: g.role === 'owner' ? null : assigned.filter((a) => a.user_id === g.user_id).map((a) => a.restaurant_id) })),
     stock: stock?.get(business.id) || null,
+    inventoryEnabled: flags ? flags.get(business.id) === true : null,
     history,
   };
 }
@@ -178,7 +193,30 @@ export async function addBranch(db, adminId, businessId, body = {}) {
   return rows[0];
 }
 
+/**
+ * Platform admin switch for the Inventory module (migration 012). Entitlement only: never touches stock records.
+ * `admin` is the requireUser() context; anyone who is not a platform admin gets 403. Idempotent: no change, no event.
+ * Call inside a transaction so the flag and its audit event commit together.
+ */
+export async function setInventoryEnabled(db, admin, businessId, enabled, { reason = null } = {}) {
+  if (admin?.profile?.role !== 'admin' || !admin?.user?.id) throw new HttpError(403, 'You do not have access to this.');
+  if (typeof enabled !== 'boolean') throw new HttpError(400, 'Say whether inventory should be on or off.');
+  const id = needId(businessId, 'Business');
+  if (!(await hasInventoryFlag(db))) throw new HttpError(503, 'The inventory update has not been applied to the database yet, so this switch is not available.');
+  const { rows } = await db.query('select id, name, inventory_enabled from public.businesses where id = $1 for update', [id]);
+  if (!rows[0]) throw new HttpError(404, 'That business doesn’t exist.');
+  const note = typeof reason === 'string' ? reason.trim().replace(/\s+/g, ' ') : '';
+  if (note.length > 280) throw new HttpError(400, 'Keep the reason under 280 characters.');
+  const before = rows[0].inventory_enabled === true;
+  if (before !== enabled) {
+    await db.query('update public.businesses set inventory_enabled = $2 where id = $1', [id, enabled]);
+    await audit(db, { businessId: id, actorId: admin.user.id, action: enabled ? 'inventory_enabled' : 'inventory_disabled', detail: note ? { note } : {} });
+  }
+  return { id, inventoryEnabled: enabled, changed: before !== enabled };
+}
+
 const ACTION_TEXT = {
+  inventory_enabled: 'switched Inventory on', inventory_disabled: 'switched Inventory off',
   business_grant: 'gave business access', business_revoke: 'removed business access', branch_assign: 'assigned a branch',
   branch_unassign: 'unassigned a branch', branch_create: 'added a branch', branch_member_add: 'added branch staff',
   branch_member_remove: 'removed branch staff', mapping_applied: 'applied a reviewed access mapping',
@@ -204,7 +242,7 @@ export async function activity(db, { businessId = null, limit = 100, before = nu
     branch: row.restaurant_id ? { id: row.restaurant_id, name: row.branch || 'Removed branch' } : null,
     actor: row.actor_id ? { id: row.actor_id, name: row.actor || row.actor_email || 'Account', email: row.actor_email } : { name: 'System' },
     subject: row.subject_id ? { id: row.subject_id, name: row.subject || row.subject_email || 'Account', email: row.subject_email } : null,
-    role: row.detail?.role || null, viaAdmin: row.detail?.by === 'platform_admin',
+    role: row.detail?.role || null, note: row.detail?.note || null, viaAdmin: row.detail?.by === 'platform_admin',
   }));
 }
 

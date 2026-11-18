@@ -13,14 +13,31 @@ const TIMEOUT_MS = 25000;
 
 export const aiConfigured = (env = process.env) => Boolean(env.OPENROUTER_API_KEY && env.OPENROUTER_API_KEY.trim());
 
-/** One chat completion that must answer with a JSON object. Returns the parsed object. */
-export async function chatJson({ system, user, env = process.env, fetchImpl = globalThis.fetch, timeoutMs = TIMEOUT_MS }) {
+const num = (value) => (typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null);
+
+/** The token counts (and the provider's own cost in USD, when it sends one) from a provider response. Null when there is no usage block. */
+export function extractUsage(body) {
+  const u = body?.usage;
+  if (!u || typeof u !== 'object') return null;
+  return { promptTokens: num(u.prompt_tokens), completionTokens: num(u.completion_tokens), costUsd: num(u.cost) };
+}
+
+const unavailable = (status, message, extra = {}) => new HttpError(status, message, { code: 'ai_unavailable', ...extra });
+
+/**
+ * One chat completion that must answer with a JSON object. ONLY ai/gateway.js may call this (it meters and limits every call).
+ * Returns { data, model, usage: { promptTokens, completionTokens, costUsd } | null, requestId, latencyMs }.
+ * Errors are HttpErrors whose details carry `retryable` (timeouts, 429, 5xx) and, when the provider answered, `usage` (so an
+ * unusable answer can still be metered).
+ */
+export async function chatCompletion({ system, user, env = process.env, fetchImpl = globalThis.fetch, timeoutMs = TIMEOUT_MS, model: modelOverride = null, maxTokens = 800 }) {
   if (!aiConfigured(env)) {
     throw new HttpError(503, 'AI suggestions aren’t set up. Add OPENROUTER_API_KEY to the backend settings to switch them on. You can still enter the recipe yourself.', { code: 'ai_not_configured' });
   }
-  const model = (env.OPENROUTER_MODEL || '').trim() || DEFAULT_MODEL;
+  const model = (modelOverride || '').trim() || (env.OPENROUTER_MODEL || '').trim() || DEFAULT_MODEL;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const started = Date.now();
   let response;
   try {
     response = await fetchImpl(OPENROUTER_URL, {
@@ -28,23 +45,31 @@ export async function chatJson({ system, user, env = process.env, fetchImpl = gl
       signal: controller.signal,
       headers: { Authorization: `Bearer ${env.OPENROUTER_API_KEY.trim()}`, 'Content-Type': 'application/json', 'X-Title': 'Cravio' },
       body: JSON.stringify({
-        model, temperature: 0.2, max_tokens: 800,
+        model, temperature: 0.2, max_tokens: maxTokens, usage: { include: true },
         response_format: { type: 'json_object' },
         messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
       }),
     });
   } catch (error) {
-    throw new HttpError(502, error?.name === 'AbortError' ? 'The AI service took too long. Try again, or enter the recipe yourself.' : 'Couldn’t reach the AI service. Try again, or enter the recipe yourself.', { code: 'ai_unavailable' });
+    throw unavailable(502, error?.name === 'AbortError' ? 'The AI service took too long. Try again, or enter the recipe yourself.' : 'Couldn’t reach the AI service. Try again, or enter the recipe yourself.', { retryable: true });
   } finally { clearTimeout(timer); }
   if (!response.ok) {
     console.error('[ai] OpenRouter answered', response.status);
-    throw new HttpError(502, 'The AI service didn’t answer. Try again, or enter the recipe yourself.', { code: 'ai_unavailable' });
+    throw unavailable(502, 'The AI service didn’t answer. Try again, or enter the recipe yourself.', { retryable: response.status === 429 || response.status >= 500, status: response.status });
   }
-  let content;
-  try { content = (await response.json())?.choices?.[0]?.message?.content; } catch { content = null; }
-  const parsed = parseJson(content);
-  if (!parsed) throw new HttpError(502, 'The AI answer couldn’t be used. Try again, or enter the recipe yourself.', { code: 'ai_bad_answer' });
-  return { data: parsed, model };
+  let body = null;
+  try { body = await response.json(); } catch { body = null; }
+  const usage = extractUsage(body);
+  const requestId = typeof body?.id === 'string' ? body.id.slice(0, 120) : null;
+  const parsed = parseJson(body?.choices?.[0]?.message?.content);
+  if (!parsed) throw new HttpError(502, 'The AI answer couldn’t be used. Try again, or enter the recipe yourself.', { code: 'ai_bad_answer', usage, requestId, model });
+  return { data: parsed, model: typeof body?.model === 'string' && body.model ? body.model : model, usage, requestId, latencyMs: Date.now() - started };
+}
+
+/** Back-compat wrapper: one completion, returns { data, model }. Prefer the gateway. */
+export async function chatJson(options) {
+  const { data, model } = await chatCompletion(options);
+  return { data, model };
 }
 
 /** The JSON object in a model answer (tolerates ```json fences and text around it). Null when there is none. */
@@ -57,7 +82,7 @@ export function parseJson(content) {
   return null;
 }
 
-const SYSTEM = `You help restaurant managers write recipes for stock control: how much of each ingredient ONE serving of a dish uses.
+export const RECIPE_SYSTEM = `You help restaurant managers write recipes for stock control: how much of each ingredient ONE serving of a dish uses.
 Answer with JSON only: {"lines":[{"name":"<ingredient>","quantity":<number>,"unit":"<unit>"}],"note":"<one short sentence>"}
 Rules: unit is one of ${UNITS.join(', ')}. quantity is a positive number per ONE dish. Prefer the restaurant's existing stock item names
 (given with their units) and a unit compatible with that item (g or kg for weight, ml or l for volume, piece, serving).
@@ -126,6 +151,6 @@ export function normaliseSuggestion(raw, stockItems) {
 
 /** Drafts a recipe for one dish. Never saves anything. */
 export async function suggestRecipe({ dish, stockItems }, options = {}) {
-  const { data, model } = await chatJson({ system: SYSTEM, user: recipePrompt(dish, stockItems), ...options });
+  const { data, model } = await chatJson({ system: RECIPE_SYSTEM, user: recipePrompt(dish, stockItems), ...options });
   return { draft: true, model, ...normaliseSuggestion(data, stockItems) };
 }

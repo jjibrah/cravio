@@ -1,0 +1,25 @@
+/* Requests, deliveries and returns (P2-26, P2-27). Builds on inventory.css, purchasing.css and receiving.css: same tokens, nothing new in colour or type. */
+.dist-sub { display: block; color: var(--muted); font-size: 13px; font-weight: 450; }
+.dist-avail { margin: 0; font-size: 13px; color: var(--ink-2); }
+.dist-avail.is-short { color: #7d5106; }
+.dist-toggle { margin: 4px 0 8px; min-height: 44px; }
+.dist-pick { align-items: flex-start; min-height: 44px; white-space: normal; }
+.dist-pick input { margin-top: 3px; }
+.dist-tabpanel { display: flex; flex-direction: column; gap: 16px; }
+.dist-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.dist-qr-row { display: flex; flex-wrap: wrap; align-items: center; gap: 16px 24px; margin-top: 16px; }
+.dist-qr svg { width: 220px; height: 220px; display: block; }
+.dist-code-label { margin: 0; color: #666; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; font-weight: 600; }
+.dist-code { margin: 0; font: 700 28px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .16em; }
+.dist-link { overflow-wrap: anywhere; }
+.dist-banner { margin: 0; padding: 10px 12px; border-radius: var(--r-row); background: var(--selected); font-size: 14px; }
+.dist-attention { color: #7d5106; }
+.dist-resolve { padding: 12px; border-radius: var(--r-row); box-shadow: 0 0 0 1px var(--line); display: flex; flex-direction: column; gap: 8px; margin: 0 0 8px; }
+.dist-done { color: var(--muted); font-size: 13px; margin: 0; }
+@media print {
+  .dist-qr svg { width: 55mm; height: 55mm; }
+}
+@media (max-width: 640px) {
+  .dist-qr svg { width: min(220px, 100%); height: auto; }
+  .dist-actions .o-btn { flex: 1 1 100%; justify-content: center; }
+}

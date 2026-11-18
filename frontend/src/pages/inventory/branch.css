@@ -1,0 +1,76 @@
+/* Branch inventory screens (P1-15). Builds on inventory.css; same tokens, nothing new in colour or type. */
+.inv-badge.is-count { background: var(--selected); color: var(--ink); box-shadow: inset 0 0 0 1px var(--line-strong); }
+.inv-badges { display: inline-flex; flex-wrap: wrap; gap: 6px; }
+.inv-filter-chip { display: inline-flex; align-items: center; gap: 4px; }
+
+.inv-stock-table tbody tr { cursor: pointer; }
+.inv-stock-table tbody tr:hover { background: var(--hover); }
+.inv-stock-table .inv-link { min-height: 32px; }
+@media (max-width: 1024px), (pointer: coarse) { .inv-stock-table .inv-link { min-height: 44px; } }
+.inv-stock-table .inv-used { display: block; margin-top: 2px; color: var(--muted); font-size: 12px; font-weight: 450; }
+
+/* Item sheet */
+.inv-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; margin: 0 0 12px; }
+.inv-fact { margin: 0; padding: 10px 12px; border-radius: var(--r-row); box-shadow: 0 0 0 1px var(--line); }
+.inv-fact dt { color: var(--muted); font-size: 12px; }
+.inv-fact dd { margin: 2px 0 0; font-size: 16px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.inv-note { margin: 0 0 12px; padding: 10px 12px; border-radius: var(--r-row); background: var(--warning-soft); color: #7d5106; font-size: 14px; }
+.inv-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 12px 0; }
+.inv-actions .o-btn { min-height: 48px; justify-content: center; }
+.inv-moves { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; }
+.inv-moves li { display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; border-top: 1px solid var(--line); font-size: 14px; }
+.inv-moves small { display: block; color: var(--muted); font-size: 12px; }
+.inv-moves .is-minus { color: var(--danger); }
+.inv-moves .inv-delta { font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* Record stock sheet: big touch targets */
+.inv-kinds { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.inv-kinds label { padding: 10px; }
+.inv-kinds small { line-height: 1.3; }
+.inv-stock-table td.is-num { white-space: nowrap; }
+.inv-kinds label { min-height: 72px; justify-content: center; position: relative; }
+.inv-kinds label strong { font-size: 15px; }
+.inv-reasons { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 8px; padding: 0; border: 0; }
+.inv-reason { min-height: 44px; padding: 0 16px; border: 0; border-radius: 999px; background: var(--surface); box-shadow: 0 0 0 1px var(--field); color: var(--ink); font: inherit; font-size: 14px; cursor: pointer; }
+.inv-reason[aria-pressed='true'] { box-shadow: 0 0 0 2px var(--ink); font-weight: 600; }
+.inv-record .o-input, .inv-record .o-select { min-height: 48px; }
+.inv-record .inv-qty { flex: 1 1 120px; font-size: 18px; }
+.inv-record .biz-form-actions .o-btn { min-height: 48px; }
+.inv-live { margin: 6px 0 0; padding: 10px 12px; border-radius: var(--r-row); background: var(--selected); font-size: 14px; }
+.inv-confirm .o-btn { min-height: 44px; }
+.inv-confirm-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* Shortfalls */
+.inv-short { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; }
+.inv-short li { display: flex; flex-direction: column; gap: 8px; padding: 12px 0; border-top: 1px solid var(--line); font-size: 14px; }
+.inv-short li:first-child { border-top: 0; }
+.inv-short-line { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; }
+.inv-short-line small { color: var(--muted); font-size: 12px; }
+.inv-short-form { display: flex; flex-direction: row; flex-wrap: wrap; gap: 8px; align-items: center; }
+.inv-short-form .o-input { flex: 1 1 180px; min-width: 0; min-height: 44px; height: auto; }
+.inv-short-form .o-btn { min-height: 44px; }
+
+.inv-more { display: flex; justify-content: center; padding: 12px; border-top: 1px solid var(--line); }
+
+/* Stock stalls to cards on phones and narrow tablets; the page never scrolls sideways. */
+@media (max-width: 720px) {
+  .inv-stock-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .inv-stock-table, .inv-stock-table tbody, .inv-stock-table tr, .inv-stock-table th, .inv-stock-table td { display: block; }
+  .inv-stock-table tbody tr { padding: 12px 16px; border-top: 1px solid var(--line); }
+  .inv-stock-table th, .inv-stock-table td { padding: 2px 0; border: 0; text-align: left; }
+  .inv-stock-table td.is-num { display: flex; justify-content: space-between; gap: 12px; text-align: right; }
+  .inv-stock-table td[data-label]::before { content: attr(data-label); color: var(--muted); font-size: 13px; text-align: left; }
+  .inv-history-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .inv-history-table, .inv-history-table tbody, .inv-history-table tr, .inv-history-table th, .inv-history-table td { display: block; }
+  .inv-history-table tbody tr { padding: 12px 16px; border-top: 1px solid var(--line); }
+  .inv-history-table th, .inv-history-table td { padding: 2px 0; border: 0; text-align: left; }
+  .inv-history-table td.is-num { text-align: left; }
+  .inv-stock-table tbody tr { display: flex; flex-direction: column; }
+  .inv-stock-table th[scope='row'] { order: 0; }
+  .inv-stock-table td.inv-status { order: 1; padding: 4px 0 8px; }
+  .inv-stock-table td.is-num { order: 2; }
+  .inv-stock-table td.is-zero { display: none; }
+  .inv-history-table td[data-label]::before { content: attr(data-label) ': '; color: var(--muted); font-size: 13px; }
+  .inv-history-table td.is-zero { display: none; }
+  .inv-actions { grid-template-columns: minmax(0, 1fr); }
+}

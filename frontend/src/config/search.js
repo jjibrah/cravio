@@ -35,7 +35,9 @@ export const searchableScopes = {
 };
 
 function pageItems(role) {
-  return sectionsFor(role).map((section) => ({
+  // Feature-switched pages (inventory) are left out: the switch is per business and isn't known here.
+  const seen = new Set();
+  return sectionsFor(role).filter((section) => !section.feature && (seen.has(section.path) ? false : seen.add(section.path))).map((section) => ({
     id: `page:${section.path || 'overview'}`,
     group: 'Pages',
     label: section.label,
