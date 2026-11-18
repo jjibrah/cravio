@@ -16,7 +16,10 @@ const fails = async (promise, test, m) => {
   checks++;
 };
 
-const db = await freshDatabase();
+// INV_EXTRA_MIGRATIONS=proposed/012_inventory_catalogue.sql runs this same suite with proposed migrations applied on top of
+// 009 (npm run test:inv:compat): proof that the code on `main` keeps working against the widened schema. Default: none.
+const extra = (process.env.INV_EXTRA_MIGRATIONS || '').split(',').map((name) => name.trim()).filter(Boolean);
+const db = await freshDatabase({ extra });
 const one = async (sql, p) => (await db.query(sql, p)).rows[0];
 const tx = (fn) => db.transaction(fn);
 
@@ -182,17 +185,22 @@ const brief = await briefing(db, { id: owner });
 eq(brief.answers.stock.includes('Coke 300ml at Main (0 servings)'), true, 'briefing lists out-of-stock items per branch');
 eq(brief.attention.some((a) => a.kind === 'stock' && a.tone === 'urgent'), true, 'out-of-stock is urgent in the briefing');
 
-// Rollback: refused while history exists; after a deliberate clear it removes everything and orders keep working.
-await fails(db.exec(readSql('proposed/009_inventory.down.sql')), /Refusing rollback/, 'rollback refuses while stock history exists');
-await db.exec(`alter table public.stock_movements disable trigger stock_movements_no_change; delete from public.order_stock_effects; delete from public.stock_movements;
-  delete from public.stock_transfers; delete from public.stock_requests;`);
-await db.exec(readSql('proposed/009_inventory.down.sql'));
-eq((await one(`select to_regclass('public.stock_items') is null as gone`)).gone, true, 'rollback removes inventory tables');
-const after = await order([{ itemId: fantaDish, name: 'Fanta', quantity: 50 }]);
-await serve(after);
-eq((await one('select status from public.orders where id = $1', [after])).status, 'served', 'orders work without inventory after rollback');
-await db.exec(readSql('migrations/009_inventory.sql'));
-eq((await one(`select to_regclass('public.stock_items') is not null as back`)).back, true, 're-apply after rollback works');
+if (extra.length) {
+  // The 009 rollback drops 009's tables, which later migrations reference; each proposed migration has its own down script and test.
+  console.log(`(skipped the 009 rollback section: extra migrations applied: ${extra.join(', ')})`);
+} else {
+  // Rollback: refused while history exists; after a deliberate clear it removes everything and orders keep working.
+  await fails(db.exec(readSql('proposed/009_inventory.down.sql')), /Refusing rollback/, 'rollback refuses while stock history exists');
+  await db.exec(`alter table public.stock_movements disable trigger stock_movements_no_change; delete from public.order_stock_effects; delete from public.stock_movements;
+    delete from public.stock_transfers; delete from public.stock_requests;`);
+  await db.exec(readSql('proposed/009_inventory.down.sql'));
+  eq((await one(`select to_regclass('public.stock_items') is null as gone`)).gone, true, 'rollback removes inventory tables');
+  const after = await order([{ itemId: fantaDish, name: 'Fanta', quantity: 50 }]);
+  await serve(after);
+  eq((await one('select status from public.orders where id = $1', [after])).status, 'served', 'orders work without inventory after rollback');
+  await db.exec(readSql('migrations/009_inventory.sql'));
+  eq((await one(`select to_regclass('public.stock_items') is not null as back`)).back, true, 're-apply after rollback works');
+}
 
-console.log(`Inventory: ${checks} checks passed (disposable PGlite database).`);
+console.log(`Inventory: ${checks} checks passed (disposable PGlite database${extra.length ? `, with ${extra.join(', ')} applied` : ''}).`);
 await db.close();
