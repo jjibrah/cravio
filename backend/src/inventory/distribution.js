@@ -37,6 +37,7 @@ import * as approvals from './approvals.js';
 import { formatNumber, nairobiYear } from './numbers.js';
 import { notify } from './notifications.js';
 import { getSettings } from './policies.js';
+import { together } from '../lib/pool.js';
 import { record as audit } from './audit.js';
 
 const fail = (status, message, code, extra = {}) => new HttpError(status, message, { code, ...extra });
@@ -79,18 +80,25 @@ export function branchLocationOf(scope, restaurantId) {
   return loc;
 }
 
-export async function loadItems(db, businessId, ids) {
-  const list = [...new Set(ids)];
+const ITEM_SELECT = `select i.id, i.name, i.unit, i.display_unit, i.avg_cost::text as avg_cost, i.archived_at, i.storage, c.name as category,
+    coalesce((select json_agg(json_build_object('name', u.name, 'factor', u.factor::text) order by u.position, lower(u.name))
+      from public.stock_item_units u where u.item_id = i.id), '[]'::json) as own_units
+  from public.stock_items i left join public.stock_categories c on c.id = i.category_id where i.business_id = $1`;
+const itemMap = (rows) => {
   const out = new Map();
-  if (!list.length) return out;
-  const rows = (await db.query(`select i.id, i.name, i.unit, i.display_unit, i.avg_cost::text as avg_cost, i.archived_at, i.storage, c.name as category
-    from public.stock_items i left join public.stock_categories c on c.id = i.category_id where i.business_id = $1 and i.id = any($2::uuid[])`, [businessId, list])).rows;
-  const own = (await db.query('select item_id, name, factor::text as factor from public.stock_item_units where item_id = any($1::uuid[]) order by position, lower(name)', [list])).rows;
   for (const r of rows) {
+    const own = typeof r.own_units === 'string' ? JSON.parse(r.own_units) : r.own_units;
     out.set(r.id, { id: r.id, name: r.name, baseUnit: r.unit, displayUnit: r.display_unit || undefined, avgCost: r.avg_cost, archived: Boolean(r.archived_at),
-      storage: r.storage, category: r.category, units: own.filter((u) => u.item_id === r.id).map((u) => ({ name: u.name, factor: u.factor })) });
+      storage: r.storage, category: r.category, units: own.map((u) => ({ name: u.name, factor: u.factor })) });
   }
   return out;
+};
+
+/** Items by id with their own units (one statement). Missing ids are absent from the map. */
+export async function loadItems(db, businessId, ids) {
+  const list = [...new Set(ids)];
+  if (!list.length) return new Map();
+  return itemMap((await db.query(`${ITEM_SELECT} and i.id = any($2::uuid[])`, [businessId, list])).rows);
 }
 const needItem = (items, id) => {
   const it = items.get(id);
@@ -159,18 +167,26 @@ async function warehouseNumbers(db, scope, itemIds) {
   return map;
 }
 
-/** Shapes request rows (with lines, holds, transfers and, for approvers, what the Warehouse has). */
+/**
+ * Shapes request rows (with lines, holds, transfers and, for approvers, what the Warehouse has). Everything is fetched for ALL the
+ * requests at once (no query per request), and the six reads only need the request ids, so they run together on separate connections.
+ */
 async function requestViews(db, scope, rows, { withWarehouse = false } = {}) {
   if (!rows.length) return [];
   const ids = rows.map((r) => r.id);
-  const lineRows = (await db.query(`select request_id, item_id, requested::text as requested, approved::text as approved, dispatched::text as dispatched, received::text as received,
-      entered_quantity::text as entered_quantity, entered_unit from public.stock_request_lines where request_id = any($1::uuid[])`, [ids])).rows;
-  const held = new Map((await db.query(`select request_id, item_id, sum(qty_reserved - qty_consumed - qty_released)::text as remaining from public.stock_reservations
-    where request_id = any($1::uuid[]) and status = 'active' group by request_id, item_id`, [ids])).rows.map((r) => [`${r.request_id}:${r.item_id}`, r.remaining]));
-  const items = await loadItems(db, scope.businessId, lineRows.map((l) => l.item_id));
-  const units = await loadUnits(db);
-  const wh = withWarehouse ? await warehouseNumbers(db, scope, [...new Set(lineRows.map((l) => l.item_id))]) : new Map();
-  const transfers = (await db.query(`select id, request_id, number, status, dispatched_at, received_at from public.stock_transfers where request_id = any($1::uuid[]) order by dispatched_at, number`, [ids])).rows;
+  const [lineRows, heldRows, itemRows, units, whRows, transfers] = await together(db,
+    async () => (await db.query(`select request_id, item_id, requested::text as requested, approved::text as approved, dispatched::text as dispatched, received::text as received,
+      entered_quantity::text as entered_quantity, entered_unit from public.stock_request_lines where request_id = any($1::uuid[])`, [ids])).rows,
+    async () => (await db.query(`select request_id, item_id, sum(qty_reserved - qty_consumed - qty_released)::text as remaining from public.stock_reservations
+    where request_id = any($1::uuid[]) and status = 'active' group by request_id, item_id`, [ids])).rows,
+    async () => (await db.query(`${ITEM_SELECT} and i.id in (select item_id from public.stock_request_lines where request_id = any($2::uuid[]))`, [scope.businessId, ids])).rows,
+    () => loadUnits(db, scope),
+    async () => (withWarehouse && scope.centerLocationId ? (await db.query(`select item_id, on_hand::text as on_hand, reserved::text as reserved from public.stock_balances
+      where location_id = $1 and item_id in (select item_id from public.stock_request_lines where request_id = any($2::uuid[]))`, [scope.centerLocationId, ids])).rows : []),
+    async () => (await db.query(`select id, request_id, number, status, dispatched_at, received_at from public.stock_transfers where request_id = any($1::uuid[]) order by dispatched_at, number`, [ids])).rows);
+  const held = new Map(heldRows.map((r) => [`${r.request_id}:${r.item_id}`, r.remaining]));
+  const items = itemMap(itemRows);
+  const wh = new Map(whRows.map((r) => [r.item_id, { onHand: r.on_hand, reserved: r.reserved, available: sub(r.on_hand, r.reserved, QTY).toString(QTY) }]));
   return rows.map((q) => {
     const open = ['submitted', 'approved', 'partially_approved', 'preparing', 'dispatched', 'partially_received', 'pending_approval'].includes(q.status);
     const lines = lineRows.filter((l) => l.request_id === q.id).map((l) => {

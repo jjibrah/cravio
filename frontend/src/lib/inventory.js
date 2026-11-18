@@ -281,10 +281,13 @@ export const notices = {
 /* ---------- the feature switch ---------- */
 
 /*
- * Is the new inventory switched on? Owner: GET the overview (`enabled`). Branch: GET /api/inventory, where
- * 403 inventory_disabled means off. The answer is read through the API cache (so the page itself costs no extra
- * request) and remembered for this tab, so a reload doesn't flash the old navigation. Anything unclear (no
- * answer yet, schema not applied, a network error) counts as OFF: the old Inventory entry and page keep working.
+ * Is the new inventory switched on? /api/me says so: every business (owner) and branch (branch area) in the account carries
+ * `inventoryEnabled`, so no inventory request is needed to draw the navigation. The account is re-read quietly when the
+ * window regains focus (lib/auth.jsx) and whenever the server answers 403 inventory_disabled or a page sees `enabled`
+ * disagree with it, so a switch-on or switch-off shows up without signing out.
+ * Only when the field is absent (an older server) do we ask the old way: owner overview `enabled`, branch GET /api/inventory
+ * (403 inventory_disabled = off); that answer seeds the first paint from this tab's last answer, but is always re-checked.
+ * Anything unclear (no answer, schema not applied, network error) counts as OFF: the old Inventory entry keeps working.
  */
 const HINT = 'cravio-inventory-on:';
 const readHint = (key) => { try { const v = sessionStorage.getItem(HINT + key); return v === null ? null : v === '1'; } catch { return null; } };
@@ -295,13 +298,23 @@ async function isOn(area, id) {
   try { await branch.snapshot(); return true; } catch { return false; }
 }
 
+/** The switch as /api/me states it: true / false, or null when the account doesn't say. */
+export function inventoryFlag(account, area, ids) {
+  if (!account || !ids.length) return null;
+  const rows = ids.map((id) => (area === 'owner' ? account.businesses : account.branches)?.find((row) => row.id === id));
+  if (rows.some((row) => typeof row?.inventoryEnabled !== 'boolean')) return null;
+  return rows.some((row) => row.inventoryEnabled);
+}
+
 export function useInventoryEnabled(area) {
   const { account } = useAuth() || {};
   const ids = area === 'owner' ? (account?.businesses || []).map((business) => business.id)
     : area === 'branch' ? [getActiveBranch()].filter(Boolean) : [];
   const key = `${area}:${ids.join(',')}`;
+  const flag = inventoryFlag(account, area, ids);
   const [answer, setAnswer] = useState(() => ({ key, on: readHint(key) }));
   useEffect(() => {
+    if (flag !== null) return undefined;
     if (!ids.length) { setAnswer({ key, on: false }); return undefined; }
     let live = true;
     Promise.all(ids.map((id) => isOn(area, id).catch(() => false))).then((results) => {
@@ -312,9 +325,38 @@ export function useInventoryEnabled(area) {
     });
     return () => { live = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key, area]);
+  }, [key, area, flag === null]);
+  if (flag !== null) return { enabled: flag, loading: false };
   const current = answer.key === key ? answer.on : readHint(key);
   return { enabled: current === true, loading: current === null };
+}
+
+/** Tells the account to re-read itself when a page learned the business's switch differs from what /api/me said. */
+export function useAccountFlagCheck(area, id, enabled) {
+  const { account } = useAuth() || {};
+  const flag = inventoryFlag(account, area, id ? [id] : []);
+  useEffect(() => {
+    if (id && typeof enabled === 'boolean' && flag !== null && flag !== enabled) window.dispatchEvent(new Event('cravio:account-stale'));
+  }, [id, enabled, flag]);
+}
+
+/* ---------- warming a screen's data (hover / focus on a navigation link) ---------- */
+
+/** The main GETs of an inventory screen, by area and sidebar path (the same URLs the screens read, so the cache is shared). */
+export function inventoryGets(area, path, { businessId } = {}) {
+  if (area === 'owner' && businessId) {
+    const p = ownerPaths(businessId);
+    const more = { 'inventory/suppliers': [p.suppliers()], 'inventory/purchase-orders': [p.purchaseOrders({ limit: 200 })],
+      'inventory/receive': [p.purchaseOrders({ status: 'open', limit: 200 })], 'inventory/approvals': [p.approvals({ status: 'pending', limit: 50 })],
+      'inventory/requests': [p.requestsInbox, p.dispatches({ status: 'active' })] }[path] || [];
+    return [p.overview(), ...more];
+  }
+  if (area === 'branch') {
+    const more = { inventory: [], 'inventory/history': [branchPaths.snapshot({ all: true })], 'inventory/requests': [branchPaths.snapshot({ all: true }), branchPaths.requests({ limit: 50 })],
+      'inventory/purchases': [branchPaths.snapshot({ all: true }), branchPaths.emergency({ limit: 100 })], recipes: [branchPaths.recipes] }[path] || [];
+    return [branchPaths.snapshot(), ...more];
+  }
+  return [];
 }
 
 /* ---------- units and amounts (display only; the server does the real arithmetic) ---------- */

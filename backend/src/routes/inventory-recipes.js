@@ -11,7 +11,7 @@ import { withDb } from '../lib/db.js';
 import { withBody } from '../lib/operations.js';
 import { database } from '../lib/pool.js';
 import { invalidateMenu } from '../lib/cache.js';
-import { STAFF_ROLES, requestedBranch, selectMembership } from '../lib/access.js';
+import { STAFF_ROLES, requestedBranch, selectMembership, businessOfBranch } from '../lib/access.js';
 import { once } from '../inventory/commands.js';
 import { authorize, inventoryScope } from '../inventory/permissions.js';
 import {
@@ -37,11 +37,7 @@ export function createRoutes({ authenticate = requireUser, pool = () => database
   };
 
   async function scopeFor(db, context, businessId) {
-    let scope = await safely(() => inventoryScope(db, context, businessId));
-    if (scope.enabled && scope.role !== 'none' && scope.role !== 'admin') {
-      scope = await safely(() => inventoryScope(db, context, businessId, { ensureLocations: true }));
-    }
-    return scope;
+    return safely(() => inventoryScope(db, context, businessId, { ensureLocations: 'active' }));
   }
 
   /** Owner side: the business in the path. */
@@ -58,7 +54,7 @@ export function createRoutes({ authenticate = requireUser, pool = () => database
     if (!membership) throw new HttpError(403, 'You aren’t part of a restaurant yet. Ask your manager to add you.', { code: 'forbidden' });
     const restaurantId = String(membership.restaurant.id).toLowerCase();
     const db = pool();
-    const row = (await safely(() => db.query('select business_id from public.restaurants where id = $1', [restaurantId]))).rows[0];
+    const row = await safely(() => businessOfBranch(db, context, restaurantId));
     if (!row) throw new HttpError(404, 'That branch doesn’t exist.', { code: 'branch_not_found' });
     return { db, scope: await scopeFor(db, context, row.business_id), restaurantId };
   }

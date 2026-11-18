@@ -67,8 +67,11 @@ async function bannedUntilOf(userId) {
 
 /** Membership rows with their restaurant, or undefined before migration 002. */
 async function loadMemberships(client, userId) {
-  const { data, error } = await client.from('restaurant_members')
-    .select(`role, created_at, restaurant:restaurants (${RESTAURANT_COLUMNS})`).eq('user_id', userId);
+  // business_id and the business's inventory flag ride along (one request): /api/me reports inventoryEnabled per branch and the
+  // inventory routes learn a branch's business without asking. A database where that embed fails answers the plain select.
+  const select = (columns) => client.from('restaurant_members').select(`role, created_at, restaurant:restaurants (${columns})`).eq('user_id', userId);
+  let { data, error } = await select(`${RESTAURANT_COLUMNS}, business_id, business:businesses (inventory_enabled)`);
+  if (error) ({ data, error } = await select(RESTAURANT_COLUMNS));
   if (error) {
     if (isMissingSchema(error)) return undefined;
     throw error;

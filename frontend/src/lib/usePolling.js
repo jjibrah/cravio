@@ -85,3 +85,28 @@ export default function usePolling(load, { interval = 10000, enabled = true, ini
 
   return { ...state, refresh };
 }
+
+/**
+ * Calls `fn` every `interval` ms while the tab is visible, and once when it becomes visible again after being hidden
+ * for longer than `interval`. Nothing runs while the tab is hidden. The first call is up to the caller (data on mount).
+ */
+export function useVisibleInterval(fn, interval = 60000, enabled = true) {
+  const latest = useRef(fn);
+  latest.current = fn;
+  useEffect(() => {
+    if (!enabled) return undefined;
+    let timer = null;
+    let last = Date.now();
+    const run = () => { last = Date.now(); latest.current(); };
+    const stop = () => { window.clearInterval(timer); timer = null; };
+    const start = () => { if (timer === null) timer = window.setInterval(run, interval); };
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') { stop(); return; }
+      if (Date.now() - last >= interval) run();
+      start();
+    };
+    if (document.visibilityState !== 'hidden') start();
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => { stop(); document.removeEventListener('visibilitychange', onVisibility); };
+  }, [interval, enabled]);
+}

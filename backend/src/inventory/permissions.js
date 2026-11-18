@@ -10,7 +10,7 @@ import { HttpError } from '../lib/http.js';
 import { MANAGER_ROLES } from '../lib/access.js';
 import { branchLocation, centerLocation } from '../stock/service.js';
 import { record } from './audit.js';
-import { getSettings } from './policies.js';
+import { effectiveSettings } from './policies.js';
 
 export const CAPABILITIES = Object.freeze([
   'inv.view', 'inv.cost.view', 'inv.item.edit', 'inv.recipe.edit', 'inv.stock.record',
@@ -63,35 +63,55 @@ const forbidden = (message = 'You don’t have access to this.', details = {}) =
 
 /**
  * Builds the caller's inventory scope for one business. `context` is the requireUser() result.
- * Does the DB lookups (business flag, restaurants, stock locations, two settings); pass a transaction or the pool.
- * { ensureLocations: true } first creates missing branch/warehouse location rows (needs a writable db).
+ * ONE database round trip for everything it needs (business flag, restaurants, stock locations, the business-level settings);
+ * a second one only when `ensureLocations` finds a location row missing. Pass a transaction or the pool.
+ * ensureLocations: true      create any missing branch/warehouse location row first (needs a writable db), unless the caller is a platform admin.
+ * ensureLocations: 'active'  the same, but only when inventory is on and the caller has some role in the business (what the routes want):
+ *                            never writes when every location already exists, so a plain GET stays a read.
  * Returns:
  *   { businessId, userId, role, roles, enabled, centerLocationId, locations: [{id, kind, restaurantId, name}],
- *     locationCaps: Map<locationId, Set<cap>>, businessCaps: Set<cap> }
+ *     locationCaps: Map<locationId, Set<cap>>, businessCaps: Set<cap>, settings: { key: value } }
+ * `settings` are the business-wide effective settings (what getSettings(db, businessId) returns), loaded with the scope so a handler
+ * need not ask again. Non-enumerable: `locationRows` (every location with code and status, for listLocations / the warehouse) and
+ * `locationsComplete` (the warehouse and every branch have a location row).
  */
 export async function inventoryScope(db, context, businessId, { ensureLocations = false } = {}) {
-  const biz = (await db.query('select id, inventory_enabled from public.businesses where id = $1', [businessId])).rows[0];
-  if (!biz) throw new HttpError(404, 'That business isn’t yours.');
+  let facts;
+  try { facts = await loadFacts(db, businessId); } catch (error) {
+    if (error?.code !== '42P01') throw error;
+    facts = await loadFactsPiecemeal(db, businessId, context?.profile?.role === 'admin'); // an older schema (no 012 tables yet): same answers, more round trips
+  }
+  if (!facts) throw new HttpError(404, 'That business isn’t yours.');
+  const biz = { id: facts.id, inventory_enabled: facts.inventory_enabled };
   const userId = context?.user?.id || null;
   const scope = { businessId: biz.id, userId, role: 'none', roles: [], enabled: biz.inventory_enabled === true, centerLocationId: null,
-    locations: [], locationCaps: new Map(), businessCaps: new Set() };
+    locations: [], locationCaps: new Map(), businessCaps: new Set(), settings: null };
 
   const isAdmin = context?.profile?.role === 'admin';
   const grant = (context?.grants || []).find((g) => String(g.businessId).toLowerCase() === String(biz.id).toLowerCase());
-  const restaurants = (await db.query('select id from public.restaurants where business_id = $1', [biz.id])).rows.map((r) => r.id);
+  const restaurants = facts.restaurants;
   const mine = (context?.memberships || []).filter((m) => m.restaurant && restaurants.includes(m.restaurant.id));
 
-  if (ensureLocations && !isAdmin) {
-    await centerLocation(db, biz.id);
-    for (const id of restaurants) await branchLocation(db, id);
+  let rows = facts.locations;
+  if (!isAdmin && ensureLocations) {
+    const hasRole = grant?.role === 'owner' || grant?.role === 'operations' || mine.some((m) => MANAGER_ROLES.includes(m.role) || m.role === 'waiter');
+    const wanted = ensureLocations === true || (scope.enabled && hasRole);
+    const missing = !rows.some((l) => l.kind === 'center') || restaurants.some((id) => !rows.some((l) => l.restaurant_id === id));
+    if (wanted && missing) {
+      await centerLocation(db, biz.id);
+      for (const id of restaurants) await branchLocation(db, id);
+      rows = (await db.query(LOCATIONS_SQL, [biz.id])).rows;
+    }
   }
-  scope.locations = (await db.query(
-    'select id, kind, restaurant_id, name from public.stock_locations where business_id = $1 order by kind, name', [biz.id])).rows
-    .map((l) => ({ id: l.id, kind: l.kind, restaurantId: l.restaurant_id, name: l.name }));
+  scope.locations = rows.map((l) => ({ id: l.id, kind: l.kind, restaurantId: l.restaurant_id, name: l.name }));
+  Object.defineProperty(scope, 'locationRows', { value: rows, enumerable: false, writable: true });
+  // true when the warehouse and one location per branch are all present (so nothing needs creating before reading them)
+  Object.defineProperty(scope, 'locationsComplete', { value: rows.some((l) => l.kind === 'center') && restaurants.every((id) => rows.some((l) => l.restaurant_id === id)), enumerable: false, writable: true });
   scope.centerLocationId = scope.locations.find((l) => l.kind === 'center')?.id || null;
+  scope.settings = effectiveSettings(facts.settings);
   if (isAdmin) { scope.role = 'admin'; scope.roles = ['admin']; return scope; }
 
-  const settings = await getSettings(db, biz.id);
+  const settings = scope.settings;
   const give = (locationId, caps) => {
     if (!locationId) return;
     if (!scope.locationCaps.has(locationId)) scope.locationCaps.set(locationId, new Set());
@@ -124,6 +144,35 @@ export async function inventoryScope(db, context, businessId, { ensureLocations 
   scope.roles = RANK.filter((r) => roles.has(r));
   scope.role = scope.roles[0] || 'none';
   return scope;
+}
+
+const LOCATIONS_SQL = `select l.id, l.kind, l.restaurant_id, l.name, l.code, l.status, coalesce(r.name, l.name) as display_name
+  from public.stock_locations l left join public.restaurants r on r.id = l.restaurant_id where l.business_id = $1 order by l.kind, l.name`;
+
+/** Everything the scope needs from the database, in ONE statement. */
+async function loadFacts(db, businessId) {
+  const { rows } = await db.query(
+    `select b.id, b.inventory_enabled,
+       coalesce((select json_agg(r.id) from public.restaurants r where r.business_id = b.id), '[]'::json) as restaurants,
+       coalesce((select json_agg(json_build_object('id', l.id, 'kind', l.kind, 'restaurant_id', l.restaurant_id, 'name', l.name, 'code', l.code,
+           'status', l.status, 'display_name', coalesce(r.name, l.name)) order by l.kind, l.name)
+         from public.stock_locations l left join public.restaurants r on r.id = l.restaurant_id where l.business_id = b.id), '[]'::json) as locations,
+       coalesce((select json_agg(json_build_object('key', s.key, 'value', s.value)) from public.inventory_settings s
+         where s.business_id = b.id and s.location_id is null), '[]'::json) as settings
+     from public.businesses b where b.id = $1`, [businessId]);
+  return rows[0] ? { ...rows[0], restaurants: asJson(rows[0].restaurants), locations: asJson(rows[0].locations), settings: asJson(rows[0].settings) } : null;
+}
+const asJson = (value) => (typeof value === 'string' ? JSON.parse(value) : value);
+
+/** The old way (four statements), for a database where the settings table doesn't exist yet. */
+async function loadFactsPiecemeal(db, businessId, isAdmin) {
+  const biz = (await db.query('select id, inventory_enabled from public.businesses where id = $1', [businessId])).rows[0];
+  if (!biz) return null;
+  const restaurants = (await db.query('select id from public.restaurants where business_id = $1', [biz.id])).rows.map((r) => r.id);
+  const locations = (await db.query(LOCATIONS_SQL, [biz.id])).rows;
+  // Platform admins never read settings (they get no capabilities), so they work before 012 too.
+  const settings = isAdmin ? [] : (await db.query('select key, value from public.inventory_settings where business_id = $1 and location_id is null', [biz.id])).rows;
+  return { ...biz, restaurants, locations, settings };
 }
 
 /** The denial for this check, or null when allowed. Pure. */

@@ -8,6 +8,10 @@ import LoadingScreen from '../components/loading/LoadingScreen';
 
 const AuthContext = createContext(null);
 
+// Same event name as ACCOUNT_STALE in lib/api.js (kept as a literal so auth doesn't import the API client).
+const ACCOUNT_STALE = 'cravio:account-stale';
+const QUIET_GAP = 2000; // focus, visibilitychange and stale hints often arrive together; one /api/me is enough
+
 /*
  * The last /api/me answer is kept in sessionStorage (this tab only), keyed by user id, so a reload
  * renders the app at once while /api/me revalidates in the background. A 401 or 403 drops it, and so
@@ -134,6 +138,42 @@ export function AuthProvider({ children }) {
     });
     return () => { controller.abort(); if (blocking) setAccountLoading(false); };
   }, [accessToken, userId, retryCount]);
+
+  // Quiet re-check of /api/me when the window regains focus (or something saw a stale feature flag), so a
+  // business switched on, or off, in another tab or by Cravio shows up without signing out. No spinner, no
+  // remount; the account only changes when the answer differs.
+  useEffect(() => {
+    if (!accessToken) return undefined;
+    let last = Date.now();
+    let controller = null;
+    const check = (event) => {
+      // Focus and visibility often arrive together (gap); a flag seen stale by a page or an API answer asks directly.
+      const asked = event?.type === ACCOUNT_STALE;
+      if (document.visibilityState === 'hidden' || (!asked && Date.now() - last < QUIET_GAP)) return;
+      last = Date.now();
+      controller?.abort();
+      controller = new AbortController();
+      const mine = controller;
+      fetch(`${import.meta.env.VITE_API_URL || ''}/api/me`, { headers: { Authorization: `Bearer ${accessToken}` }, signal: mine.signal })
+        .then((response) => (response.ok ? response.json() : null))
+        .then((data) => {
+          if (!data || mine.signal.aborted || data.onboardingRequired || accountRef.current?.id !== data.id) return;
+          if (JSON.stringify(data) === JSON.stringify(accountRef.current)) return;
+          setAccount(data);
+          writeAccount(userId, data);
+        })
+        .catch(() => { /* quiet: the next focus tries again */ });
+    };
+    window.addEventListener('focus', check);
+    document.addEventListener('visibilitychange', check);
+    window.addEventListener(ACCOUNT_STALE, check);
+    return () => {
+      controller?.abort();
+      window.removeEventListener('focus', check);
+      document.removeEventListener('visibilitychange', check);
+      window.removeEventListener(ACCOUNT_STALE, check);
+    };
+  }, [accessToken, userId]);
 
   const retry = useCallback(() => setRetryCount((count) => count + 1), []);
   // Restoring the session takes a few milliseconds (longer only when the token must be refreshed), so

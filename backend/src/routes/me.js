@@ -44,10 +44,14 @@ export const routes = [
       const managed = rows.filter((row) => MANAGER_ROLES.includes(row.role));
       const onboardingRequired = profile.role === 'owner' && memberships !== undefined && !grants?.length
         && (managed.length === 0 ? rows.length === 0 : managed.length === 1 && managed[0].restaurant.status === 'onboarding');
+      // Whether inventory is switched on, per business and per branch, so the app needn't call the (heavy) inventory overview just to learn it.
+      const flagOf = new Map((grants || []).map((grant) => [String(grant.businessId).toLowerCase(), grant.inventoryEnabled === true]));
+      const branchFlag = (restaurant) => restaurant.business?.inventory_enabled === true
+        || (restaurant.business_id ? flagOf.get(String(restaurant.business_id).toLowerCase()) === true : false);
       const branches = rows.map((row) => ({
-        ...placeFor(row.restaurant), role: branchRole(row.role), membershipRole: row.role,
+        ...placeFor(row.restaurant), role: branchRole(row.role), membershipRole: row.role, inventoryEnabled: branchFlag(row.restaurant),
       })).sort((a, b) => a.name.localeCompare(b.name));
-      const businesses = (grants || []).map((grant) => ({ id: grant.businessId, name: grant.name, role: grant.role, branchIds: grant.branchIds }));
+      const businesses = (grants || []).map((grant) => ({ id: grant.businessId, name: grant.name, role: grant.role, branchIds: grant.branchIds, inventoryEnabled: grant.inventoryEnabled === true }));
       const terms = await termsFor(user, profile.role);
       return {
         id: user.id, email: user.email, name: profile.name, role: profile.role,

@@ -10,6 +10,7 @@ import { QTY, MONEY, dec, add, sub, mul, cmp, isNeg, isZero } from './decimal.js
 import { DEFAULT_UNITS, baseUnitFor, compatibleUnits, dimensionOf, display, normaliseUnit, toBase } from './units.js';
 import { can, locationsWith, requireCan } from './permissions.js';
 import { diff, record } from './audit.js';
+import { UNITS_TTL_MS, canParallel, together } from '../lib/pool.js';
 
 const fail = (status, message, code, extra = {}) => new HttpError(status, message, { code, ...extra });
 
@@ -33,10 +34,26 @@ const has = (obj, key) => obj && typeof obj === 'object' && Object.hasOwn(obj, k
 const tidy = (text) => String(text ?? '').trim().replace(/\s+/g, ' ');
 const empty = (v) => v === undefined || v === null || (typeof v === 'string' && v.trim() === '');
 
-/** Unit rows from the `units` table (falls back to the built-in list when the table is empty). */
-export async function loadUnits(db) {
-  const { rows } = await db.query('select code, dimension, to_base::text as to_base, label, plural from public.units where active order by position');
-  return rows.length ? rows.map((u) => ({ code: u.code, dimension: u.dimension, toBase: u.to_base, label: u.label, plural: u.plural })) : DEFAULT_UNITS;
+/**
+ * Unit rows from the `units` table (falls back to the built-in list when the table is empty). The table is near-static (changed only
+ * by migrations), so on the real pool the answer is kept in memory for UNITS_TTL_MS, and within one request (pass the scope) it is
+ * asked for once even when several parts of the handler need it at the same time.
+ */
+let unitsCache = null;
+const perRequest = new WeakMap();
+export const clearUnitsCache = () => { unitsCache = null; };
+export async function loadUnits(db, scope = null) {
+  const shared = canParallel(db) && db.parallelSafe !== true; // only the real pool: tests (and transactions) always read the table
+  if (shared && unitsCache && unitsCache.until > Date.now()) return unitsCache.value;
+  if (scope && perRequest.has(scope)) return perRequest.get(scope);
+  const promise = (async () => {
+    const { rows } = await db.query('select code, dimension, to_base::text as to_base, label, plural from public.units where active order by position');
+    const value = rows.length ? rows.map((u) => ({ code: u.code, dimension: u.dimension, toBase: u.to_base, label: u.label, plural: u.plural })) : DEFAULT_UNITS;
+    if (shared) unitsCache = { value, until: Date.now() + UNITS_TTL_MS };
+    return value;
+  })();
+  if (scope) perRequest.set(scope, promise);
+  try { return await promise; } catch (error) { if (scope) perRequest.delete(scope); throw error; }
 }
 
 /** What units.js needs to know about an item. */
@@ -207,9 +224,10 @@ async function replaceUnits(db, itemId, defs) {
 
 /* ---------- listing and reading ---------- */
 
-async function locationNames(db, businessId) {
+async function locationNames(db, scope) {
+  if (scope.locationRows) return new Map(scope.locationRows.map((r) => [r.id, r.display_name ?? r.name])); // loaded with the scope
   const { rows } = await db.query(`select l.id, coalesce(r.name, l.name) as name from public.stock_locations l
-    left join public.restaurants r on r.id = l.restaurant_id where l.business_id = $1`, [businessId]);
+    left join public.restaurants r on r.id = l.restaurant_id where l.business_id = $1`, [scope.businessId]);
   return new Map(rows.map((r) => [r.id, r.name]));
 }
 
@@ -221,38 +239,41 @@ const q4 = (v) => dec(v ?? '0').toString(QTY);
  * Costs and values only when the scope holds inv.cost.view (per location for values).
  */
 async function loadItems(db, scope, { ids = null, search, categoryId, includeArchived = false, lowOnly = false } = {}) {
-  const units = await loadUnits(db);
-  const names = await locationNames(db, scope.businessId);
   const viewable = locationsWith(scope, 'inv.view');
   const costLocations = new Set(locationsWith(scope, 'inv.cost.view'));
   const seeCost = costLocations.size > 0;
   const term = empty(search) ? null : tidy(search);
-  const { rows } = await db.query(`select ${ITEM_COLUMNS}, c.name as category_name
+  // One statement: the items with their own units, barcodes, balances and levels folded in as JSON (no query per item, none per collection).
+  const [units, { rows }] = await together(db, () => loadUnits(db, scope), () => db.query(`select ${ITEM_COLUMNS}, c.name as category_name,
+      coalesce((select json_agg(json_build_object('id', u.id, 'name', u.name, 'factor', u.factor::text, 'for_purchase', u.for_purchase,
+        'for_recipe', u.for_recipe, 'for_count', u.for_count, 'position', u.position) order by u.position, lower(u.name))
+        from public.stock_item_units u where u.item_id = i.id), '[]'::json) as own_units,
+      coalesce((select json_agg(b.code order by b.code) from public.stock_item_barcodes b where b.item_id = i.id), '[]'::json) as barcode_list,
+      coalesce((select json_agg(json_build_object('location_id', sb.location_id, 'on_hand', sb.on_hand::text, 'reserved', sb.reserved::text))
+        from public.stock_balances sb where sb.item_id = i.id and sb.location_id = any($6::uuid[])), '[]'::json) as balance_list,
+      coalesce((select json_agg(json_build_object('location_id', sl.location_id, 'min', sl.min::text, 'reorder', sl.reorder::text, 'par', sl.par::text, 'max', sl.max::text))
+        from public.stock_item_levels sl where sl.item_id = i.id and sl.location_id = any($6::uuid[])), '[]'::json) as level_list
     from public.stock_items i left join public.stock_categories c on c.id = i.category_id
     where i.business_id = $1 and ($2::boolean or i.archived_at is null)
       and ($3::uuid is null or i.category_id = $3::uuid)
       and ($4::uuid[] is null or i.id = any($4::uuid[]))
       and ($5::text is null or position(lower($5::text) in lower(i.name)) > 0 or position(lower($5::text) in lower(coalesce(i.sku, ''))) > 0
         or exists (select 1 from public.stock_item_barcodes b where b.item_id = i.id and b.code = $5::text))
-    order by lower(i.name)`, [scope.businessId, Boolean(includeArchived), categoryId ? needId(categoryId, 'The category') : null, ids, term]);
+    order by lower(i.name)`, [scope.businessId, Boolean(includeArchived), categoryId ? needId(categoryId, 'The category') : null, ids, term, viewable]));
   if (!rows.length) return { items: [], units };
-  const itemIds = rows.map((r) => r.id);
-  const own = (await db.query(`select item_id, id, name, factor::text as factor, for_purchase, for_recipe, for_count, position
-    from public.stock_item_units where item_id = any($1::uuid[]) order by position, lower(name)`, [itemIds])).rows;
-  const barcodes = (await db.query(`select item_id, code from public.stock_item_barcodes where item_id = any($1::uuid[]) order by code`, [itemIds])).rows;
-  const balances = viewable.length ? (await db.query(`select item_id, location_id, on_hand::text as on_hand, reserved::text as reserved
-    from public.stock_balances where item_id = any($1::uuid[]) and location_id = any($2::uuid[])`, [itemIds, viewable])).rows : [];
-  const levels = viewable.length ? (await db.query(`select item_id, location_id, min::text as min, reorder::text as reorder, par::text as par, max::text as max
-    from public.stock_item_levels where item_id = any($1::uuid[]) and location_id = any($2::uuid[])`, [itemIds, viewable])).rows : [];
+  const json = (v) => (typeof v === 'string' ? JSON.parse(v) : v);
+  const names = await locationNames(db, scope);
 
   const visibleLocations = scope.locations.filter((l) => viewable.includes(l.id));
   const items = rows.map((row) => {
-    const ownRows = own.filter((o) => o.item_id === row.id);
+    const ownRows = json(row.own_units);
+    const rowBalances = json(row.balance_list);
+    const rowLevels = json(row.level_list);
     const item = unitItem(row, ownRows);
     const show = (v) => display(v, item, units);
     const perLocation = visibleLocations.map((loc) => {
-      const bal = balances.find((b) => b.item_id === row.id && b.location_id === loc.id);
-      const lvl = levels.find((l) => l.item_id === row.id && l.location_id === loc.id);
+      const bal = rowBalances.find((b) => b.location_id === loc.id);
+      const lvl = rowLevels.find((l) => l.location_id === loc.id);
       const onHand = q4(bal?.on_hand);
       const reserved = q4(bal?.reserved);
       const available = sub(dec(onHand), dec(reserved), QTY).toString(QTY);
@@ -280,7 +301,7 @@ async function loadItems(db, scope, { ids = null, search, categoryId, includeArc
       lowLevel: row.low_level === null ? null : q4(row.low_level), lowLevelDisplay: row.low_level === null ? null : show(row.low_level),
       archived: row.archived_at !== null, archivedAt: row.archived_at,
       units: ownRows.map((u) => ({ id: u.id, ...unitView(u), size: display(u.factor, { ...item, units: [] }, units) })),
-      barcodes: barcodes.filter((b) => b.item_id === row.id).map((b) => b.code),
+      barcodes: json(row.barcode_list),
       locations: perLocation, totals, low: perLocation.some((l) => l.low),
     };
     if (seeCost) { view.avgCost = row.avg_cost === null ? null : dec(row.avg_cost).toString(6); view.lastCost = row.last_cost === null ? null : dec(row.last_cost).toString(6); }
@@ -309,7 +330,7 @@ export async function getItem(db, scope, itemId) {
   if (!item) throw fail(404, 'That stock item isn’t in this business. Pick it from the items list.', 'item_not_found');
   const viewable = locationsWith(scope, 'inv.view');
   const costLocations = new Set(locationsWith(scope, 'inv.cost.view'));
-  const names = await locationNames(db, scope.businessId);
+  const names = await locationNames(db, scope);
   const own = await loadOwnUnits(db, item.id);
   const unitView1 = unitItem({ name: item.name, unit: item.baseUnit, display_unit: item.displayUnit }, own);
   const { rows } = viewable.length ? await db.query(`select id, location_id, delta::text as delta, balance_after::text as balance_after, reason, note, occurred_at, created_at,
@@ -545,7 +566,7 @@ export async function setLevels(db, scope, itemId, list) {
   if (!Array.isArray(list)) throw fail(400, 'Send the levels as a list, one entry per location.', 'bad_levels');
   const own = await loadOwnUnits(db, row.id);
   const item = unitItem(row, own);
-  const names = await locationNames(db, scope.businessId);
+  const names = await locationNames(db, scope);
   const show = (v) => display(v, item, units);
   const editable = new Set(locationsWith(scope, 'inv.stock.record'));
   const seen = new Set();
@@ -606,7 +627,7 @@ export async function archiveItem(db, scope, itemId) {
   const units = await loadUnits(db);
   const row = await loadRow(db, scope, itemId, { lock: true });
   if (row.archived_at) return itemView(db, scope, row.id);
-  const names = await locationNames(db, scope.businessId);
+  const names = await locationNames(db, scope);
   const viewable = new Set(locationsWith(scope, 'inv.view'));
   const left = (await db.query(`select location_id, on_hand::text as on_hand, reserved::text as reserved from public.stock_balances
     where item_id = $1 and (on_hand <> 0 or reserved <> 0) order by location_id`, [row.id])).rows;
@@ -643,17 +664,21 @@ const categoryAudit = (db, scope, id, action, before, after) => record(db, {
 /** Categories (top level first, children after their parent). Seeds the default list the first time a business has none. */
 export async function listCategories(db, scope, { includeInactive = true } = {}) {
   requireCan(scope, 'inv.view');
-  const { rows: any } = await db.query('select 1 from public.stock_categories where business_id = $1 limit 1', [scope.businessId]);
-  if (!any.length) {
-    const seeded = await db.query(`insert into public.stock_categories (business_id, name, position)
-      select $1, n, (o - 1) * 10 from unnest($2::text[]) with ordinality as t(n, o) on conflict do nothing returning id`, [scope.businessId, [...DEFAULT_CATEGORIES]]);
-    if (seeded.rows.length) await categoryAudit(db, scope, null, 'seed', null, { count: seeded.rows.length });
-  }
-  const { rows } = await db.query(`select c.id, c.name, c.parent_id, c.position, c.active,
+  const select = () => db.query(`select c.id, c.name, c.parent_id, c.position, c.active,
       (select count(*)::int from public.stock_items i where i.category_id = c.id and i.archived_at is null) as item_count
     from public.stock_categories c where c.business_id = $1 and ($2::boolean or c.active)
     order by coalesce((select p.position from public.stock_categories p where p.id = c.parent_id), c.position), (c.parent_id is not null), c.position, lower(c.name)`,
   [scope.businessId, Boolean(includeInactive)]);
+  let { rows } = await select();
+  if (!rows.length) { // the usual case has rows: one query. Only an empty answer may mean "never seeded".
+    const { rows: any } = await db.query('select 1 from public.stock_categories where business_id = $1 limit 1', [scope.businessId]);
+    if (!any.length) {
+      const seeded = await db.query(`insert into public.stock_categories (business_id, name, position)
+        select $1, n, (o - 1) * 10 from unnest($2::text[]) with ordinality as t(n, o) on conflict do nothing returning id`, [scope.businessId, [...DEFAULT_CATEGORIES]]);
+      if (seeded.rows.length) await categoryAudit(db, scope, null, 'seed', null, { count: seeded.rows.length });
+      rows = (await select()).rows;
+    }
+  }
   return rows.map((c) => ({ id: c.id, name: c.name, parentId: c.parent_id, position: c.position, active: c.active, itemCount: c.item_count }));
 }
 

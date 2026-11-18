@@ -80,15 +80,39 @@ const known = (key) => {
   return SETTINGS[key];
 };
 
+/** { key: value } for every known key from business-level rows [{ key, value }] (defaults where no row). Pure. */
+export function effectiveSettings(rows = []) {
+  const out = Object.fromEntries(Object.entries(SETTINGS).map(([key, def]) => [key, def.default]));
+  for (const row of rows) if (Object.hasOwn(SETTINGS, row.key)) out[row.key] = row.value;
+  return out;
+}
+
+// Settings change rarely and are read by many requests. On the real pool (never inside a transaction, never in tests' in-memory databases)
+// the answer is kept for SETTINGS_TTL_MS. setSetting / resetSetting drop it at once; because they run inside a transaction that is not yet
+// committed, reads for that business bypass the cache for a few seconds afterwards instead of re-caching the old value.
+export const SETTINGS_TTL_MS = 30_000;
+const SETTINGS_QUIET_MS = 5_000;
+const cached = new Map();   // `${businessId}|${locationId}` -> { value, until }
+const quietUntil = new Map(); // businessId -> time before which the cache is not used
+const isPool = (db) => typeof db?.totalCount === 'number' && db.parallelSafe !== true;
+export function invalidateSettings(businessId) {
+  for (const key of cached.keys()) if (key.startsWith(`${businessId}|`)) cached.delete(key);
+  quietUntil.set(businessId, Date.now() + SETTINGS_QUIET_MS);
+}
+export const clearSettingsCache = () => { cached.clear(); quietUntil.clear(); };
+
 /** Effective values for a business (and optionally one location): { key: value } for every known key. */
 export async function getSettings(db, businessId, locationId = null) {
+  const key = `${businessId}|${locationId || ''}`;
+  const useCache = isPool(db) && (quietUntil.get(businessId) || 0) <= Date.now();
+  if (useCache) { const hit = cached.get(key); if (hit && hit.until > Date.now()) return { ...hit.value }; }
   const { rows } = await db.query(
     `select key, value, location_id from public.inventory_settings
      where business_id = $1 and (location_id is null or location_id = $2::uuid)`, [businessId, locationId || null]);
-  const out = Object.fromEntries(Object.entries(SETTINGS).map(([key, def]) => [key, def.default]));
-  for (const row of rows.filter((r) => r.location_id === null)) if (Object.hasOwn(SETTINGS, row.key)) out[row.key] = row.value;
+  const out = effectiveSettings(rows.filter((r) => r.location_id === null));
   for (const row of rows.filter((r) => r.location_id !== null)) if (Object.hasOwn(SETTINGS, row.key)) out[row.key] = row.value;
-  return out;
+  if (useCache) cached.set(key, { value: out, until: Date.now() + SETTINGS_TTL_MS });
+  return { ...out };
 }
 
 export async function getSetting(db, businessId, key, locationId = null) {
@@ -110,6 +134,7 @@ export async function setSetting(db, { businessId, locationId = null, key, value
      on conflict (business_id, coalesce(location_id, '00000000-0000-0000-0000-000000000000'::uuid), key)
      do update set value = excluded.value, updated_by = excluded.updated_by, updated_at = now() returning id`,
     [businessId, locationId || null, key, JSON.stringify(clean), actorId]);
+  invalidateSettings(businessId);
   await record(db, { businessId, locationId, actorId, actorRole, entity: 'setting', entityId: rows[0].id, action: old[0] ? 'update' : 'create',
     before: { key, value: before === undefined ? SETTINGS[key].default : before, inherited: before === undefined }, after: { key, value: clean } });
   return clean;
@@ -121,6 +146,7 @@ export async function resetSetting(db, { businessId, locationId = null, key, act
   const { rows } = await db.query(
     `delete from public.inventory_settings where business_id = $1 and key = $2 and location_id is not distinct from $3::uuid returning id, value`,
     [businessId, key, locationId || null]);
+  invalidateSettings(businessId);
   if (rows[0]) await record(db, { businessId, locationId, actorId, actorRole, entity: 'setting', entityId: rows[0].id, action: 'reset', before: { key, value: rows[0].value } });
   return Boolean(rows[0]);
 }

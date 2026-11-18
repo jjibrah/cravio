@@ -14,7 +14,7 @@ import { HttpError } from '../lib/http.js';
 import { withDb } from '../lib/db.js';
 import { withBody } from '../lib/operations.js';
 import { database } from '../lib/pool.js';
-import { requestedBranch, selectMembership, STAFF_ROLES } from '../lib/access.js';
+import { requestedBranch, selectMembership, STAFF_ROLES, businessOfBranch } from '../lib/access.js';
 import { once } from '../inventory/commands.js';
 import { authorize, denyAndAudit, inventoryScope } from '../inventory/permissions.js';
 import { attachSummaries, decide, deleteRule, getApproval, history, inbox, listRules, mine, setRule } from '../inventory/approvals.js';
@@ -96,7 +96,7 @@ export function createRoutes({ authenticate = requireUser, pool = () => database
         if (!membership) throw new HttpError(409, 'Choose which branch you are working in. Send the X-Cravio-Branch header.', { code: 'branch_required' });
         restaurantId = String(membership.restaurant.id).toLowerCase();
       }
-      const row = (await db.query('select business_id from public.restaurants where id = $1', [restaurantId])).rows[0];
+      const row = await businessOfBranch(db, context, restaurantId);
       if (!row) throw NO_BRANCH();
       const scope = await safely(() => inventoryScope(db, context, row.business_id));
       const location = scope.locations.find((l) => l.kind === 'branch' && l.restaurantId === restaurantId) || null;

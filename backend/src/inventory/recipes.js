@@ -21,6 +21,7 @@ import { compatibleUnits, display, fromBase, normaliseUnit, toBase } from './uni
 import { can, requireCan } from './permissions.js';
 import { diff, record } from './audit.js';
 import { loadUnits } from './catalogue.js';
+import { together } from '../lib/pool.js';
 
 const fail = (status, message, code, extra = {}) => new HttpError(status, message, { code, ...extra });
 export const MAX_LINES = 30;
@@ -76,14 +77,17 @@ async function loadItems(db, scope, ids) {
   const unique = [...new Set(ids.filter(Boolean))];
   const map = new Map();
   if (!unique.length) return map;
-  const { rows } = await db.query(`select id, name, unit, display_unit, yield_pct::text as yield_pct, avg_cost::text as avg_cost, archived_at, active
-    from public.stock_items where business_id = $1 and id = any($2::uuid[])`, [scope.businessId, unique]);
-  const own = (await db.query(`select item_id, name, factor::text as factor from public.stock_item_units where item_id = any($1::uuid[]) order by position, lower(name)`, [unique])).rows;
+  // One statement: each item with its own units (crate = 10 kg) folded in as JSON.
+  const { rows } = await db.query(`select i.id, i.name, i.unit, i.display_unit, i.yield_pct::text as yield_pct, i.avg_cost::text as avg_cost, i.archived_at, i.active,
+      coalesce((select json_agg(json_build_object('name', u.name, 'factor', u.factor::text) order by u.position, lower(u.name))
+        from public.stock_item_units u where u.item_id = i.id), '[]'::json) as own_units
+    from public.stock_items i where i.business_id = $1 and i.id = any($2::uuid[])`, [scope.businessId, unique]);
   for (const row of rows) {
+    const own = typeof row.own_units === 'string' ? JSON.parse(row.own_units) : row.own_units;
     map.set(row.id, { id: row.id, name: row.name, baseUnit: row.unit, yieldPct: row.yield_pct, avgCost: row.avg_cost,
       archived: row.archived_at !== null || row.active === false,
       unitItem: { name: row.name, baseUnit: row.unit, displayUnit: row.display_unit || undefined,
-        units: own.filter((u) => u.item_id === row.id).map((u) => ({ name: u.name, factor: u.factor })) } });
+        units: own.map((u) => ({ name: u.name, factor: u.factor })) } });
   }
   return map;
 }
@@ -446,18 +450,21 @@ export async function listRecipes(db, scope, { restaurantId } = {}) {
   requireCan(scope, 'inv.view', { locationId });
   const rid = String(restaurantId).toLowerCase();
   const withCost = can(scope, 'inv.cost.view', { locationId });
-  const branch = (await db.query('select name from public.restaurants where id = $1', [rid])).rows[0];
-  const dishes = (await db.query(`select m.id, m.name, m.price::text as price, m.available, c.name as category, r.id as recipe_id, r.current_version_id, r.allow_when_out,
+  // The branch name came with the scope; dishes, recipe lines and availability don't depend on each other: together (separate connections).
+  const [branch, dishes, recipeLines, availabilityRows] = await together(db,
+    async () => { const row = scope.locationRows?.find((l) => l.restaurant_id === rid); return row ? { name: row.display_name ?? row.name } : (await db.query('select name from public.restaurants where id = $1', [rid])).rows[0]; },
+    async () => (await db.query(`select m.id, m.name, m.price::text as price, m.available, c.name as category, r.id as recipe_id, r.current_version_id, r.allow_when_out,
       v.version, mis.item_id as link_item, mis.servings::text as link_servings, mis.allow_when_out as link_allow
     from public.menu_items m
     left join public.menu_categories c on c.id = m.category_id
     left join public.recipes r on r.menu_item_id = m.id
     left join public.recipe_versions v on v.id = r.current_version_id
     left join public.menu_item_stock mis on mis.menu_item_id = m.id
-    where m.restaurant_id = $1 order by lower(coalesce(c.name, '')), m.position, lower(m.name)`, [rid])).rows;
-  const recipeLines = (await db.query(`select r.menu_item_id, rl.item_id, rl.qty_base::text as qty_base from public.recipes r
-    join public.recipe_lines rl on rl.version_id = r.current_version_id where r.restaurant_id = $1 and not rl.takeaway_only`, [rid])).rows;
-  const availability = new Map((await db.query('select * from public.stock_menu_availability($1)', [rid])).rows.map((a) => [a.menu_item_id, a]));
+    where m.restaurant_id = $1 order by lower(coalesce(c.name, '')), m.position, lower(m.name)`, [rid])).rows,
+    async () => (await db.query(`select r.menu_item_id, rl.item_id, rl.qty_base::text as qty_base from public.recipes r
+    join public.recipe_lines rl on rl.version_id = r.current_version_id where r.restaurant_id = $1 and not rl.takeaway_only`, [rid])).rows,
+    async () => (await db.query('select * from public.stock_menu_availability($1)', [rid])).rows);
+  const availability = new Map(availabilityRows.map((a) => [a.menu_item_id, a]));
   const items = await loadItems(db, scope, [...recipeLines.map((l) => l.item_id), ...dishes.map((d) => d.link_item), ...[...availability.values()].map((a) => a.item_id)]);
 
   const out = dishes.map((d) => {

@@ -5,6 +5,9 @@ import { getActiveBranch } from './branch';
 
 export { invalidate } from './cache';
 
+/** Fired (on window) when something learns the account's feature flags may be out of date; AuthProvider re-reads /api/me. */
+export const ACCOUNT_STALE = 'cravio:account-stale';
+
 export class ApiError extends Error {
   constructor(status, message, details) { super(message); this.status = status; this.details = details; }
 }
@@ -26,6 +29,10 @@ async function request(path, { method = 'GET', body, signal } = {}) {
   });
   if (response.status === 204) return null;
   const data = await response.json().catch(() => ({}));
+  if (response.status === 403 && data.details?.code === 'inventory_disabled' && typeof window !== 'undefined') {
+    // The account we hold may say inventory is on: ask /api/me again (lib/auth.jsx listens).
+    window.dispatchEvent(new Event(ACCOUNT_STALE));
+  }
   if (!response.ok) throw new ApiError(response.status, data.error || 'Something went wrong. Please try again.', data.details);
   return data;
 }
@@ -56,9 +63,21 @@ function invalidateAfter(path) {
  * memory when it can (see lib/cache.js). `force: true` skips a cached answer (but joins a request already
  * in flight). Any other method marks what it can change stale (see STALE_AFTER), so cached screens refetch.
  */
-export async function api(path, { method = 'GET', body, signal, cache, ttl, force } = {}) {
-  if (cache === 'swr' && method === 'GET') return swr(path, () => request(path), { ttl, force, signal });
-  if (method === 'GET') return request(path, { method, body, signal });
+const inFlight = new Map(); // `${branch}|${path}` -> promise, for plain GETs asked twice at once
+
+export async function api(path, { method = 'GET', body, signal, cache, ttl, force, quiet } = {}) {
+  if (cache === 'swr' && method === 'GET') {
+    // `quiet`: a background poll (no "Updating…" pill); always goes to the network.
+    if (quiet) return revalidate(path, () => request(path), { quiet: true });
+    return swr(path, () => request(path), { ttl, force, signal });
+  }
+  if (method === 'GET') {
+    // Two components asking for the same URL at the same moment share one request (unless one can abort it).
+    if (signal) return request(path, { method, body, signal });
+    const id = `${getActiveBranch() || ''}|${path}`;
+    if (!inFlight.has(id)) inFlight.set(id, request(path).finally(() => inFlight.delete(id)));
+    return inFlight.get(id);
+  }
   try {
     return await request(path, { method, body, signal });
   } finally {
