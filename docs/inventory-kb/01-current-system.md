@@ -37,7 +37,7 @@ Access code: `backend/src/lib/access.js` and `backend/src/lib/business.js`. The 
 ## Inventory on main: three layers
 
 ### a) 007 "inventory preview" (legacy, still wired)
-A `private.stock_*` bakery workspace per owner account, with routes in `backend/src/routes/inventory.js` and the domain in `backend/src/inventory/`. Its UI was removed under decision R7, but the **API route is still registered** in `routes/index.js`. It is unrelated to the 009 tables, despite the similar names. It's a candidate for removal.
+A `private.stock_*` bakery workspace per owner account. UI removed under R7; **API and code removed 18 Nov 2026 (P1-02)**; its tables remain pending a later drop. Unrelated to the 009 tables.
 
 ### b) 009 inventory (APPLIED 16 Nov 2026)
 

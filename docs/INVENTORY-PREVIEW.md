@@ -1,3 +1,5 @@
+> **Removed 18 Nov 2026.** The preview API (`/api/inventory`, `backend/src/inventory/`, its tests) was removed. Its `private.stock_*` tables remain in the database pending a later drop. The live inventory is the 009 stock API (`/api/stock`, `/api/owner/stock`).
+
 # Inventory and management preview
 
 Implemented on dev for review. Main retains its existing application code. The shared database has additive migration `007_inventory_preview.sql`; existing restaurant rows and policies were not modified.

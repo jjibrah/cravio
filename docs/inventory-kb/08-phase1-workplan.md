@@ -11,17 +11,17 @@ Turns Phase 1 of `07-implementation-plan.md` into tickets you can pick up one at
 | Database | Migrations live in `backend/db/proposed/` until reviewed. Tested only on disposable PGlite (`backend/tests/support/pg.js` → `freshDatabase({ extra: ['proposed/012_…sql'] })`). **Nothing touches the shared database until P1-19.** |
 | Compatibility | Every migration ticket re-runs the existing suites (`npm run test:v2`, esp. `inventory-v2.js`) with the new migration applied, to prove `main`'s code still works on the shared DB. |
 | Tests | New suites under `backend/tests/inv/` run by `npm run test:inv`. Name checks after PRD IDs (`T-INV-1 …`) so coverage is traceable. |
-| Definition of done (each ticket) | Code + tests green (`test:inv`, `test:v2`, `npm run build`) · no UI without working API · server-side permission checks · audit/ledger entries for state changes · KB doc touched if behaviour or schema changed. |
+| Definition of done (each ticket) | Code + tests green (`test:inv`, `test:v2`, `npm run build`) · UI follows `DESIGN.md` and 07 §0.7 (same components, plain words, unit picker, mobile check) · no UI without working API · server-side permission checks · audit/ledger entries for state changes · KB doc touched if behaviour or schema changed. |
 | Feature switch | New UI sits behind `businesses.inventory_enabled` (and a dev env flag) until P1-19, so `main` users see no change. |
 
 ## Decisions needed before coding the schema
 
 | Blocks | Decision | Default in this plan |
 | --- | --- | --- |
-| P1-05 | A3 several warehouses per business | Yes |
-| P1-05 | A4 store in base units (g/ml/piece/serving), 4 dp; rewrite 012 | Yes |
-| P1-09 | A5 keep-selling: stock floors at 0 + exception, or negative allowed | Floor at 0 + exception (policy setting) |
-| P1-14/16 | A8 who edits recipes | Owner (all branches) + branch manager (own branch) |
+| P1-05 | A3 warehouses | **Decided 18 Nov: one per business** (the center, labelled Warehouse) |
+| P1-05 | A4 units | **Decided: base-unit storage, user-chosen entry/display units per item** |
+| P1-09 | A5 selling past zero | **Decided: stop at 0, log exception, notify owner + branch manager** |
+| P1-14/16 | A8 who edits recipes | **Decided: owner (all branches) + branch manager (own branch)** |
 A1, A2, A6, A7 only affect Phase 2/3 and can be confirmed later.
 
 ## Milestones
@@ -90,7 +90,7 @@ Suggested **de-risk spike on day 2**: a throwaway PGlite script proving the orde
 **P1-09 Migration 013 — recipes & order snapshots** · 3 d (riskiest; spike already done on day 2)
 - File `013_inventory_recipes.sql` + down, per 07 §WP1.2: `recipes`, `recipe_versions` (immutable once used), `recipe_lines`, `menu_extra_recipe_lines`, `order_stock_lines`, `stock_exceptions`.
 - Replace (same names/contracts) `order_dish_needs`, `order_stock_needs`, `stock_check_new_lines`, `stock_on_serve`, `stock_menu_availability` to read the snapshot; new trigger fills `order_stock_lines` on `order_items` insert (dish + deal components + extras, yield applied, aggregated per item).
-- Serve writes `pos_consumption` with `unit_cost = avg_cost`; keep-selling shortfall → floor at 0 + `stock_exceptions` row (policy `negative_policy`).
+- Serve writes `pos_consumption` with `unit_cost = avg_cost`; keep-selling shortfall → stop at 0 + `stock_exceptions` row + in-app notification to owner(s) and branch managers (also when an item first hits zero).
 - Data step: each `menu_item_stock` link → recipe v1 with one line.
 - Tests: T-POS-1 (reserve 300 g, serve → 1,700 g, consumption references order), T-POS-2 (shared buns aggregated), T-POS-3 (cancel releases; orders are insert-only so “modify” = cancel + new order — documented), T-POS-4 (replay serve ×5 → one deduction), T-POS-5 (edit recipe after sale → old order unchanged), T-POS-6 (150 g / 100 g → 1 available, override → exception), T-POS-7 (yield 70%), deal + extra expansion, untracked dish unaffected, `inventory-v2.js` still green.
 
@@ -116,7 +116,7 @@ Suggested **de-risk spike on day 2**: a throwaway PGlite script proving the orde
 - Hidden unless `inventory_enabled` (old Inventory page shown otherwise).
 
 **P1-14 Owner screens** · 3 d
-- Stock across locations (filters: location, category, low, search; CSV export), Items list + item editor (plain-word base unit picker, units/packs table, levels per location, archive), Warehouses (in Locations page), Opening stock wizard, CSV import (upload → dry-run report → confirm).
+- Stock across locations (filters: location, category, low, search; CSV export), Items list + item editor (plain-word base unit picker, units/packs table, levels per location, archive), Warehouse name (in Locations page; one per business), Opening stock wizard, CSV import (upload → dry-run report → confirm).
 - Playwright: create item in kg with a crate unit, set levels, opening stock 40 crates → shows 400 kg.
 
 **P1-15 Branch screens** · 2 d
@@ -124,6 +124,9 @@ Suggested **de-risk spike on day 2**: a throwaway PGlite script proving the orde
 
 **P1-16 Recipe editor with food cost** · 1.5 d
 - Port the v3-dev layout (`docs/inventory-kb/v3-prototype/`) onto the real API: lines with entered units, yield note, live preview, food cost + % / “unknown”, keep-selling switch, version history, ✨ AI draft. Used by owner (choose branch) and branch manager.
+
+**P1-17a Design review of all inventory screens** · 0.5 d
+- Review owner, branch and admin inventory screens against `DESIGN.md` and 07 §0.7 (consistency with Orders/Locations, plain words, touch targets, contrast, phone/tablet widths). Fix findings before M4.
 
 **P1-17 Admin entitlement** · 0.5 d
 - Admin → Businesses → business detail: “Inventory module” on/off (audited in `access_events`); counts only, no stock records.

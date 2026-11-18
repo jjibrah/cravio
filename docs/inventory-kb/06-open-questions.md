@@ -2,7 +2,7 @@
 
 Each has a **recommended default** so planning can move; confirm or correct in discussion.
 
-**18 Nov 2026:** Q-L1 (several warehouses), Q-U1 (base units), Q-N1 (floor at 0 + exception) and Q-N2/A8 (owner + branch manager edit recipes) accepted as defaults — see `docs/v2/DECISIONS.md` (INV-A3/A4/A5/A8). The rest stay open until Phase 2.
+**18 Nov 2026 (product owner):** Q-L1 → **one warehouse per business** for now; Q-U1 → base-unit storage **with user-chosen entry/display units**; Q-N1 → **stop at 0, log the shortfall and notify owner + branch manager**; Q-N2/A8 → owner + branch manager edit recipes. See `docs/v2/DECISIONS.md` (INV-A3/A4/A5/A8). The rest stay open until Phase 2.
 
 | ID | Question | Recommended default | Why it matters |
 | --- | --- | --- | --- |

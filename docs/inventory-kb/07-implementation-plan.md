@@ -5,12 +5,12 @@ Builds on `main`'s engine (ledger, idempotent commands, DB-enforced sold-out, de
 > **Assumptions to confirm** (from 06-open-questions; each is reversible at the point marked):
 > A1 Scope = inventory module only. M-Pesa, eTIMS, shifts/KDS, offline are separate later modules.
 > A2 Owner acts as head office + procurement + warehouse for now; operations managers are read-mostly; branch managers run the branch. Warehouse staff role arrives in Phase 3 (WP3.9).
-> A3 Many warehouses per business; today's "main center" becomes the first warehouse.
-> A4 Quantities stored in a **base unit** (g / ml / piece / serving), `numeric(18,4)`. The unapplied 012 is **rewritten**, not applied.
-> A5 "Keep selling when out": the sale goes through but stock **floors at zero**; the shortfall is logged as a *stock exception* for review (PRD default). Per-location policy can switch to "allow negative".
+> A3 **One warehouse per business** (confirmed 18 Nov): today's "main center", labelled *Warehouse* in the UI. Schema keeps `kind` open so more warehouses can be added later without redesign; no multi-warehouse UI, source-warehouse choice or W→W transfers in this plan.
+> A4 Quantities stored in a **base unit** (g / ml / piece / serving), `numeric(18,4)`, **but users pick the units they enter and see** per item (kg, L, crate, sack, tray…; confirmed 18 Nov). The unapplied 012 is **rewritten**, not applied.
+> A5 "Keep selling when out": the sale goes through but stock **stops at zero**; the shortfall is logged as a *stock exception* **and the owner and branch manager are notified** (confirmed 18 Nov). No "allow negative" option.
 > A6 Approving a branch request **reserves** stock at the chosen warehouse.
 > A7 Cost method: **weighted average** first; batch/FIFO costing comes with batches (Phase 3).
-> A8 Recipes: owner edits in Operations → Items & recipes; branch manager edits its own branch's recipes under Menu (configurable later).
+> A8 Recipes: owner edits for all branches (Operations → Items & recipes); branch manager edits own branch's recipes (confirmed 18 Nov).
 
 ---
 
@@ -73,8 +73,21 @@ Every check is server-side and location-scoped. **Maker-checker**: `approver_id 
 ### 0.6 Audit
 `inventory_events` (append-only): actor, role, location, entity, action, before/after JSON, at. Written for item/recipe/settings edits, approvals, rejections, cancellations. Ledger rows are their own audit for quantities.
 
-### 0.7 UI conventions
-Reuse `PageHeader`, `Panel`, `Segmented`, `TaskDrawer`, `SkeletonRows`, `EmptyState`. Unit shown next to every quantity input, defaulting to the item's usual unit; confirmation for unusually large amounts (e.g. > 10× typical). No button without server logic. KES formatting, dd/mm/yyyy, EAT.
+### 0.7 UI: same look, easy to use (product owner requirement, 18 Nov 2026)
+**Look the same as the rest of Cravio.** Follow `DESIGN.md` (v2 white). Reuse the existing pieces instead of new styles: `PageHeader`, `Panel`, `Segmented`, `TaskDrawer`, `SkeletonRows`, `EmptyState`, `OIcon`, `stock.css`/`business.css` tokens. A new inventory page should be indistinguishable in style from Orders or Locations. No new colour, font or component unless an existing one can't do the job (then add it to the shared set).
+
+**Easy to use:**
+- Plain words, no jargon: "On hand", "Held for open orders", "Available", "Coming in"; never "reserved/ledger/base unit/SKU" on screen (SKU shown as "Code (optional)").
+- One clear main action per page (e.g. Stock → "Record stock"; Items → "Add item"). Forms open in the side drawer, like today.
+- Units the way people think: the user picks the unit to type in (kg, g, crate of 10 kg, tray of 30…), with a live line showing what it means ("40 crates = 400 kg"). The item's usual unit is preselected; a unit is shown next to every quantity box.
+- Guided start: an empty inventory shows a short checklist (add items → set opening stock → add recipes → done), as the current "How stock works" guide does.
+- Show state at a glance: low / out / count needed badges, counts on tabs, and the one thing that needs attention at the top (exceptions, items at zero).
+- Food cost readable: "KES 186 · 31% of the price"; "Unknown — no price for cheese" instead of 0.
+- Forgiving: confirm before anything that can't be undone; warn on unusually large amounts ("4,000 kg? Did you mean 4 kg?"); clear error messages that say how to fix it.
+- Tablet and phone first (branch managers use tablets at the pass): large touch targets, tables that collapse to cards on narrow screens, no horizontal scrolling.
+- Fast: skeleton rows while loading, no full-page spinners.
+
+**Checks:** each screen ticket includes a mobile-width Playwright check (no overflow) and, at milestone M3, a design review of all inventory screens against DESIGN.md (usability, consistency, accessibility) before merging to `main`.
 
 ---
 
@@ -97,7 +110,7 @@ Reuse `PageHeader`, `Panel`, `Segmented`, `TaskDrawer`, `SkeletonRows`, `EmptySt
 | `stock_item_levels` | location, item, `min`, `reorder`, `par`, `max`. Old `low_level` read as org default |
 | `stock_balances` | widen `on_hand` to (18,4); add `reserved` (18,4) default 0 (used from P2) |
 | `stock_movements` + | widen `delta`/`balance_after`; add `unit_cost`, `value`, `ref_type`, `ref_id`, `counterparty_location_id`, `batch_id` (null until P3), `idempotency_key`, `occurred_at`; superset reason check; unique `(idempotency_key, reason)` where key not null |
-| `stock_locations` | allow `kind='warehouse'`; keep `'center'`; add `code`, `status` (active/suspended/archived), `archived_at` |
+| `stock_locations` | keep the single `'center'` as the business's warehouse (UI label "Warehouse"); widen check to allow `'warehouse'` for later; add `code`, `status`, `archived_at` |
 | `inventory_settings` | business, location (null = default), `key`, `value jsonb`. Keys: negative_policy, low_alert, cost_method, display defaults |
 | `inventory_events` | audit (0.6), append-only trigger |
 Rules: base unit immutable once any movement exists (trigger). Conversions across dimensions refused (no density in Phase 1; density = Phase 3 optional).
@@ -115,7 +128,7 @@ Behaviour changes (DB functions replaced, same contracts):
 - Expansion at insert: dish → current recipe version lines; deal → each component's recipe × component qty; extras → extra lines × line qty; `qty_base = line_qty × recipe_qty / (yield_pct/100)`, aggregated per item.
 - Sold-out check aggregates needs across the whole order (shared buns summed) under the advisory lock, as today.
 - Serve: `pos_consumption` movement per (order line, item) from the snapshot with `unit_cost = avg_cost`; `order_stock_effects` keeps it once-only.
-- A5 shortfall: if a keep-selling dish is served with less on hand than needed, deduct to zero and write `stock_exceptions` (order, item, short_qty, status open/resolved).
+- A5 shortfall: if a keep-selling dish is served with less on hand than needed, deduct to zero, write `stock_exceptions` (order, item, short_qty, status open/resolved) and **notify the business owner(s) and the branch's managers** (in-app notification; also when an item first reaches zero / sold out).
 - Data migration: each 009 `menu_item_stock` link → recipe v1 with one line (servings).
 
 ### WP1.3 Backend services & API
