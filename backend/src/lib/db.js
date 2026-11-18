@@ -1,7 +1,7 @@
 // Direct Postgres access for the v2 business and stock features (transactions, row locks). Runs as the server's
 // database role, so every caller must check the user's branch/business access first (routes do, then lib/*).
 import { HttpError } from './http.js';
-import { database } from '../inventory/database.js';
+import { database } from './pool.js';
 
 const SCHEMA = { business: 'database update 008', stock: 'database update 009 (inventory)', legal: 'database update 010 (terms and conditions)' };
 

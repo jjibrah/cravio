@@ -11,7 +11,7 @@ Turns Phase 1 of `07-implementation-plan.md` into tickets you can pick up one at
 | Database | Migrations live in `backend/db/proposed/` until reviewed. Tested only on disposable PGlite (`backend/tests/support/pg.js` → `freshDatabase({ extra: ['proposed/012_…sql'] })`). **Nothing touches the shared database until P1-19.** |
 | Compatibility | Every migration ticket re-runs the existing suites (`npm run test:v2`, esp. `inventory-v2.js`) with the new migration applied, to prove `main`'s code still works on the shared DB. |
 | Tests | New suites under `backend/tests/inv/` run by `npm run test:inv`. Name checks after PRD IDs (`T-INV-1 …`) so coverage is traceable. |
-| Definition of done (each ticket) | Code + tests green (`test:inv`, `test:v2`, `npm run build`) · UI follows `DESIGN.md` and 07 §0.7 (same components, plain words, unit picker, mobile check) · no UI without working API · server-side permission checks · audit/ledger entries for state changes · KB doc touched if behaviour or schema changed. |
+| Definition of done (each ticket) | Code + tests green (`test:inv` — includes `server-load.test.js`, which loads every route module — `test:inv:compat`, `test:v2`, `npm run build`) · UI follows `DESIGN.md` and 07 §0.7 (same components, plain words, unit picker, mobile check) · no UI without working API · server-side permission checks · audit/ledger entries for state changes · KB doc touched if behaviour or schema changed. |
 | Feature switch | New UI sits behind `businesses.inventory_enabled` (and a dev env flag) until P1-19, so `main` users see no change. |
 
 ## Decisions needed before coding the schema
