@@ -26,10 +26,10 @@ const fail = (status, message, code, extra = {}) => new HttpError(status, messag
 export const BUCKET = 'inventory-evidence';
 export const MAX_BYTES = 8 * 1024 * 1024;          // D2-8: 8 MB (the table allows up to 10 MB so the limit can be raised without a migration)
 export const SIGNED_URL_SECONDS = 300;
-export const ENTITY_TYPES = Object.freeze(['po', 'grn', 'invoice', 'return', 'emergency', 'transfer', 'discrepancy', 'wastage']);
+export const ENTITY_TYPES = Object.freeze(['po', 'grn', 'invoice', 'return', 'emergency', 'transfer', 'discrepancy', 'wastage', 'adjustment']);
 export const MIME_EXTENSIONS = Object.freeze({ 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'application/pdf': 'pdf' });
 const UPLOAD_CAPABILITY = Object.freeze({ po: 'inv.purchase.create', invoice: 'inv.purchase.create', grn: 'inv.stock.record', return: 'inv.stock.record',
-  emergency: 'inv.emergency.create', transfer: 'inv.transfer.receive', discrepancy: 'inv.exception.resolve', wastage: 'inv.adjust.create' });
+  emergency: 'inv.emergency.create', transfer: 'inv.transfer.receive', discrepancy: 'inv.exception.resolve', wastage: 'inv.adjust.create', adjustment: 'inv.adjust.create' });
 
 const NO_FILE = 'Choose a photo or PDF to attach.';
 const WRONG_TYPE = 'Only photos (JPEG, PNG, WebP) and PDFs can be attached.';

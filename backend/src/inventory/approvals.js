@@ -365,6 +365,7 @@ export async function getApproval(db, businessId, id) {
  * expectedDate, status } so the inbox row reads "PO-2026-0007 · Farm Fresh · KES 11,600.00 · 3 lines · Warehouse". Mutates and returns the list.
  */
 export async function attachSummaries(db, items) {
+  await attachTransferSummaries(db, items);
   const ids = items.filter((a) => a.subject === 'purchase_order').map((a) => a.subjectId);
   if (!ids.length) return items;
   const { rows } = await db.query(`select po.id, po.number, po.status, po.total::text as total, po.expected_date::text as expected_date, s.name as supplier_name,
@@ -378,6 +379,21 @@ export async function attachSummaries(db, items) {
       deliverTo: r.place_kind === 'branch' ? r.place : 'Warehouse', expectedDate: r.expected_date };
   }
   return items;
+}
+
+/** Branch -> branch transfers and returns: { kind: 'transfer', number, direction, from, to, lineCount, status } (P2-22). */
+async function attachTransferSummaries(db, items) {
+  const ids = items.filter((a) => a.subject === 'transfer').map((a) => a.subjectId);
+  if (!ids.length) return;
+  const { rows } = await db.query(`select t.id, t.number, t.direction, t.status, case when lf.kind = 'branch' then coalesce(rf.name, lf.name) else 'Warehouse' end as from_name,
+      case when lt.kind = 'branch' then coalesce(rt.name, lt.name) else 'Warehouse' end as to_name, (select count(*)::int from public.stock_transfer_lines x where x.transfer_id = t.id) as line_count
+    from public.stock_transfers t join public.stock_locations lf on lf.id = t.from_location left join public.restaurants rf on rf.id = lf.restaurant_id
+    join public.stock_locations lt on lt.id = t.to_location left join public.restaurants rt on rt.id = lt.restaurant_id where t.id = any($1::uuid[])`, [ids]);
+  const byId = new Map(rows.map((r) => [r.id, r]));
+  for (const a of items) {
+    const r = a.subject === 'transfer' ? byId.get(a.subjectId) : null;
+    if (r) a.summary = { kind: 'transfer', number: r.number, direction: r.direction, from: r.from_name, to: r.to_name, lineCount: r.line_count, status: r.status };
+  }
 }
 
 /** Everyone who may be asked: approvers at the location, minus the requester. */

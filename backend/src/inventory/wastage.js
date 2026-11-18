@@ -395,6 +395,8 @@ export function ensureWastageApprovals() {
 /** For tests: forget the registration so ensureWastageApprovals() adds it back after approvals.clearDecisionHandlers(). */
 export function resetWastageApprovals() { unregister = null; }
 ensureWastageApprovals();
+// Shared with adjustments.js / allowances.js (P3-05): what an item or a dish expands to, and what it is worth.
+export { dishLines, itemLines, loadItemRow, totalOf };
 
 /* ---------- reading ---------- */
 

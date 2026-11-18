@@ -20,7 +20,7 @@ import {
   approvePo, cancelPo, closePo, createPo, createPosFromSuggestions, getPo, listPos, poDocument, receiveCapability, rejectPo, reorderSuggestions, sendPo, submitPo, updatePo,
 } from '../inventory/purchasing.js';
 import {
-  createInvoice, createReceipt, expectedDeliveries, getInvoice, getReceipt, getReturn, listInvoices, listReceipts, listReturns, postReceipt, receive, returnToSupplier,
+  checkReceipt, createInvoice, createReceipt, expectedDeliveries, getInvoice, getReceipt, getReturn, listInvoices, listReceipts, listReturns, postReceipt, receive, returnToSupplier,
   reverseReceipt, updateInvoice, updateReceipt,
 } from '../inventory/receiving.js';
 
@@ -156,6 +156,13 @@ export function createRoutes({ authenticate = requireUser, pool = () => database
     // ----- Goods receipts -----
     { method: 'GET', path: path('/goods-receipts'), handler: read((db, scope, _p, q) => listReceipts(db, scope,
       { status: q.get('status') || undefined, supplierId: q.get('supplier') || undefined, locationId: q.get('location') || undefined, poId: q.get('po') || undefined, limit: q.get('limit') || undefined, before: q.get('before') || undefined })) },
+    // Dry run: would these lines raise a price warning? Nothing is written (no transaction, no command id).
+    { method: 'POST', path: path('/goods-receipts/check'), handler: withBody(async ({ request, params, body }) => {
+      const { db, scope } = await open(request, params);
+      const locationId = await newGrnAt(db, scope, params, body);
+      await safely(() => authorize(db, scope, receiveCap(scope, locationId), { locationId, entity: 'goods_receipt' }));
+      return safely(() => checkReceipt(db, scope, strip(body), { today: today() }));
+    }) },
     { method: 'POST', path: path('/goods-receipts'), handler: write('grn_create', receiveCap, newGrnAt, (tx, scope, _p, body) => (body.post === true
       ? receive(tx, scope, strip(body), { today: today() }) : createReceipt(tx, scope, strip(body), { today: today() }))) },
     { method: 'GET', path: path(`/goods-receipts/(?<id>${ID})`), handler: read((db, scope, params) => getReceipt(db, scope, params.id)) },
@@ -181,6 +188,14 @@ export function createRoutes({ authenticate = requireUser, pool = () => database
     { method: 'GET', path: branchPath('/purchase-orders/expected'), handler: branchRead((db, scope, location) => expectedDeliveries(db, scope, location.id)) },
     { method: 'GET', path: branchPath('/goods-receipts'), handler: branchRead((db, scope, location, _p, q) => listReceipts(db, scope,
       { status: q.get('status') || undefined, locationId: location.id, poId: q.get('po') || undefined, limit: q.get('limit') || undefined, before: q.get('before') || undefined })) },
+    { method: 'POST', path: branchPath('/goods-receipts/check'), handler: withBody(async ({ request, body }) => {
+      const { db, scope, location } = await openBranch(request);
+      if (!empty(body.poId)) {
+        const at = await poLocation(db, scope, body.poId);
+        if (at !== location.id) throw await denyAndAudit(db, scope, 'inv.stock.record', { locationId: at, entity: 'goods_receipt', error: NO_BRANCH() });
+      }
+      return safely(() => checkReceipt(db, scope, { ...strip(body), locationId: location.id }, { today: today() }));
+    }) },
     { method: 'POST', path: branchPath('/goods-receipts'), handler: branchWrite('grn_create_branch', (tx, scope, location, _p, body) => {
       const input = { ...strip(body), locationId: location.id };
       return body.post === true ? receive(tx, scope, input, { today: today() }) : createReceipt(tx, scope, input, { today: today() });

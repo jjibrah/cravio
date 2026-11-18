@@ -8,6 +8,7 @@ import { useApi } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import { branchPath } from '../../lib/branch';
 import { branchPaths, formatStamp } from '../../lib/inventory';
+import BranchExpected from './BranchExpected';
 import BranchRecordDrawer from './BranchRecordDrawer';
 import BranchShortfalls from './BranchShortfalls';
 import { EmptyState, ErrorState, OIcon, PageHeader, Panel, SkeletonRows, TaskDrawer } from './parts';
@@ -99,6 +100,8 @@ function StockBody({ data, refresh, canAddItems, sheet, setSheet }) {
         <span><strong>{card.title}</strong>{card.text}</span>
         <button type="button" className="o-btn is-small" onClick={() => setFilter(card.key)}>Show</button></div>)}
     </section>}
+
+    <BranchExpected units={data.units} onReceived={refresh} />
 
     <Panel title="Stock" count={items.length} sub="On hand is what is on the shelf. Available is what is left after what open orders will use.">
       {!items.length ? <>

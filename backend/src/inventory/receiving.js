@@ -162,7 +162,9 @@ async function buildReceiptLines(db, scope, { po, poLines, supplierId, locationI
       seen.add(itemId);
     }
     const item = await loadOrderItem(db, scope.businessId, itemId);
-    const unitText = empty(entry.unit) ? (poLine?.entered_unit || item.displayUnit || item.baseUnit) : String(entry.unit);
+    // A missing unit is an error, never a guess: defaulting to the order's pack ("3 crates") would turn "5" into 5 crates.
+    if (empty(entry.unit)) throw fail(400, `${item.name}: say which unit the amount is in (for example kg, or crate).`, 'unit_required');
+    const unitText = String(entry.unit);
     const code = normaliseUnit(unitText, item, units);
     if (!code) toBase('1', unitText, item, units);
     const factor = toBase('1', code, item, units);
@@ -190,15 +192,19 @@ async function buildReceiptLines(db, scope, { po, poLines, supplierId, locationI
   return out;
 }
 
-/** The prefilled lines for a receipt against an order: everything still outstanding, in the order's own unit when it divides exactly. */
-function prefill(poLines) {
-  return poLines.filter((l) => !isZero(lineOutstanding(l))).map((l) => {
+/**
+ * The prefilled lines for a receipt against an order: everything still outstanding. Each line always carries its unit and round-trips
+ * exactly: in the order's own unit when the outstanding amount is an exact decimal of it (0.5 crate), otherwise in the item's base unit.
+ */
+export async function prefill(db, scope, poLines) {
+  const out = [];
+  for (const l of poLines.filter((x) => !isZero(lineOutstanding(x)))) {
     const open = lineOutstanding(l);
     const inUnit = div(open, l.unit_factor, QTY);
-    const exact = cmp(mul(inUnit, l.unit_factor, QTY), open) === 0;
-    return exact ? { poLineId: l.id, receivedQty: inUnit.toString(QTY), unit: l.entered_unit }
-      : { poLineId: l.id, receivedQty: open.toString(QTY), unit: undefined };
-  });
+    if (cmp(mul(inUnit, l.unit_factor, QTY), open) === 0) out.push({ poLineId: l.id, receivedQty: inUnit.toString(QTY), unit: l.entered_unit });
+    else out.push({ poLineId: l.id, receivedQty: open.toString(QTY), unit: (await loadOrderItem(db, scope.businessId, l.item_id)).baseUnit });
+  }
+  return out;
 }
 
 async function insertReceiptLines(db, scope, grnId, lines) {
@@ -240,7 +246,7 @@ export async function createReceipt(db, scope, body = {}, { today = todayNairobi
   }
   if (!scope.locations.some((l) => l.id === locationId)) throw fail(404, 'That location isn’t part of this business. Pick it from the locations list.', 'location_not_found');
   requireReceive(scope, locationId);
-  const input = has(body, 'lines') && body.lines !== undefined && body.lines !== null ? body.lines : (po ? prefill(poLines) : null);
+  const input = has(body, 'lines') && body.lines !== undefined && body.lines !== null ? body.lines : (po ? await prefill(db, scope, poLines) : null);
   const lines = await buildReceiptLines(db, scope, { po, poLines, supplierId, locationId, input, today });
   const deliveryNoteNo = readText(body.deliveryNoteNo, 60, 'the delivery note number');
   const notes = readText(body.notes, 500, 'the notes');
@@ -305,6 +311,16 @@ export async function updateReceipt(db, scope, id, patch = {}, { today = todayNa
 /* ---------- post ---------- */
 
 /** The price-increase check (GRN-6): cost per base above the order price or the previous cost by more than the owner's percentage. Null when fine or switched off. */
+/** The strongest price warning for one line, or null: { label, against, pct }. `pct` null/undefined (alert switched off) never warns. */
+function priceAlert({ unitCost, poPricePerBase, lastCost }, pct) {
+  if (pct === null || pct === undefined) return null;
+  const hits = [['the order price', poPricePerBase ?? null], ['the last price paid', lastCost ?? null]]
+    .map(([label, against]) => [label, against, variance(unitCost, against, pct)]).filter((x) => x[2] !== null);
+  if (!hits.length) return null;
+  const worst = hits.sort((a, b) => cmp(b[2], a[2]))[0];
+  return { label: worst[0], against: worst[1], pct: worst[2] };
+}
+
 function variance(costPerBase, against, pct) {
   if (against === null || against === undefined || isZero(against) || isZero(costPerBase)) return null;
   const diffPct = div(mul(sub(costPerBase, against, 8), '100', 8), against, 2);
@@ -366,14 +382,11 @@ export async function postReceipt(db, scope, id, { confirmOverDelivery = false, 
   const pctSetting = await getSetting(db, scope.businessId, 'price_variance_alert_pct', g.location_id);
   const alerts = [];
   for (const l of lines) {
-    if (isZero(l.qty_received_base) || pctSetting === null || pctSetting === undefined) continue;
+    if (isZero(l.qty_received_base)) continue;
     const item = items.get(l.item_id);
     const pl = l.po_line_id ? poLines.find((x) => x.id === l.po_line_id) : null;
-    const hits = [['the order price', pl?.price_per_base ?? null], ['the last price paid', item.lastCost]]
-      .map(([label, against]) => [label, against, variance(l.unit_cost, against, pctSetting)]).filter((x) => x[2] !== null);
-    if (!hits.length) continue;
-    const worst = hits.sort((a, b) => cmp(b[2], a[2]))[0];
-    alerts.push({ line: l, item, label: worst[0], against: worst[1], pct: worst[2] });
+    const hit = priceAlert({ unitCost: l.unit_cost, poPricePerBase: pl?.price_per_base, lastCost: item.lastCost }, pctSetting);
+    if (hit) alerts.push({ line: l, item, ...hit });
   }
 
   // Stock in, one movement per accepted line (stable order inside postMany so concurrent receipts can't deadlock).
@@ -416,6 +429,38 @@ export async function postReceipt(db, scope, id, { confirmOverDelivery = false, 
       body: `${g.number}: ${g.unplanned_reason}`, link: `/owner/inventory/receipts/${g.id}`, entity: { type: 'grn', id: g.id }, locationId: g.location_id, dedupeKey: `unplanned:${g.id}`, exclude: [scope.userId] });
   }
   return { receipt: await grnView(db, scope, await loadGrn(db, scope, g.id)), warnings, replayed: false };
+}
+
+/**
+ * Dry run for the screen: the same price rule as posting, per line, with NO writes. Same inputs as createReceipt (poId, or supplierId for an
+ * unplanned delivery; no reason needed yet). Returns { lines: [{ itemId, itemName, costPerUnit, unit, orderPricePerUnit, lastPricePerUnit, warning }], warnings }.
+ */
+export async function checkReceipt(db, scope, body = {}, { today = todayNairobi() } = {}) {
+  let po = null; let poLines = []; let locationId; let supplierId;
+  if (!empty(body.poId)) {
+    po = await loadPo(db, scope, body.poId);
+    locationId = po.deliver_to_location_id; supplierId = po.supplier_id; poLines = await loadPoLines(db, po.id);
+  } else {
+    locationId = empty(body.locationId) ? scope.centerLocationId : needId(body.locationId, 'The location');
+    supplierId = needId(body.supplierId, 'The supplier');
+  }
+  requireReceive(scope, locationId);
+  const input = Array.isArray(body.lines) ? body.lines : (po ? await prefill(db, scope, poLines) : null);
+  const lines = await buildReceiptLines(db, scope, { po, poLines, supplierId, locationId, input, today });
+  const pct = await getSetting(db, scope.businessId, 'price_variance_alert_pct', locationId);
+  const out = []; const warnings = [];
+  for (const l of lines) {
+    const item = await loadOrderItem(db, scope.businessId, l.itemId);
+    const hit = isZero(l.receivedBase) ? null : priceAlert({ unitCost: l.unitCost, poPricePerBase: l.poLine?.price_per_base, lastCost: item.lastCost }, pct);
+    const perUnit = (v) => (v === null || v === undefined ? null : mul(v, l.unitFactor, MONEY).toString(MONEY));
+    let warning = null;
+    if (hit) {
+      warning = { code: 'price_variance', itemId: l.itemId, pct: hit.pct, against: hit.label, message: `${item.name} would cost ${trimZeros(hit.pct)}% more than ${hit.label}.` };
+      warnings.push(warning);
+    }
+    out.push({ itemId: l.itemId, itemName: item.name, unit: l.enteredUnit, costPerUnit: perUnit(l.unitCost), orderPricePerUnit: perUnit(l.poLine?.price_per_base), lastPricePerUnit: perUnit(item.lastCost), warning });
+  }
+  return { lines: out, warnings };
 }
 
 /** Create and post in one go (the usual "I'm standing at the door" flow). Same inputs as createReceipt plus confirmOverDelivery. */

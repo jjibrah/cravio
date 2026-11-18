@@ -136,7 +136,7 @@ test.describe('navigation', () => {
     await expect(nav.getByText('Purchasing', { exact: true })).toBeVisible();
     for (const name of ['Suppliers', 'Purchase orders', 'Receive goods', 'Approvals']) await expect(nav.getByRole('link', { name })).toBeVisible();
     await expect(page.getByRole('heading', { level: 1, name: 'Receive goods' })).toBeVisible();
-    await expect(page.getByText('Receiving goods is coming soon')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Expected deliveries' })).toBeVisible();
     await expect(nav.getByRole('link', { name: 'Receive goods' })).toHaveClass(/is-active/);
     // The Approvals entry shows how many decisions are waiting.
     await expect(nav.getByRole('link', { name: /Approvals/ })).toContainText('2');

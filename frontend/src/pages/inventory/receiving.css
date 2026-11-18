@@ -1,0 +1,66 @@
+/* Receiving, approvals and emergency purchases (P2-15 to P2-17). Builds on inventory.css and purchasing.css: same tokens, nothing new in colour or type. */
+.rcv-cards { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; }
+.rcv-card { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; padding: 14px 16px; border-top: 1px solid var(--line); font-size: 14px; }
+.rcv-card:first-child { border-top: 0; }
+.rcv-card-main { flex: 1 1 240px; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.rcv-card-main strong { font-weight: 600; font-size: 15px; overflow-wrap: anywhere; }
+.rcv-card-main small { color: var(--muted); font-size: 13px; }
+.rcv-card-side { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.rcv-card-next { margin: 0; color: var(--ink-2); font-size: 13px; }
+
+.rcv-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; margin: 0 0 12px; }
+.rcv-facts > div { padding: 10px 12px; border-radius: var(--r-row); box-shadow: 0 0 0 1px var(--line); min-width: 0; }
+.rcv-facts dt { color: var(--muted); font-size: 12px; }
+.rcv-facts dd { margin: 2px 0 0; font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
+
+/* One line of a delivery or purchase: a card, never a wide table. */
+.rcv-lines { display: flex; flex-direction: column; gap: 10px; margin: 0 0 8px; padding: 0; list-style: none; }
+.rcv-line { display: flex; flex-direction: column; gap: 8px; padding: 12px; border-radius: var(--r-row); box-shadow: 0 0 0 1px var(--line); }
+.rcv-line-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 2px 12px; }
+.rcv-line-head strong { font-size: 15px; font-weight: 600; }
+.rcv-line-head small { color: var(--muted); font-size: 13px; }
+.rcv-line-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 8px 12px; align-items: start; }
+.rcv-line-grid > div { min-width: 0; }
+.rcv-more { font-size: 14px; }
+.rcv-more summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; color: var(--ink-2); }
+.rcv-more .rcv-line-grid { padding-bottom: 4px; }
+.rcv-variance { margin: 0; font-size: 13px; color: #7d5106; }
+.rcv-variance.is-down { color: var(--success); }
+
+.rcv-steps { margin: 0 0 8px; color: var(--muted); font-size: 13px; }
+.rcv-summary { margin: 0 0 12px; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; }
+.rcv-summary li { display: flex; gap: 8px; align-items: flex-start; font-size: 14px; }
+.rcv-summary svg { flex: none; margin-top: 3px; color: var(--success); }
+
+.rcv-photo-btn { cursor: pointer; justify-content: center; }
+.rcv-photo-btn:focus-within, input.visually-hidden:focus-visible + .rcv-photo-btn { outline: 3px solid var(--ember); outline-offset: 2px; }
+.rcv-photo-got { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.rcv-photo-got img { width: 96px; height: 72px; object-fit: cover; border-radius: var(--r-row); box-shadow: 0 0 0 1px var(--line); }
+.rcv-photo-name { font-size: 14px; overflow-wrap: anywhere; }
+.rcv-evidence { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; padding: 0; list-style: none; }
+.rcv-evidence a { display: block; min-width: 44px; min-height: 44px; }
+.rcv-evidence img { display: block; width: 88px; height: 66px; object-fit: cover; border-radius: var(--r-row); box-shadow: 0 0 0 1px var(--line); }
+
+.rcv-decide { display: flex; flex-direction: column; gap: 8px; padding: 12px 16px 16px; }
+.rcv-decide .biz-form-actions { margin: 0; }
+.rcv-self { margin-left: 6px; }
+.rcv-limit { margin: 0; padding: 10px 12px; border-radius: var(--r-row); background: var(--selected); font-size: 14px; }
+.rcv-limit.is-ok { background: var(--success-soft); color: var(--success); }
+.rcv-limit.is-ask { background: var(--warning-soft); color: #7d5106; }
+.rcv-expected { display: flex; flex-direction: column; }
+.rcv-expected .rcv-card { padding-left: 16px; padding-right: 16px; }
+.is-late { color: var(--danger); font-weight: 600; }
+
+@media (max-width: 1024px), (pointer: coarse) {
+  .rcv-photo-btn { min-height: 44px; }
+  .rcv-more summary { min-height: 44px; }
+  .inv-reason { min-height: 44px; }
+}
+@media (max-width: 640px) {
+  .rcv-card { padding: 12px; }
+  .rcv-card-side { width: 100%; }
+  .rcv-card-side .o-btn { flex: 1 1 100%; justify-content: center; }
+  .rcv-line-grid { grid-template-columns: minmax(0, 1fr); }
+  .rcv-decide { padding: 12px; }
+  .rcv-decide .biz-form-actions .o-btn { flex: 1 1 100%; justify-content: center; }
+}

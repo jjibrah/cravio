@@ -18,4 +18,6 @@ assert.ok(matches(`/api/owner/inventory/${biz}/purchase-orders`) && matches('/ap
 assert.ok(matches(`/api/owner/inventory/${biz}/approvals`) && matches('/api/inventory/approvals'), 'approval routes are registered');
 assert.ok(matches(`/api/owner/inventory/${biz}/emergency`) && matches('/api/inventory/emergency'), 'emergency purchase routes are registered');
 assert.ok(routes.some((r) => /wastage/.test(String(r.path))), 'wastage routes are registered');
-console.log(`Server load: 13 checks passed (${routes.length} routes).`);
+assert.ok(matches(`/api/owner/inventory/${biz}/requests`) && matches('/api/inventory/requests'), 'distribution routes are registered');
+assert.ok(routes.some((r) => /adjustments/.test(String(r.path))), 'adjustment routes are registered');
+console.log(`Server load: 15 checks passed (${routes.length} routes).`);

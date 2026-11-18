@@ -15,6 +15,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from './api';
 import { getActiveBranch } from './branch';
 import { useAuth } from './auth';
+import { downscaleImage, readBase64 } from './images';
 
 /* ---------- errors and writes ---------- */
 
@@ -120,6 +121,16 @@ export const ownerPaths = (businessId) => {
     approvalDecide: (id) => `${base}/approvals/${id}/decide`,
     attachments: ({ entityType, entityId } = {}) => `${base}/attachments${query({ entityType, entityId })}`,
     attachmentUrl: (id) => `${base}/attachments/${id}/url`,
+    // Receiving and returns (P2-15)
+    goodsReceipts: ({ status, po, location, limit, before } = {}) => `${base}/goods-receipts${query({ status, po, location, limit, before })}`,
+    goodsReceipt: (id) => `${base}/goods-receipts/${id}`,
+    goodsReceiptAction: (id, action) => `${base}/goods-receipts/${id}/${action}`, // post | reverse
+    supplierInvoices: `${base}/supplier-invoices`,
+    supplierReturns: ({ grn } = {}) => `${base}/supplier-returns${query({ grn })}`,
+    // Emergency purchases seen by the owner (P2-16, P2-17)
+    emergency: ({ status, location, limit } = {}) => `${base}/emergency${query({ status, locationId: location, limit })}`,
+    emergencyOne: (id) => `${base}/emergency/${id}`,
+    emergencyReview: (id) => `${base}/emergency/${id}/review`,
   };
 };
 
@@ -139,6 +150,16 @@ export const branchPaths = {
   recipeVersions: (menuItemId) => `/api/inventory/recipes/${menuItemId}/versions`,
   recipeVersion: (menuItemId, versionId) => `/api/inventory/recipes/${menuItemId}/versions/${versionId}`,
   extraRecipe: (extraId) => `/api/inventory/extras/${extraId}/recipe`,
+  // Orders on their way to this branch and receiving them (P2-15)
+  expected: '/api/inventory/purchase-orders/expected',
+  goodsReceipts: '/api/inventory/goods-receipts',
+  goodsReceiptPost: (id) => `/api/inventory/goods-receipts/${id}/post`,
+  // Emergency purchases (P2-17)
+  emergency: ({ status, limit } = {}) => `/api/inventory/emergency${query({ status, limit })}`,
+  emergencyLimits: (amount) => `/api/inventory/emergency/limits${query({ amount })}`,
+  emergencySuppliers: (search) => `/api/inventory/emergency/suppliers${query({ search })}`,
+  emergencyOne: (id) => `/api/inventory/emergency/${id}`,
+  emergencyAction: (id, action) => `/api/inventory/emergency/${id}/${action}`, // submit | purchased | receive | cancel | evidence
 };
 
 /**
@@ -203,17 +224,18 @@ export const purchasing = {
   decide: (businessId, id, body, options) => send('POST', ownerPaths(businessId).approvalDecide(id), body, options),
   attachments: (businessId, options) => api(ownerPaths(businessId).attachments(options)),
   attachmentUrl: (businessId, id) => api(ownerPaths(businessId).attachmentUrl(id)),
-  /** Uploads a picked file as evidence: { entityType, entityId, locationId? }. The server accepts JSON with base64 (up to 8 MB). */
+  /** Uploads a picked file as evidence: { entityType, entityId, locationId? }. Photos are made smaller first (up to 1600 px, JPEG); the server accepts JSON with base64 (up to 8 MB). */
   async upload(businessId, { entityType, entityId, locationId, file }, options) {
-    const base64 = await new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(String(reader.result).split(',')[1] || '');
-      reader.onerror = () => reject(new Error('That file could not be read. Try another one.'));
-      reader.readAsDataURL(file);
-    });
-    return send('POST', ownerPaths(businessId).attachments(), { entityType, entityId, locationId, file: { name: file.name, type: file.type, base64 } }, options);
+    return uploadFile(ownerPaths(businessId).attachments(), { entityType, entityId, locationId }, file, options);
   },
 };
+
+/** Sends a picked photo or PDF to an evidence endpoint as { ...fields, file: { name, type, base64 } }. Photos are downscaled first (lib/images.js). */
+export async function uploadFile(path, fields, file, options) {
+  const prepared = await downscaleImage(file);
+  const base64 = await readBase64(prepared);
+  return send('POST', path, { ...fields, file: { name: prepared.name, type: prepared.type, base64 } }, options);
+}
 
 export const branch = {
   snapshot: (options) => api(branchPaths.snapshot(options), { cache: 'swr', ttl: 10000 }),
@@ -429,3 +451,43 @@ export function estimateTotals(lines, vatPct = 16) {
   return { subtotal, vat, total: round2(subtotal + vat) };
 }
 export { round2 };
+
+
+/* ---------- receiving, approvals and emergency purchases (P2-15 to P2-17) ---------- */
+
+export const INVOICE_LABEL = { etims: 'eTIMS invoice', other: 'Other invoice or receipt', none: 'No invoice' };
+export const EMERGENCY_STATUS = {
+  draft: { label: 'Not sent yet', tone: 'off', next: 'Send it to the owner' },
+  pending_approval: { label: 'Waiting for the owner', tone: 'low', next: 'Wait for the owner to decide' },
+  authorised: { label: 'Go ahead and buy', tone: 'ok', next: 'Buy it, then press “I’ve bought it”' },
+  purchased: { label: 'Bought — receive the goods', tone: 'low', next: 'When it arrives, press “Goods arrived”' },
+  received: { label: 'Received', tone: 'ok', next: 'Nothing more to do' },
+  under_review: { label: 'Received — the owner will check', tone: 'low', next: 'The owner will look at it' },
+  closed: { label: 'Closed', tone: 'off', next: 'Nothing more to do' },
+  rejected: { label: 'Sent back by the owner', tone: 'out', next: 'Start a new purchase if you still need it' },
+  cancelled: { label: 'Cancelled', tone: 'off', next: 'Nothing more to do' },
+};
+export const PAYMENT_LABEL = { cash: 'Cash', mpesa: 'M-Pesa', supplier_credit: 'On credit with the supplier' };
+export const APPROVAL_SUBJECT_LABEL = { purchase_order: 'Purchase order', emergency_purchase: 'Emergency purchase', wastage: 'Wastage', adjustment: 'Stock adjustment', count: 'Stock count', transfer: 'Transfer' };
+
+/** An M-Pesa code is 10 capital letters and numbers (SHK7Q2X9LM). Returns the tidied code, or null when it isn't one. */
+export function normaliseMpesa(value) {
+  const code = String(value ?? '').replace(/\s+/g, '').toUpperCase();
+  return /^[A-Z][A-Z0-9]{9}$/.test(code) ? code : null;
+}
+
+const WORDS = { kg: ['kg', 'kg'], g: ['g', 'g'], l: ['L', 'L'], ml: ['ml', 'ml'], piece: ['piece', 'pieces'] };
+/** "crates", "kg", "pieces": a unit's name for a quantity, with or without the standard unit list. */
+export function unitName(unit, quantity, units = []) {
+  const key = lower(unit);
+  if (units.some((u) => lower(u.code) === key)) return unitWord(unit, quantity, units);
+  if (WORDS[key]) return Number(quantity) === 1 ? WORDS[key][0] : WORDS[key][1];
+  return Number(quantity) === 1 ? String(unit) : plural(String(unit));
+}
+
+/** The percentage a price moved: 20 for Ksh 600 against Ksh 500; null when either is missing. */
+export function percentMore(now, before) {
+  const a = Number(now); const b = Number(before);
+  if (!(a > 0) || !(b > 0)) return null;
+  return Math.round(((a - b) / b) * 1000) / 10;
+}

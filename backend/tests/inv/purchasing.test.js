@@ -563,6 +563,57 @@ let ricePo;
 }
 
 // =============================================================================================================
+// 12b. Prefill round-trips exactly; a missing unit is refused; the dry-run price check writes nothing
+// =============================================================================================================
+{
+  const po = await approvedPo(supplierA, [{ itemId: chicken, qty: 3, unit: 'crate' }]);
+  const pl = po.lines[0].id;
+  const grnCount = async () => (await one('select count(*)::int as n from public.goods_receipts')).n;
+  const moveCount = async () => (await one('select count(*)::int as n from public.stock_movements')).n;
+  // 25 kg of 3 crates (30 kg) in: 5 kg outstanding = exactly 0.5 crate, so the prefill speaks in crates.
+  await api('owner', 'POST', `/purchase-orders/${po.id}/receive`, { lines: [{ poLineId: pl, receivedQty: 25, unit: 'kg' }] });
+  const start = await bal(centre, chicken);
+  const half = await api('owner', 'POST', '/goods-receipts', { poId: po.id });
+  eq([half.receipt.lines[0].qty, half.receipt.lines[0].unit], ['0.5', 'crate'], 'prefill: 0.5 crate, with its unit');
+  await api('owner', 'POST', `/goods-receipts/${half.receipt.id}/post`, {});
+  eq(await bal(centre, chicken), (Number(start) + 5000).toFixed(4), 'posting the prefill unchanged receives exactly the 5 kg outstanding (not 5 crates)');
+  // An outstanding amount that is not a whole number of 4-decimal crates (0.5 g = 0.00005 crate) is prefilled in the base unit, with the unit named.
+  const po2 = await approvedPo(supplierA, [{ itemId: chicken, qty: 3, unit: 'crate' }]);
+  await api('owner', 'POST', `/purchase-orders/${po2.id}/receive`, { lines: [{ poLineId: po2.lines[0].id, receivedQty: 29999.5, unit: 'g' }] });
+  const before2 = await bal(centre, chicken);
+  const tiny = await api('owner', 'POST', '/goods-receipts', { poId: po2.id });
+  eq([tiny.receipt.lines[0].qty, tiny.receipt.lines[0].unit, tiny.receipt.lines[0].receivedBase], ['0.5', 'g', '0.5000'], 'prefill falls back to the base unit, never a bare number');
+  await api('owner', 'POST', `/goods-receipts/${tiny.receipt.id}/post`, {});
+  eq(await bal(centre, chicken), (Number(before2) + 0.5).toFixed(4), 'exactly 0.5 g received');
+  // Missing unit: refused, never guessed (it used to default to the order's crate).
+  const po3 = await approvedPo(supplierA, [{ itemId: chicken, qty: 3, unit: 'crate' }]);
+  const n0 = await grnCount();
+  const noUnit = await refuses(api('owner', 'POST', `/purchase-orders/${po3.id}/receive`, { lines: [{ poLineId: po3.lines[0].id, receivedQty: 5 }] }), 400, 'unit_required', /which unit/, 'missing unit on an order line');
+  ok(noUnit, 'refused');
+  await refuses(api('owner', 'POST', '/goods-receipts', { unplannedReason: 'x', supplierId: supplierA, lines: [{ itemId: chicken, receivedQty: 5 }] }), 400, 'unit_required', null, 'missing unit on an unplanned line');
+  eq(await grnCount(), n0, 'nothing was written');
+
+  // Dry run: same rule as posting, no writes.
+  const g0 = await grnCount(); const m0 = await moveCount(); const s0 = (await q('select count(*)::int as n from public.inventory_events'))[0].n;
+  const mild = await api('owner', 'POST', '/goods-receipts/check', { poId: po3.id, lines: [{ poLineId: po3.lines[0].id, receivedQty: 1, unit: 'crate', unitCost: 630 }] });
+  eq([mild.warnings, mild.lines[0].costPerUnit, mild.lines[0].orderPricePerUnit], [[], '630.00', '600.00'], '5 % above the order price: no warning');
+  const hot = await api('owner', 'POST', '/goods-receipts/check', { poId: po3.id, lines: [{ poLineId: po3.lines[0].id, receivedQty: 1, unit: 'crate', unitCost: 750 }] });
+  eq([hot.warnings.length, hot.warnings[0].code, hot.warnings[0].pct, hot.lines[0].warning.against], [1, 'price_variance', '25.00', 'the order price'], '25 % above: warns before posting');
+  const defaults = await api('owner', 'POST', '/goods-receipts/check', { poId: po3.id });
+  eq([defaults.warnings, defaults.lines.length, defaults.lines[0].costPerUnit], [[], 1, '600.00'], 'no lines given: the prefill at the order price');
+  const spot = await api('owner', 'POST', '/goods-receipts/check', { supplierId: supplierA, lines: [{ itemId: chicken, receivedQty: 1, unit: 'crate', unitCost: 900 }] });
+  eq(spot.warnings.map((w) => w.against), ['the last price paid'], 'unplanned: compared with the last price paid (no reason needed yet)');
+  await refuses(api('owner', 'POST', '/goods-receipts/check', { poId: po3.id, lines: [{ poLineId: po3.lines[0].id, receivedQty: 1, unitCost: 750 }] }), 400, 'unit_required', null, 'the check applies the same input rules');
+  await refuses(api('manager', 'POST', '/goods-receipts/check', { supplierId: supplierA, locationId: centre, lines: [{ itemId: chicken, receivedQty: 1, unit: 'crate' }] }), 403, 'forbidden', null, 'a branch manager cannot check a warehouse receipt');
+  const viaBranch = await call('manager', 'POST', '/api/inventory/goods-receipts/check', { supplierId: supplierA, lines: [{ itemId: chicken, receivedQty: 1, unit: 'crate', unitCost: 900 }] }, '', branch1.restaurantId);
+  eq(viaBranch.warnings.length, 1, 'the branch route checks too');
+  await refuses(call('manager2', 'POST', '/api/inventory/goods-receipts/check', { poId: po3.id, lines: [] }, '', branch2.restaurantId), 403, 'branch_forbidden', null, 'not another branch’s order');
+  eq([await grnCount(), await moveCount()], [g0, m0], 'the dry run wrote no receipt and no movement');
+  eq((await q('select count(*)::int as n from public.inventory_events'))[0].n - s0 >= 0, true, 'only denied-attempt audit rows may be added');
+  await api('owner', 'POST', `/purchase-orders/${po3.id}/cancel`, { reason: 'test only' });
+}
+
+// =============================================================================================================
 // 13. Lists, statuses, permissions, cost visibility, tenant isolation
 // =============================================================================================================
 {
