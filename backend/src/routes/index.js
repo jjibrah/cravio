@@ -8,6 +8,8 @@ import { routes as notifications } from './notifications.js';
 import { routes as inventorySuppliers } from './inventory-suppliers.js';
 import { routes as ai } from './ai.js';
 import { routes as inventoryAttachments } from './inventory-attachments.js';
+import { routes as inventoryPurchasing } from './inventory-purchasing.js';
+import { routes as inventoryApprovals } from './inventory-approvals.js';
 import { routes as legal } from './legal.js';
 import { routes as restaurant } from './restaurant.js';
 import { routes as menuMerch } from './menu-merch.js';
@@ -21,4 +23,4 @@ import { routes as adminPlatform } from './admin-platform.js';
 import { routes as adminBusiness } from './admin-business.js';
 import { routes as settings } from './settings.js';
 
-export const routes = [...me, ...legal, ...owner, ...stock, ...inventoryOwner, ...inventoryRecipes, ...inventoryBranch, ...notifications, ...inventorySuppliers, ...ai, ...inventoryAttachments, ...settings, ...menuMerch, ...restaurant, ...adminBusiness, ...adminPlatform, ...adminUsers, ...publicMenu, ...publicGuest, ...publicTable, ...operations, ...support];
+export const routes = [...me, ...legal, ...owner, ...stock, ...inventoryOwner, ...inventoryRecipes, ...inventoryBranch, ...notifications, ...inventorySuppliers, ...ai, ...inventoryAttachments, ...inventoryPurchasing, ...inventoryApprovals, ...settings, ...menuMerch, ...restaurant, ...adminBusiness, ...adminPlatform, ...adminUsers, ...publicMenu, ...publicGuest, ...publicTable, ...operations, ...support];

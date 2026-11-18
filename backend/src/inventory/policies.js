@@ -39,6 +39,7 @@ export const SETTINGS = {
   // approval rules the owner sets (D2-6, D2-7); until a limit is set every emergency buy goes to the owner (D2-6).
   operations_can_purchase: { default: false, type: 'boolean', validate: bool('Operations managers creating purchase orders') },
   price_variance_alert_pct: { default: 10, type: 'number', validate: number('The price-increase alert', { min: 0, max: 1000 }) },
+  over_delivery_tolerance_pct: { default: 5, type: 'number', validate: number('The extra-delivery allowance on supplier deliveries', { min: 0, max: 50 }) },
   transfer_over_tolerance_pct: { default: 5, type: 'number', validate: number('The extra-delivery allowance on transfers', { min: 0, max: 100 }) },
   returns_need_approval: { default: false, type: 'boolean', validate: bool('Approval for returns to the warehouse') },
   branch_to_branch_enabled: { default: true, type: 'boolean', validate: bool('Transfers between branches') },
