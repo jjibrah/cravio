@@ -1,4 +1,4 @@
-# 07 · Inventory module: implementation plan (draft v1, 18 Nov 2026)
+# 07 · Inventory module: implementation plan (draft v1, 18 Nov 2026; updated 18 Nov with product owner answers INV-P2/P3)
 
 Builds on `main`'s engine (ledger, idempotent commands, DB-enforced sold-out, deduct-on-serve, request → dispatch → QR receive) and brings in v3-dev's restaurant model (base units, yield, cost, supplier purchases, food cost %) plus the PRD modules that matter for inventory. Work on `dev`; merge to `main` per work package.
 
@@ -11,6 +11,10 @@ Builds on `main`'s engine (ledger, idempotent commands, DB-enforced sold-out, de
 > A6 Approving a branch request **reserves** stock at the Warehouse (accepted 18 Nov).
 > A7 Cost method: **weighted average** first; batch/FIFO costing comes with batches (Phase 3).
 > A8 Recipes: owner edits for all branches (Operations → Items & recipes); branch manager edits own branch's recipes (confirmed 18 Nov).
+> A9 **Self-approval (answered 18 Nov):** if the business has another user who can approve, approval by a different person is required (maker-checker). If the requester is the **only** possible approver (a sole owner), they may approve their own record; it is **logged and flagged `self_approved`**, shown in the Approvals inbox/history and in a Self-approved report. Emergency buys come from branch managers, so the owner is always a different person.
+> A10 **Limits are the owner's (answered 18 Nov):** no built-in KES amounts or percentages anywhere. Emergency-buy limits (per purchase, per day, per week, per branch, optional per category) and approval thresholds (wastage, adjustments, count variance; business default with per-branch override) are set in **Settings → Inventory** and changeable any time. **Safe defaults until set** (decision 18 Nov): every emergency buy needs approval; wastage posts without approval; every manual stock adjustment needs approval; a count session with any variance needs one approval for the session.
+> A11 **AI insights layer (answered 18 Nov):** server-only gateway through OpenRouter, every call metered per business, monthly allowance set by the platform admin (owner may lower), figures always computed by Cravio and validated against the AI text. Gateway and metering early in Phase 2; insights after the Phase 3 reports. Design: `12-ai-insights.md`.
+> A12 **Reports and Receipts tabs (answered 18 Nov):** owner group **Reports** → *Reports* (catalogue of every report, CSV, Save as PDF through the browser) and *Receipts* (supplier invoices, goods received notes, delivery/dispatch notes with QR, supplier returns). Branch managers see their own branch. Server-generated PDFs only if emailed/scheduled reports are needed. Customer sale receipts are out of this module (open question).
 
 ---
 
@@ -68,10 +72,13 @@ Movement types (superset of 009's reasons, so `main` still validates): `opening,
 | Branch manager | branch stock, counts, wastage, requests, receive, emergency purchase (within limit), recipes for own branch |
 | Waiter | read availability; (P3) record wastage “limited” |
 | Platform admin | none on stock; entitlement + global defaults only |
-Every check is server-side and location-scoped. **Maker-checker**: `approver_id ≠ created_by`, enforced in SQL check where possible. Capabilities stored in code in Phase 1; an editable `role_capabilities` table is optional in Phase 3.
+Every check is server-side and location-scoped. **Maker-checker**: `approver_id ≠ created_by`, enforced in SQL check where possible, **except** when the business has no other holder of the approving capability: then the requester may approve their own record and it is stored `self_approved = true` (A9). Branch managers can never self-approve. Capabilities stored in code in Phase 1; an editable `role_capabilities` table is optional in Phase 3.
 
 ### 0.6 Audit
 `inventory_events` (append-only): actor, role, location, entity, action, before/after JSON, at. Written for item/recipe/settings edits, approvals, rejections, cancellations. Ledger rows are their own audit for quantities.
+
+### 0.6a AI gateway (A11; `12-ai-insights.md`)
+`backend/src/ai/gateway.js` is the only module that may call `lib/ai.js` (OpenRouter). It checks the per-business switch and monthly limit, caches, times out and retries once, and writes one `ai_usage` row per provider call (tokens, cost in USD and KES, status; no prompt text). Tables `ai_usage`, `ai_limits`, `ai_business_settings` (migration 014, applied with Release A); insight tables in 023. The existing recipe draft is retrofitted first (P2-32/33). Insights use only deterministic Cravio figures, a number validator and a template fallback (Phase 3, P3-40…P3-44).
 
 ### 0.7 UI: same look, easy to use (product owner requirement, 18 Nov 2026)
 **Look the same as the rest of Cravio.** Follow `DESIGN.md` (v2 white). Reuse the existing pieces instead of new styles: `PageHeader`, `Panel`, `Segmented`, `TaskDrawer`, `SkeletonRows`, `EmptyState`, `OIcon`, `stock.css`/`business.css` tokens. A new inventory page should be indistinguishable in style from Orders or Locations. No new colour, font or component unless an existing one can't do the job (then add it to the shared set).
@@ -172,10 +179,10 @@ PGlite: `tests/inv-units.js`, `inv-ledger.js`, `inv-recipes.js`, `inv-orders.js`
 ---
 
 ## Phase 2 — Purchasing & distribution
-> **Updated 18 Nov 2026 (final decisions: ONE warehouse per business).** Everything multi-warehouse is removed from this phase and listed under "Later": choosing a source warehouse, splitting a request across warehouses, warehouse → warehouse transfers, "warehouse with most available". Transfers in Phase 2 are exactly three: **Warehouse → branch** (fulfilling requests), **branch → Warehouse** (returns) and **branch → branch** (needs owner approval). The schema still allows more locations of kind `warehouse` later (`stock_locations.kind`, `from/to_location` on transfers), so nothing here blocks that. The ticket-level plan is in `09-phase2-workplan.md`; migrations are re-split as 014–017 (see the table at the end).
+> **Updated 18 Nov 2026 (final decisions: ONE warehouse per business).** Everything multi-warehouse is removed from this phase and listed under "Later": choosing a source warehouse, splitting a request across warehouses, warehouse → warehouse transfers, "warehouse with most available". Transfers in Phase 2 are exactly three: **Warehouse → branch** (fulfilling requests), **branch → Warehouse** (returns) and **branch → branch** (needs owner approval). The schema still allows more locations of kind `warehouse` later (`stock_locations.kind`, `from/to_location` on transfers), so nothing here blocks that. The ticket-level plan is in `09-phase2-workplan.md`; migrations are re-split as 015–018 (see the table at the end).
 **Goal:** stock and cost enter through suppliers; branches get stock from warehouses with reservations; branches can buy in an emergency within limits; owner approves from one inbox.
 
-### WP2.1 Migrations 014 (suppliers & price lists) and 015 (purchase orders, receipts, invoices, returns, attachments)
+### WP2.1 Migrations 015 (suppliers & price lists) and 016 (purchase orders, receipts, invoices, returns, attachments)
 | Table | Key columns |
 | --- | --- |
 | `suppliers` | business, name, contact, phone (254 format), email, kra_pin, `type` (formal/informal/one_off), payment_terms_days, mpesa/bank details, status, `incomplete` flag (on-the-spot) |
@@ -185,16 +192,16 @@ PGlite: `tests/inv-units.js`, `inv-ledger.js`, `inv-recipes.js`, `inv-orders.js`
 | `goods_receipts` + `grn_lines` | po_id (nullable = unplanned with reason), location, per line: ordered, received, rejected, unit + factor snapshot, unit_cost, batch/expiry (stored, used in P3) |
 | `supplier_invoices` | supplier, number, date, supplier PIN, eTIMS invoice no. (free text, VERIFY), amounts, VAT, attachment, status unpaid/part/paid (P3 aging) |
 | `supplier_returns` | grn/line, qty, reason, credit amount |
-| `approval_rules` | business, subject (po, emergency, wastage, adjustment, count), band min/max, approver capability, location/category scope, period limits |
-| `approvals` | subject_type/id, requested_by, status pending/approved/rejected, decided_by (≠ requested_by), reason, at |
+| `approval_rules` | business, subject (po, emergency, wastage, adjustment, count), band min/max or %, approver capability, location/category scope, period limits. **Rows exist only when the owner creates them; no seeded amounts** (A10) |
+| `approvals` | subject_type/id, requested_by, status pending/approved/rejected, decided_by (≠ requested_by unless `self_approved`, A9), `self_approved`, reason, at |
 | `attachments` | owner entity, storage path (Supabase Storage bucket `inventory-evidence`, private), mime, size |
 
-### WP2.2 Migration 016 — emergency purchases, approval rules and approvals (the `approval_rules` / `approvals` tables listed under WP2.1 are created here, since emergency buys are their first user)
+### WP2.2 Migration 017 — emergency purchases, approval rules and approvals (the `approval_rules` / `approvals` tables listed under WP2.1 are created here, since emergency buys are their first user)
 `emergency_purchases`: branch, item lines, supplier (or new incomplete supplier), estimated/approved/actual amounts, payment method (cash/M-Pesa/credit) + reference, reason, `invoice_status` (etims/other/none), evidence ids, status `draft → pending_approval → authorised → purchased → received → under_review → closed / rejected`.
-Threshold check (EMP-1): per transaction, per branch per day/week cumulative, per category — all from `approval_rules`; below → auto-authorised; above → approval.
+Threshold check (EMP-1): per purchase, per branch per day/week cumulative, per category — all from `approval_rules` **set by the owner**; within the limit → auto-authorised; above → approval; **no limit set → approval** (A10).
 No-invoice requires reason + goods photo + payment reference (T-EMP-3).
 
-### WP2.3 Migration 017 — distribution upgrade
+### WP2.3 Migration 018 — distribution upgrade
 - `stock_requests`: statuses → `draft, submitted, approved, partially_approved, rejected, preparing, dispatched, partially_received, received, completed, cancelled` (superset).
 - `stock_request_lines` + `approved`, `dispatched`, `received`. The source is always the business's Warehouse (no source choice, no split); one request → at most one open transfer at a time, further dispatches for the remainder allowed (partial dispatch).
 - `stock_reservations`: location (the Warehouse), item, qty, ref (request line; production later), status active/released/consumed. `available = on_hand − reserved − order holds`. `stock_balances.reserved` (from 012) is the cached sum; the ledger keeps them in step.
@@ -205,7 +212,7 @@ No-invoice requires reason + goods photo + payment reference (T-EMP-3).
 ### WP2.4 Services, API, UI
 - **Owner → Operations → Purchasing**: Suppliers (list, profile, price history), Purchase orders (create from **reorder suggestions**: items below reorder/par per location minus open POs), approve (bands), send (PDF + WhatsApp share link), Receive (GRN against PO or unplanned), Returns. GRN posts `purchase_receipt` with cost → updates `avg_cost`/`last_cost`; price variance alert above X% vs PO/last price (GRN-6).
 - **Owner → Requests & transfers**: approve/partial/reject per line, reserve at the Warehouse on approval, pick list (printable / mobile), dispatch (partial allowed, delivery note + QR as today), start a return (branch → Warehouse) or approve a branch → branch transfer, discrepancy review queue. (Single Warehouse: no source picker.)
-- **Owner → Approvals**: one inbox for POs, emergency buys, (P3) wastage/adjustments/count variances; shows who asked, amount, rule triggered.
+- **Owner → Approvals**: one inbox for POs, emergency buys, (P3) wastage/adjustments/count variances; shows who asked, amount, rule triggered and a "Self-approved" chip where the owner approved their own record. **Owner → Settings → Inventory**: emergency limits per branch, approval thresholds, PO bands, AI usage and allowance (P2-35). **Owner → Reports → Receipts** (P2-36/37).
 - **Branch → Requests & deliveries**: create request (suggested quantities from par/reorder and recent use), track status, receive with short/damaged/over per line.
 - **Branch → Purchases**: emergency buy form (v3-dev purchase form + threshold indicator “within your KES X limit”), evidence upload (camera), on-the-spot supplier.
 - Notifications (in-app, existing NotificationCenter): request submitted/approved/rejected/dispatched, delivery incoming, discrepancy, approval needed, price variance, low stock.
@@ -226,13 +233,16 @@ No-invoice requires reason + goods photo + payment reference (T-EMP-3).
 | Cancel dispatch after partial receipt | Refused; resolve via discrepancy |
 | PO → partial GRN → 2nd GRN → supplier return | Balances, PO status, credit correct (T-PRC-1) |
 | GRN price 20% above last | Variance alert |
-| Emergency below threshold | Auto-authorised; stock on receipt (T-EMP-1) |
-| Emergency above threshold | Blocked until a different user approves (T-EMP-2) |
+| Emergency within the owner-set limit | Auto-authorised; stock on receipt (T-EMP-1) |
+| Emergency buy, no limit set | Goes to approval (safe default) |
+| Emergency above the owner-set limit | Blocked until a different user approves (T-EMP-2) |
 | Weekly cumulative limit exceeded by small buys | Next one routed to approval |
 | No-invoice without photo/ref | Rejected (T-EMP-3) |
-| Change threshold in settings | Applies immediately, no code change (T-EMP-4) |
+| Owner changes a limit in Settings → Inventory | Applies immediately, no code change (T-EMP-4) |
 | Same item bought in emergency 3× in a week | Alert to adjust par (EMP-7) |
-| Approver tries to approve own PO | Denied (T-SEC-2) |
+| Approver tries to approve own PO while another approver exists | Denied (T-SEC-2) |
+| Sole owner approves own PO | Allowed, flagged `self_approved`, reported |
+| Recipe AI draft | Metered per business; blocked at the allowance with a plain message |
 
 ### WP2.6 Exit criteria
 T-REQ-1..3, T-PRC-1, T-EMP-1..4, T-SEC-2 automated; full request→receipt and PO→GRN flows in Playwright; reconciliation zero.
@@ -242,28 +252,31 @@ T-REQ-1..3, T-PRC-1, T-EMP-1..4, T-SEC-2 automated; full request→receipt and P
 ## Phase 3 — Controls, production, batches & reporting
 **Goal:** prove where stock went (wastage, counts, variance), prep kitchens, expiry, and the reports owners act on.
 
-> **Updated 18 Nov 2026:** migrations are renumbered **018–022** because Phase 2 now uses 014–017 (see the sequencing table); Phase 3 stays single-warehouse (location-scoped features apply to the Warehouse and branches). The ticket-level plan is in `10-phase3-workplan.md`.
+> **Updated 18 Nov 2026:** migrations are renumbered **019–023** because Phase 2 now uses 015–018 (see the sequencing table); Phase 3 stays single-warehouse (location-scoped features apply to the Warehouse and branches). The ticket-level plan is in `10-phase3-workplan.md`.
 
-### WP3.1 Wastage & adjustments (migration 018)
-`stock_reason_codes` (configurable: burned, spoiled, expired, prep error, spill, damaged, customer return, over-production, theft suspected); `wastage_records` (item or **menu item expanded via recipe**, qty, reason, cost from avg, photo, status); `stock_adjustments` (gain/loss, reason, evidence, status). Above value/qty threshold → approval (maker-checker). Unusual wastage (vs 4-week rolling average) → alert. Staff meal / complimentary as own types with allowance limits.
+### WP3.1 Wastage & adjustments (migration 019)
+`stock_reason_codes` (configurable: burned, spoiled, expired, prep error, spill, damaged, customer return, over-production, theft suspected); `wastage_records` (item or **menu item expanded via recipe**, qty, reason, cost from avg, photo, status); `stock_adjustments` (gain/loss, reason, evidence, status). Above the **owner-set** value/qty threshold → approval (maker-checker, A9/A10); defaults until set: wastage free, adjustments approved. Unusual wastage (vs 4-week rolling average) → alert. Staff meal / complimentary as own types with allowance limits.
 
-### WP3.2 Stock counts (migration 019)
-`stock_counts` (location, type full/cycle/spot, category/zone filter, blind flag, status `open → counting → under_review → approved → posted / cancelled`, snapshot_at) + `stock_count_lines` (expected at snapshot, movements since snapshot, counted per counter, recount flag, variance qty/value). Variance = counted − (expected + movements during count). Beyond tolerance → approval; post as `count_correction`. Replaces the single-item “count”.
+### WP3.2 Stock counts (migration 020)
+`stock_counts` (location, type full/cycle/spot, category/zone filter, blind flag, status `open → counting → under_review → approved → posted / cancelled`, snapshot_at) + `stock_count_lines` (expected at snapshot, movements since snapshot, counted per counter, recount flag, variance qty/value). Variance = counted − (expected + movements during count). Beyond the **owner-set** tolerance (until set: any variance, one approval per session) → approval; post as `count_correction`. Replaces the single-item “count”.
 
-### WP3.3 Production / prepared items (migration 020)
+### WP3.3 Production / prepared items (migration 021)
 Prepared stock items get recipes (sub-recipes, cycle detection). `production_orders`: planned qty, inputs reserved, actual output, yield variance; posts `production_input` (−) and `production_output` (+) linked by production id, output cost = Σ input cost / output qty. Dish recipes may use prepared items (consumed as stock, not re-expanded).
 
-### WP3.4 Batches, expiry, FEFO (migration 021)
+### WP3.4 Batches, expiry, FEFO (migration 022)
 `batches` (item, number, supplier, received, expiry, unit_cost) + `batch_balances` (location, item, batch). Item `expiry_tracking` off/optional/mandatory. GRN/production create batches; consumption, dispatch and wastage allocate FEFO (FIFO if no expiry); expired batches blocked from POS/transfers/production with manager override + reason; near-expiry alerts; traceability (batch → movements → orders). Batch cost becomes available as cost method.
 
 ### WP3.5 Costing, variance & reports
 - Valuation by location/category/date (avg cost; batch cost once 3.4 lands).
 - Theoretical usage (Σ order_stock_lines served) vs actual (opening + receipts ± transfers − wastage − closing count) by item/branch/period; variance in qty and KES with tolerance highlighting (CST-3/4).
 - Menu engineering: food cost %, margin, popularity (from orders) per dish and branch (CST-5); price-change impact list (CST-6).
-- Reports (17.2 subset): valuation, movement ledger, consumption, variance, wastage, expiry, procurement spend (central vs emergency), emergency compliance, supplier performance, stock turnover/days on hand. CSV for all; PDF for key ones; background job for long ranges.
+- Reports (17.2 subset): valuation, movement ledger, consumption, variance, wastage, expiry, procurement spend (central vs emergency), emergency compliance, supplier performance, stock turnover/days on hand. Owner **Reports** catalogue (list → open → filters → table/chart → CSV → Save as PDF via print layout); background CSV job for long ranges; server PDF only if emailed/scheduled reports are wanted (optional).
 - Dashboards: owner Overview tiles (inventory value, low/expiring, pending approvals, in transit, emergency spend, variance alerts) with drill-down to ledger rows; branch Overview tiles.
 
-### WP3.6 Reliability & governance (migration 022: reconciliation runs, report jobs, period locks, role capabilities, delegations)
+### WP3.5a AI insights (migrations: tables in 023; gateway tables 014 in Phase 2)
+Fact builders over the reports above (branch profitability as *gross profit after food cost*, loss-making branch, dish food-cost spikes, wastage, emergency spend, variance hotspots, reorder suggestions) → validated plain-language findings → daily job and a fixed "Ask about my numbers" list → owner Overview briefing and Reports → Insights; branch managers see their own branch. Tickets P3-40…P3-44; design in `12-ai-insights.md`.
+
+### WP3.6 Reliability & governance (migration 023: reconciliation runs, report jobs, period locks, role capabilities, delegations)
 - Scheduled reconciliation (balances vs ledger) + alert; manual reconcile report (LED-5).
 - Period close/lock (LED-8).
 - Editable `role_capabilities` per business (RBAC-8) and approval delegation (RBAC-4).
@@ -294,11 +307,14 @@ Location-scoped role for the Warehouse (warehouse manager, storekeeper) working 
 ## Later modules (outside this plan)
 M-Pesa (Daraja STK + reconciliation), KRA eTIMS (OSCU/VSCU adapter), shifts/cash-up, KDS stations, offline PWA sync, delivery platforms, accounting exports API, recall workflow, demand forecasting, **multi-warehouse features** (several warehouses, choosing a source, splitting a request, warehouse → warehouse transfers; the schema allows it, no UI or logic is planned). The inventory ledger is designed so these plug in (e.g. `pos_consumption` is already idempotent per order line; eTIMS item codes can map onto `vat_class`).
 
+## Reports and Receipts in the navigation and phases
+Owner sidebar group **Reports**: **Receipts** arrives in Phase 2 (P2-36 supplier documents at Release A, P2-37 delivery notes at Release B); **Reports** (catalogue) arrives in Phase 3 (P3-26/28, Release E) and **Reports → Insights** in Release G. Branch managers see **Receipts** and **Reports** for their own branch. See `05-navigation-proposal.md`.
+
 ## Sequencing summary
 | Phase | Migrations | Main deliverable | Rough size |
 | --- | --- | --- | --- |
 | 1 | 012 catalogue & units, 013 recipes & snapshots | Real units, warehouses, versioned recipes, food cost, sold-out on real ingredients | Largest backend change (touches order triggers) |
-| 2 | 014 suppliers & price lists, 015 purchase orders / receipts / invoices / returns / attachments, 016 emergency purchases + approval rules + approvals, 017 distribution upgrade | Suppliers → POs → GRN, emergency buys with limits, reservations, Warehouse ↔ branch and branch → branch transfers, approvals inbox | Most UI |
-| 3 | 018 wastage/adjust/allowances, 019 counts, 020 production, 021 batches, 022 governance & reporting support | Controls, prep, expiry, variance & reports | Most reporting |
+| 2 | 015 suppliers & price lists, 016 purchase orders / receipts / invoices / returns / attachments, 017 emergency purchases + approval rules + approvals, **014 AI gateway (usage, limits, switches)**, 018 distribution upgrade | Suppliers → POs → GRN, emergency buys with owner-set limits, self-approval flag, reservations, Warehouse ↔ branch and branch → branch transfers, approvals inbox, Settings → Inventory, Receipts, AI gateway with metering | Most UI (≈ 70 days, `09`) |
+| 3 | 019 wastage/adjust/allowances, 020 counts, 021 production, 022 batches, 023 governance, reporting support & AI insight tables | Controls, prep, expiry, variance, **Reports catalogue**, **AI insights** | Most reporting (≈ 115 days, `10`) |
 
 Each WP ends with: migration reviewed + rehearsed, tests green, KB updated, PR `dev → main`.

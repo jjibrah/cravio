@@ -15,6 +15,7 @@ Working reference for adding the inventory management module to Cravio. Written 
 | [09-phase2-workplan.md](09-phase2-workplan.md) | Phase 2 (purchasing & distribution) broken into tickets (P2-01…), milestones, migrations 014–017, migration of the 009 request/dispatch flow, first week, risks |
 | [10-phase3-workplan.md](10-phase3-workplan.md) | Phase 3 (controls, production, batches & reporting) broken into tickets (P3-01…), migrations 018–022, cases, risks |
 | [11-design-review.md](11-design-review.md) | Design review of the Phase 1 inventory screens: findings, fixes, what's left |
+| [12-ai-insights.md](12-ai-insights.md) | AI insights layer: server-only gateway with per-business metering and limits, deterministic facts, number validator, daily and on-demand insights, privacy, risks, open questions (tickets P2-32…34, P3-40…44) |
 
 Source PRD file: `/Users/it-macmini-5/.t3/userdata/attachments/247035ad-0c89-4fd3-be22-f56e01f97d25-64d170dc-07f1-467b-a3bf-c27a37af2ef2-pdf.pdf`
 

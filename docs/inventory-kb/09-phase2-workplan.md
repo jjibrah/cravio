@@ -1,8 +1,12 @@
 # 09 · Phase 2 work plan: purchasing & distribution
 
-Turns Phase 2 of `07-implementation-plan.md` into tickets you can pick up one at a time, in the same format as `08-phase1-workplan.md`. Estimates assume one developer working with Claude; **≈ 57 working days (11–12 weeks)**, shipped in **two releases** (A: purchasing + emergency buying, B: distribution). Each ticket is small enough for one PR into `dev`. Written 18 Nov 2026.
+> **Migration numbering (18 Nov 2026):** the runner (`backend/scripts/migrate.js`) only applies files named `NNN_name.sql` (three digits). Phase 2 migrations are 014 AI gateway, 015 suppliers, 016 purchasing, 017 emergency + approvals, 018 distribution; Phase 3 continues at 019–023. Never use suffixes like `016a`.
+
+Turns Phase 2 of `07-implementation-plan.md` into tickets you can pick up one at a time, in the same format as `08-phase1-workplan.md`. Estimates assume one developer working with Claude; **≈ 70 working days (about 14 weeks)** (57 for the original purchasing/distribution scope + 13 for the owner Settings → Inventory screen, Receipts, and the AI gateway with metering and limits added on 18 Nov), shipped in **two releases** (A: purchasing + emergency buying, B: distribution). Each ticket is small enough for one PR into `dev`. Written 18 Nov 2026.
 
 **Scope in one line:** stock and cost enter through suppliers (price lists → purchase orders → goods receipts → invoices → returns); branches can buy in an emergency within limits; the owner approves from one inbox; branches request stock from the **one Warehouse**, approval **reserves** it, dispatch/receive/discrepancy run on the new ledger; the old 009 request/dispatch/QR flow moves onto the new engine and its pages are retired.
+
+**Added 18 Nov 2026 (product owner answers, INV-P2/P3):** self-approved purchase orders for a sole owner (D2-5); **no built-in emergency-buy amounts** — the owner sets limits in a new Settings → Inventory screen (D2-6, P2-35); owner-configurable approval thresholds (D2-16); owner **Reports → Receipts** tab (P2-36/37); and the **AI gateway with per-business metering and limits** (P2-32…P2-34, design in `12-ai-insights.md`).
 
 **What is NOT in Phase 2** (final decisions, 18 Nov): several warehouses, choosing a source warehouse, splitting a request, warehouse → warehouse transfers (schema allows them later; no UI, no logic); M-Pesa/eTIMS integrations (the invoice screen only *stores* an eTIMS number and PIN as text; M-Pesa reference is a typed text field); offline; 3-way match and supplier payments/AP (invoice `payment_status` is stored, not driven — Phase 3 reports/AP later); batches and expiry (stored on the receipt line, used in Phase 3).
 
@@ -26,9 +30,9 @@ Same rules as `08-phase1-workplan.md`; the differences are called out.
 | Topic | Rule |
 | --- | --- |
 | Branches | `main` ← `dev` ← short-lived `inv/p2-NN-short-name` per ticket. PR ticket → `dev`; PR `dev` → `main` at **Release A** (after P2-18) and **Release B** (after P2-31). Set your git identity first. |
-| Database | New migrations **014–017** in `backend/db/proposed/` until reviewed, each with `.down.sql`. Tested only on disposable PGlite (`freshDatabase({ extra: [...] })`). **Nothing touches the shared database until P2-18 (014–016) and P2-31 (017).** `main` and `dev` share one database: every migration is **additive** (new tables/columns, widened checks that are supersets, widened numerics); `main`'s code must keep working. Never rename or drop a column `main` reads. |
+| Database | New migrations **015–018** in `backend/db/proposed/` until reviewed, each with `.down.sql`. Tested only on disposable PGlite (`freshDatabase({ extra: [...] })`). **Nothing touches the shared database until P2-18 (015–017) and P2-31 (018).** `main` and `dev` share one database: every migration is **additive** (new tables/columns, widened checks that are supersets, widened numerics); `main`'s code must keep working. Never rename or drop a column `main` reads. |
 | Rehearsal | Each migration ticket includes a PGlite rehearsal test (`backend/tests/inv/migration-0NN.test.js`): apply on a seeded database shaped like the census, assert counts, apply the down file, assert restore, assert the down file **refuses** when new-world data exists. P2-19 rehearses the 009 backfill on a copy of the P2-01 census shape. |
-| Compatibility | Update `npm run test:inv:compat` so `INV_EXTRA_MIGRATIONS` lists **all** proposed migrations in order (012…017 as they appear) and `backend/tests/inventory-v2.js` still passes. Every migration ticket runs it; a red `inventory-v2.js` blocks the PR. |
+| Compatibility | Update `npm run test:inv:compat` so `INV_EXTRA_MIGRATIONS` lists **all** proposed migrations in order (012…018 as they appear) and `backend/tests/inventory-v2.js` still passes. Every migration ticket runs it; a red `inventory-v2.js` blocks the PR. |
 | Tests | New suites under `backend/tests/inv/` run by `npm run test:inv` (includes `server-load.test.js`, which loads **every** route module — a new `routes/inventory-*.js` that fails to import breaks the whole API, so it must be green). Name checks after PRD IDs (`T-REQ-1 …`). |
 | UI rules | Follow `DESIGN.md` and 07 §0.7: same components (`PageHeader`, `Panel`, `Segmented`, `TaskDrawer`, `SkeletonRows`, `EmptyState`, `OIcon`), plain words (“On hand”, “Held for requests”, “Coming in”, never “reserved/ledger/SKU”), unit picker with live conversion line, one main action per page, forms in the side drawer, phone/tablet first (tables collapse to cards, no horizontal scroll), skeleton rows, confirm before irreversible actions, warn on unusual amounts. |
 | UI tests | Mocked Playwright specs per screen ticket (`frontend/tests/inventory-<area>.spec.js`: fake session in storage, `/api/me` and every inventory call answered in the spec, unlisted API paths 404, **no backend, no database, no password**), including a phone-width “no horizontal overflow” check. **Run on a non-5173 port** so other dev servers are not disturbed: `cd frontend && npx vite --port 5191 & npx playwright test tests/inventory-<area>.spec.js` with a one-off config that sets `baseURL: 'http://localhost:5191'` and no `webServer` (copy of `playwright.v2.config.js` with the port; do not edit `playwright.config.js`). |
@@ -44,9 +48,9 @@ Same rules as `08-phase1-workplan.md`; the differences are called out.
 | D2-2 | **Approving a request reserves stock** at the Warehouse; dispatch consumes the reservation; cancel/reject releases it. | INV-A6 |
 | D2-3 | The **owner acts as head office, procurement and warehouse**: creates/approves POs, receives goods, dispatches. | INV-A2 |
 | D2-4 | **Weighted-average cost**; a goods receipt with cost re-averages (`ledger.post` already does this). Batch/FIFO arrives in Phase 3. | INV-A7 |
-| D2-5 | Maker-checker: approver ≠ requester (DB check on `approvals`). Exception, **default on and audited**: an owner may approve their *own* PO when setting `owner_self_approve_po` is on (the owner is head office and may be the only person). Emergency purchases are made by branch managers, so the owner is always a different person. T-SEC-2 is tested with the setting off and with an operations-manager-drafted PO. | Proposed default; confirm (Q2-1) |
-| D2-6 | Emergency-purchase limits live in `approval_rules` (not code) and default to **KES 5,000 per transaction, KES 10,000 per branch per day, KES 20,000 per branch per week** (week = Monday–Sunday, Africa/Nairobi); optional per-category limit. Below all limits → auto-authorised; any breach → needs owner approval. Edited in **Approvals → Limits** and effective immediately (T-EMP-4). | Q-P1; amounts proposed (Q2-2) |
-| D2-7 | **PO approval bands** in `approval_rules` (subject `po`): default no band → owner-created POs are approved by the owner in one click (self-approval per D2-5); an owner can add a band (e.g. above KES 100,000 needs a second approver — another owner or an operations manager with `operations_can_approve`). | Proposed |
+| D2-5 | **Approvals and who may approve (answered 18 Nov: a sole owner may approve their own PO).** Rule: when a purchase order (or other approval subject) needs approval, the system looks for **another user who holds the approving capability** (`inv.purchase.approve`: another owner, or an operations manager with `operations_can_approve`) **in that business**. If one exists, approval by someone **other than the requester is required** (maker-checker, DB check `decided_by <> requested_by`). If none exists, the requester **may approve their own** record; it is **logged and flagged `self_approved = true`**, shown with a "Self-approved" chip in the Approvals inbox and history, and listed in a **Self-approved records** report (P3-26). The `owner_self_approve_po` setting is removed: it is the data (is there another approver?), not a switch. Emergency buys are made by branch managers, so the owner is always a different person; a branch manager can never self-approve. T-SEC-2 is tested both ways: another approver exists → own approval denied; sole owner → allowed and flagged. | Product owner, 18 Nov (INV-P2/P3) |
+| D2-6 | **Emergency-buy limits are set by the owner, with no built-in amounts (answered 18 Nov).** The owner sets limits **per branch** — per purchase, per day, per week — and optionally **per category**, in **Settings → Inventory** (P2-35) and can change them at any time (T-EMP-4; effective at once, audited with before/after). They live in `approval_rules`; the migration and the code carry **no default amounts**. **Until a limit is set for a branch, every emergency buy goes to the owner for approval** (the safe default), and the branch form says "No limit set — the owner will be asked". A set limit that is not exceeded → auto-authorised; any breach → owner approval. Week = Monday–Sunday, Africa/Nairobi. | Product owner, 18 Nov (INV-P2/P3) |
+| D2-7 | **PO approval bands** in `approval_rules` (subject `po`): none until the owner adds one. With no band, a PO is approved by the owner in one click (self-approval flagged when there is no other approver, D2-5); an owner can add a band (e.g. above an amount they choose, a second approver is needed — another owner or an operations manager with `operations_can_approve`; if no second person exists the self-approval rule still applies). No amounts are built in. | Proposed |
 | D2-8 | Evidence (invoice/goods photos, delivery notes) lives in a **private Supabase Storage bucket `inventory-evidence`**; the browser uploads straight to a **signed upload URL** issued by the API, viewing uses a **5-minute signed URL** after a permission check on the parent record. Allowed: jpeg/png/webp/pdf, ≤ 8 MB; images downscaled to ≤ 1600 px in the browser. | Q-P2 |
 | D2-9 | A **no-invoice** emergency purchase needs a reason, a payment reference (M-Pesa code or receipt no.) and at least one goods photo — enforced in the service **and** by a DB check/trigger (T-EMP-3). | PRD EMP, T-EMP-3 |
 | D2-10 | PO number = `PO-<year>-<0001>` per business per year; request, transfer and GRN numbers per business (existing `nextNumber` pattern with advisory lock). | Proposed |
@@ -55,17 +59,21 @@ Same rules as `08-phase1-workplan.md`; the differences are called out.
 | D2-13 | Price variance alert: a receipt line costing more than `price_variance_alert_pct` (default **10 %**) above the PO price or the last receipt cost notifies the owner. | PRD GRN-6 |
 | D2-14 | Suppliers: name unique per business (case-insensitive); phone stored as `2547XXXXXXXX`/`2541XXXXXXXX`; KRA PIN format `A123456789B` validated but optional; bank/M-Pesa details visible to the owner only. An *on-the-spot* supplier created from an emergency purchase is `incomplete = true` and shows a “complete this supplier” prompt. | PRD SUP |
 | D2-15 | Business that switches the module on **keeps its open 009 requests and in-transit dispatches** (same tables, no copying). Approved-but-not-dispatched 009 requests get reservations created at the switch (P2-19); if stock is short the request is flagged “needs attention”, never silently shortened. | Proposed |
+| D2-16 | **Approval thresholds are owner-configured (answered 18 Nov).** Wastage, stock-loss/gain adjustments and count variance have **no fixed KES or % defaults in code**. The owner sets them per business with an optional **per-branch override** in the same Settings → Inventory screen (built in P2-35 with the emergency limits; the Phase 3 subjects plug into it). **Safe default until the owner sets them (decision 18 Nov):** wastage is **recorded straight away, no approval** (it is routine and a restaurant would drown in approvals; every record has a reason, can need a photo, appears in the owner's wastage log and feeds the unusual-wastage alert); a **manual stock adjustment** (a gain or a loss) **always needs approval** (rare, and a gain is how stock is conjured); a **stock count session with any non-zero variance needs one approval for the whole session** (one approval per count, not per line). Setting a threshold replaces the default for that subject: "approve wastage above KES X", "approve adjustment losses above KES X", "approve count variance above X % or KES Y". See D3-4/D3-5. | Product owner, 18 Nov (INV-P2/P3); default chosen here |
+| D2-17 | **AI gateway first.** The server-only AI gateway, per-business metering and limits (design: `12-ai-insights.md`) ship early in Phase 2 because the recipe AI draft already calls OpenRouter unmetered. Every AI call goes through `backend/src/ai/gateway.js` (P2-32); the recipe draft is retrofitted (P2-33); the admin sets each business's monthly allowance (P2-34). Insights built on it come in Phase 3. | Product owner, 18 Nov |
 
 ## Milestones
 
 | Milestone | Tickets | Outcome | ~Days |
 | --- | --- | --- | --- |
 | M0 Ready | P2-01 → P2-02 | Decisions logged, census, reservation spike, harness + shared helpers | 1.5 |
+| MA AI gateway | P2-32 → P2-33 | Gateway, metering, limits, switches; recipe draft retrofitted (tested; any time after M0, before Release A) | 4.5 |
 | M1 Purchasing engine | P2-03 → P2-08 | Suppliers, price lists, POs, receipts, invoices, returns, evidence storage (tested, no UI) | 12 |
 | M2 Approvals & emergency | P2-09 → P2-11 | Rules, approvals with maker-checker, emergency purchases end to end (tested, no UI) | 6.5 |
-| M3 Purchasing screens → **Release A** | P2-12 → P2-18 | Purchasing, Approvals, branch Purchases screens; migrations 014–016 applied; `dev` → `main` | 13.5 |
-| M4 Distribution engine | P2-19 → P2-25 | Migration 017 + 009 backfill, reservations in the ledger, request → dispatch → receive → discrepancy, returns, branch → branch, 009 flow switched over | 13.5 |
-| M5 Distribution screens → **Release B** | P2-26 → P2-31 | Requests & transfers (owner), Requests & deliveries (branch), old pages retired, design review, race test, migration 017 applied, `dev` → `main` | 10 |
+| M3 Purchasing screens → **Release A** | P2-12 → P2-18, P2-34 → P2-36 | Purchasing, Approvals, branch Purchases screens; **Settings → Inventory** (limits, thresholds, AI usage); **Receipts**; admin AI usage and limits; migrations 015–017 + 014 applied; `dev` → `main` | 21 |
+| M4 Distribution engine | P2-19 → P2-25 | Migration 018 + 009 backfill, reservations in the ledger, request → dispatch → receive → discrepancy, returns, branch → branch, 009 flow switched over | 13.5 |
+| M5 Distribution screens → **Release B** | P2-26 → P2-31, P2-37 | Requests & transfers (owner), Requests & deliveries (branch), Receipts gain delivery notes, old pages retired, design review, race test, migration 018 applied, `dev` → `main` | 11 |
+| **Total** | | | **70** |
 
 **De-risk spike on day 2** (inside P2-01): a throwaway PGlite script proving reservations under concurrency — two approvals racing for the last 10 kg at the Warehouse, one reservation consumed by a dispatch, one released by cancel — and that `stock_balances.reserved` equals Σ active reservation remainders afterwards. It is the riskiest new ledger behaviour; finding a problem in week 8 would be expensive.
 
@@ -82,17 +90,29 @@ Same rules as `08-phase1-workplan.md`; the differences are called out.
 - Done when: decisions logged with date; census numbers recorded; spike passes (or the design in P2-20 is adjusted before any code).
 
 **P2-02 Harness and shared helpers** · 1 d
-- `backend/tests/inv/fixture.js`: add a second owner, an operations manager (assigned to the branch, `operations_can_approve` toggle), a second branch with its manager, a supplier, two stock items with packs, and helper `fixture.rig({ extra })` that applies 012–017 as they exist.
+- `backend/tests/inv/fixture.js`: add a second owner, an operations manager (assigned to the branch, `operations_can_approve` toggle), a second branch with its manager, a supplier, two stock items with packs, and helper `fixture.rig({ extra })` that applies 012–018 as they exist.
 - `backend/src/inventory/numbers.js`: `nextNumber(db, table, businessId, { year })` (advisory-lock pattern from `stock/service.js`), used by POs, GRNs, requests, transfers.
 - `backend/src/inventory/notifications.js`: add writer `notify(db, { businessId, kind, title, body, link, entityType, entityId, locationId, dedupeKey, to })` where `to` is `{ owners: true, branchManagersOf: locationId, capability, userIds }`; recipients resolved from `business_members` / `restaurant_members` (same source as `inventoryScope`); `dedupe_key` prevents repeats; never throws on a duplicate.
-- `policies.js` `SETTINGS`: add `owner_self_approve_po` (bool, true), `operations_can_purchase` (bool, false), `price_variance_alert_pct` (number, 10), `transfer_over_tolerance_pct` (number, 5), `returns_need_approval` (bool, false), `branch_to_branch_enabled` (bool, true), `emergency_repeat_alert_count` (3) and `emergency_repeat_alert_days` (7).
+- `policies.js` `SETTINGS`: add `operations_can_purchase` (bool, false), `price_variance_alert_pct` (number, 10), `transfer_over_tolerance_pct` (number, 5), `returns_need_approval` (bool, false), `branch_to_branch_enabled` (bool, true), `emergency_repeat_alert_count` (3) and `emergency_repeat_alert_days` (7), `ai_usd_to_kes` (number, set by admin). **No amount defaults** for emergency, wastage, adjustment or count thresholds (D2-6, D2-16); `wastage_approval_value_kes` and `count_tolerance_pct` stay as legacy keys defaulting to `null` (Phase 3 migrates them to rules; the 3 % default is removed).
 - `package.json`: make `test:inv:compat` read the list from one place (`backend/tests/inv/migrations.js` exporting the ordered proposed files) so adding a migration is a one-line change.
 - Done when: smoke tests for `notify` (recipients, dedupe), `nextNumber` (concurrent callers get distinct numbers) and the settings validators pass.
 
+### MA — AI gateway (design in `12-ai-insights.md`; can run in parallel with M1, must finish before Release A)
+
+**P2-32 AI gateway, metering, limits, migration 014** · 3.5 d
+- `backend/db/proposed/014_ai_gateway.sql` + down (additive, independent of 015–018): `ai_usage` (insert-only), `ai_limits`, `ai_business_settings` (columns in `12-ai-insights.md` §2.1). Down refuses when usage rows exist.
+- `backend/src/ai/gateway.js` wrapping `lib/ai.js`: `call({ db, businessId, userId, feature, system, user, maxTokens, cacheKey })` with switch check, limit check under an advisory lock (reserve worst-case cost, settle after), cache, timeout and one retry, **one `ai_usage` row per provider attempt** (tokens from the provider `usage` block, cost USD → KES with `ai_usd_to_kes`), failed provider calls not counted against the allowance, rejected answers counted. Plain messages: **“Your AI allowance for this month is used up. It resets on 1 December.”** (date computed), 80 % warning notification to owner and admin once per month. `lib/ai.js` gains token/cost extraction and keeps its env config (`OPENROUTER_API_KEY`, `OPENROUTER_MODEL`); per-feature model override read from `ai_business_settings`.
+- `usage(db, businessId, month)` and `limits(db, businessId)` helpers for the screens (P2-34/35). Owner may lower the allowance, never raise it (`owner_budget_kes ≤ monthly_budget_kes`).
+- Tests (**stubbed fetch only, no network**): metering exactness (tokens and cost on three scripted calls sum to the hand-calculated month total), limit enforcement (call n+1 refused when budget reached; concurrent calls cannot overshoot), 80 % warning once, failed call not counted, cached call costs zero, feature switch off → 403, no row → AI off, owner cannot raise the admin figure, `usage` rows cannot be updated or deleted, **a grep test fails if any file other than the gateway imports `lib/ai.js`**, message text and reset date correct on 31 Dec/1 Jan.
+
+**P2-33 Retrofit the recipe AI draft through the gateway** · 1 d (0.5 + tests)
+- `inventory/recipes.js` `suggest` and the old `stock/recipes.js` suggest route call `gateway.call({ feature: 'recipe_draft', … })`; the payload stays menu text and stock item names only (unchanged privacy); a business with no `ai_limits` row has AI **off** (not unmetered) — the admin must set an allowance (P2-34), and the “Suggest” button shows “AI suggestions are off for this business” until then. (Existing pilots get a default allowance row at the P2-18 runbook step.)
+- Tests: draft is metered with the right feature and model, blocked at the limit with the allowance message, recipe still saved by hand when AI is off.
+
 ### M1 — Purchasing engine
 
-**P2-03 Migration 014 — suppliers & price lists** · 1.5 d
-- `backend/db/proposed/014_inventory_suppliers.sql` + `.down.sql`:
+**P2-03 Migration 015 — suppliers & price lists** · 1.5 d
+- `backend/db/proposed/015_inventory_suppliers.sql` + `.down.sql`:
   - `suppliers` (business_id, name — unique per business on `lower(name)`, `type` formal/informal/one_off, contact_name, phone with 254 check, email, kra_pin with format check, payment_terms_days 0–180, payment_method cash/mpesa/bank/credit, mpesa_number, bank_details, status active/inactive/archived, `incomplete` bool, created_by, timestamps).
   - `supplier_items` (supplier, item, supplier_sku, pack_name, pack_factor snapshot, rank, lead_time_days, min_order_qty, unique (supplier, item)).
   - `supplier_prices` (supplier, item, pack_name, pack_factor, `price` numeric(14,2) per pack, `price_per_base` numeric(18,6), effective_from date, created_by) — **insert-only** (trigger refuses UPDATE/DELETE) so history is kept; the price in force on a date is the row with the greatest `effective_from ≤ date`.
@@ -107,8 +127,8 @@ Same rules as `08-phase1-workplan.md`; the differences are called out.
 - Capabilities: `inv.purchase.create` for edits; reading prices needs `inv.cost.view`. Operations manager read-only. Branch managers cannot list suppliers except the *emergency picker* (name + id, no bank data) in P2-11.
 - Tests: validators, owner isolation between businesses, price in force on a date, history order, archive rule, bank details hidden from non-owners.
 
-**P2-05 Migration 015 — purchase orders, goods receipts, invoices, returns, attachments** · 2 d
-- `015_inventory_purchasing.sql` + down:
+**P2-05 Migration 016 — purchase orders, goods receipts, invoices, returns, attachments** · 2 d
+- `016_inventory_purchasing.sql` + down:
   - `purchase_orders` (business, `year`, `number` — unique (business, year, number), supplier, `deliver_to_location` (the Warehouse by default; a branch is allowed for direct delivery), expected_date, status `draft → pending_approval → approved → sent → partially_received → received → closed | cancelled`, subtotal, vat_total, total, notes, created_by, approved_by, approved_at, sent_at, sent_via, cancelled_by/at/reason).
   - `po_lines` (po, item, pack_name, pack_factor snapshot, qty_packs, qty_base, price_per_pack, price_per_base, vat_class snapshot, vat_amount, line_total, position).
   - `goods_receipts` (business, number, po_id null, `unplanned_reason` required when po_id is null, supplier_id, location_id, received_at, received_by, delivery_note_no, status `posted | reversed`) + `grn_lines` (grn, po_line_id null, item, pack snapshot, qty_ordered_base, qty_received_base, qty_rejected_base, reject_reason, unit_cost per base, movement_id, `batch_no`, `expiry_date` — stored, unused until Phase 3).
@@ -148,35 +168,35 @@ Same rules as `08-phase1-workplan.md`; the differences are called out.
 
 ### M2 — Approvals & emergency
 
-**P2-09 Migration 016 — emergency purchases, approval rules, approvals** · 2 d
-- `016_inventory_approvals_emergency.sql` + down:
-  - `approval_rules` (business, `subject` po/emergency (extended in Phase 3 with wastage/adjustment/count), `metric` per_transaction/per_day/per_week/per_month/band, `location_id` null = every branch, `category_id` null, `band_min`/`band_max`/`amount_kes`, `approver_capability`, active, created_by, updated_at; unique active rule per (subject, metric, location, category)).
-  - `approvals` (business, `subject_type`, `subject_id`, location_id, requested_by, amount_kes, `rule_id`, `reason`, status `pending|approved|rejected|withdrawn`, decided_by, decided_at, decision_note, `self_approved` bool). **Checks:** `decided_by is null or decided_by <> requested_by or self_approved`; `status = 'approved'` requires `decided_by`. Polymorphic (no FK to the subject) so Phase 3 reuses it.
+**P2-09 Migration 017 — emergency purchases, approval rules, approvals** · 2 d
+- `017_inventory_approvals_emergency.sql` + down:
+  - `approval_rules` (business, `subject` po/emergency (extended in Phase 3 with wastage/adjustment/count), `metric` per_transaction/per_day/per_week/per_month/band/variance_pct, `location_id` null = every branch (the owner's default) or one branch (override), `category_id` null, `band_min`/`band_max`/`amount_kes`/`threshold_pct`, `approver_capability`, active, created_by, updated_at; unique active rule per (subject, metric, location, category)).
+  - `approvals` (business, `subject_type`, `subject_id`, location_id, requested_by, amount_kes, `rule_id`, `reason`, status `pending|approved|rejected|withdrawn`, decided_by, decided_at, decision_note, `self_approved` bool). **Checks:** `decided_by is null or decided_by <> requested_by or self_approved`; `status = 'approved'` requires `decided_by`; `self_approved` may be true only when `decided_by = requested_by` (the service sets it only when no other approver exists, D2-5). Polymorphic (no FK to the subject) so Phase 3 reuses it.
   - `emergency_purchases` (business, branch location, number, supplier_id null, `supplier_name` text for on-the-spot, status `draft → pending_approval → authorised → purchased → received → under_review → closed | rejected | cancelled`, estimated/approved/actual amount, payment_method cash/mpesa/credit, payment_reference, reason, `invoice_status` etims/other/none, invoice_no, `no_invoice_reason`, created_by, timestamps; check: `invoice_status <> 'none' or (no_invoice_reason is not null and payment_reference is not null)`) + `emergency_purchase_lines` (item, qty_base, entered qty/unit, estimated and actual unit cost).
   - Trigger on `emergency_purchases`: moving to `received` requires `invoice_status` and, for `none`, at least one `attachments` row with `entity_type = 'emergency'` (T-EMP-3 at the DB level).
-  - Seed rule rows are created on first use by P2-10, not by the migration (migration stays data-free).
+  - **No seed rows and no default amounts**: rules exist only when the owner creates them in Settings → Inventory (D2-6, D2-16). The migration stays data-free.
 - Tests: rehearsal; maker-checker check; no-invoice constraints; `compat` green.
 
 **P2-10 Approvals engine + PO approval wiring** · 2 d
 - `backend/src/inventory/approvals.js`:
-  - `evaluate(db, scope, { subject, locationId, amount, categoryId })` → `{ decision: 'auto' | 'needs_approval', rule, usage }`; cumulative metrics computed from authorised emergency purchases in the current day/week/month in Africa/Nairobi, in the same transaction under an advisory lock per (business, location) so two simultaneous small buys cannot both slip under the weekly limit.
-  - `request`, `decide(approve|reject, note)` (assertDifferentPeople unless `self_approved` is allowed by D2-5), `withdraw`, `inbox(scope)` (pending for everyone the caller can approve, with who asked, amount, rule triggered, how much of the limit is used), `history`.
-  - Rules CRUD (`inv.settings.edit`), default seed on first read of the Limits page (D2-6); changes audited with before/after; effective at once.
+  - `evaluate(db, scope, { subject, locationId, amount, categoryId })` → `{ decision: 'auto' | 'needs_approval', rule, usage }`; **no rule for the branch and subject `emergency` → `needs_approval` with reason `no_limit_set`** (D2-6); for `wastage` no rule → `auto`; `adjustment` and `count` with no rule → `needs_approval` (D2-16); cumulative metrics computed from authorised emergency purchases in the current day/week/month in Africa/Nairobi, in the same transaction under an advisory lock per (business, location) so two simultaneous small buys cannot both slip under the weekly limit.
+  - `request`, `decide(approve|reject, note)` (**`approverAvailable(db, businessId, requesterId, subject)`** looks for another holder of the approving capability: if one exists `assertDifferentPeople` applies; if none, the requester's own approval is allowed and stored with `self_approved = true` — D2-5), `withdraw`, `inbox(scope)` (pending for everyone the caller can approve, with who asked, amount, rule triggered, how much of the limit is used), `history`.
+  - Rules CRUD (`inv.settings.edit`), **no default seed**; per-branch limits (per purchase/day/week, optional category) and per-business thresholds with optional branch override; changes audited with before/after; effective at once. Self-approved decisions emit an audit event `self_approved`.
   - Wiring: `purchasing.submit` calls `evaluate('po')`; PO approve/reject goes through `decide`; emergency `submit` uses `evaluate('emergency')` (P2-11).
   - Events: `approval_needed` (to approvers), `approval_decided` (to requester).
 - Routes: `/api/owner/inventory/:biz/approvals`, `/approvals/:id/decide`, `/approval-rules`.
-- Tests: **T-SEC-2** (requester cannot approve own; owner can only when `owner_self_approve_po` is on and the row is flagged `self_approved`; operations manager without `operations_can_approve` cannot decide), band logic, cumulative weekly limit exceeded by small buys routes the next one to approval, concurrency (two parallel evaluations, one auto, one routed).
+- Tests: **T-SEC-2** (another approver exists → requester cannot approve own; sole owner → allowed and the row is flagged `self_approved`; adding a second owner or approving operations manager switches the rule back; operations manager without `operations_can_approve` cannot decide; a branch manager can never self-approve), band logic, cumulative weekly limit exceeded by small buys routes the next one to approval, **no limit set → every emergency buy routes to approval**, concurrency (two parallel evaluations, one auto, one routed).
 
 **P2-11 Emergency purchase service + branch API** · 2.5 d
 - `backend/src/inventory/emergency.js`: `create` (draft with lines in entered units, estimated cost, reason, supplier from list or on-the-spot name → `suppliers` row `incomplete = true`), `submit` (evaluate → `authorised` or `pending_approval`), `markPurchased` (payment method + reference + actual amount), `receive` (posts **`emergency_receipt`** per line at the branch, `unitCost` = actual ÷ qty; needs invoice status + evidence rules: eTIMS/other → invoice no.; none → reason + reference + ≥ 1 goods photo), `review` (owner closes or flags `under_review`), `cancel`.
 - Repeat purchase alert (EMP-7): ≥ `emergency_repeat_alert_count` receipts of the same item within `emergency_repeat_alert_days` → `notify('emergency_repeat', “You bought cooking oil in an emergency 3 times this week. Raise its par level?”)` with link to the item levels.
 - Routes: branch `/api/inventory/emergency…` (list mine, create, submit, purchased, receive, cancel, `limits` = “within your KES X limit” numbers for the form), owner `/api/owner/inventory/:biz/emergency` (all branches, review).
-- Tests: **T-EMP-1** (below threshold → authorised, stock on receipt, avg cost), **T-EMP-2** (above → blocked until a different user approves; branch manager cannot approve own), **T-EMP-3** (no invoice without reason/reference/photo → 400 and DB check), **T-EMP-4** (change the weekly limit via rules, applies to the next submit with no deploy), branch isolation (T-SEC-1), on-the-spot supplier flagged incomplete, repeat alert.
+- Tests: **T-EMP-1** (below threshold → authorised, stock on receipt, avg cost), **T-EMP-2** (above → blocked until a different user approves; branch manager cannot approve own), **T-EMP-3** (no invoice without reason/reference/photo → 400 and DB check), **T-EMP-4** (the owner sets and then changes a branch's weekly limit via rules, applies to the next submit with no deploy; before any limit is set every buy needs approval), branch isolation (T-SEC-1), on-the-spot supplier flagged incomplete, repeat alert.
 
 ### M3 — Purchasing screens → Release A
 
 **P2-12 Navigation & plumbing for Phase 2** · 0.5 d
-- `frontend/src/config/dashboards.js` (all `feature: 'inventory'`): owner Operations adds **Requests & transfers** (`inventory/requests`), **Purchasing** (`inventory/purchasing`, one page with `Segmented` tabs Suppliers · Purchase orders · Receive goods), **Approvals** (`inventory/approvals`, count badge); branch Operations adds **Requests & deliveries** (`inventory/requests`) and **Purchases** (`inventory/purchases`). Order, owner: Stock, Items, Recipes, Requests & transfers, Purchasing, Approvals, History. Branch: Stock, Requests & deliveries, Purchases, History.
+- `frontend/src/config/dashboards.js` (all `feature: 'inventory'`): owner Operations adds **Requests & transfers** (`inventory/requests`), **Purchasing** (`inventory/purchasing`, one page with `Segmented` tabs Suppliers · Purchase orders · Receive goods), **Approvals** (`inventory/approvals`, count badge); branch Operations adds **Requests & deliveries** (`inventory/requests`) and **Purchases** (`inventory/purchases`). Order, owner: Stock, Items, Recipes, Requests & transfers, Purchasing, Approvals, History; plus the owner **Reports** group (**Reports**, **Receipts**; see 05) and Settings → Inventory (P2-35). Branch: Stock, Requests & deliveries, Purchases, History; plus **Reports** and **Receipts** for the branch's own records.
 - Routes in `App.jsx` (lazy, as the Phase 1 pages), API helpers in `frontend/src/lib/inventory.js`; the badge reads pending-approvals count from the existing notification poll (add a `badge` field to the section config only if absent).
 - Pages added in later tickets; until then entries render an `EmptyState`.
 - Done when: sidebar shows the new entries only with the switch on; `npm run build` green.
@@ -196,26 +216,42 @@ Same rules as `08-phase1-workplan.md`; the differences are called out.
 - Receipt history list with “reverse” (confirm dialog; refused message when stock already used).
 - Mocked Playwright (part 3): receive partial, second receive closes PO, return; phone width.
 
-**P2-16 Owner screen: Approvals inbox and limits** · 2 d
-- Approvals page: tabs **Waiting for you** / **Decided**; each card says who asked, what, how much, which rule (“Weekly emergency limit KES 20,000 — KES 17,500 already used”), photos attached; **Approve** / **Reject with a reason** (reason required on reject). Empty state: “Nothing needs your approval.”
-- **Limits** panel (owner only): per-transaction/day/week emergency limits per branch or all branches, optional per-category, PO approval bands, the “owner may approve own PO” switch (wording: “I approve my own purchase orders”); changes confirm and show “applies from now”.
-- Mocked Playwright (part 4): approve an emergency buy; reject needs a reason; change a limit; phone width.
+**P2-16 Owner screen: Approvals inbox** · 1.5 d
+- Approvals page: tabs **Waiting for you** / **Decided**; each card says who asked, what, how much, which rule (“Weekly emergency limit set by you: KES X — KES Y already used”, or “No limit set for this branch”), a **Self-approved** chip when the owner approved their own record, photos attached; **Approve** / **Reject with a reason** (reason required on reject). Empty state: “Nothing needs your approval.”
+- A **History** tab shows decided items including who decided and the self-approved flag. **Limits moved to Settings → Inventory (P2-35)**; this page links to it (“Set emergency limits”).
+- Mocked Playwright (part 4): approve an emergency buy; reject needs a reason; self-approved chip; phone width.
 
 **P2-17 Branch screen: Purchases (emergency)** · 2.5 d
-- Purchases page: my emergency purchases by status; **“Buy something now”** drawer: items (existing or on-the-spot name), quantity with unit picker, estimated cost, reason, supplier (pick or type a name), live **“Within your KES 5,000 limit”** / **“Above your limit — the owner will be asked”** indicator from the `limits` endpoint, submit.
+- Purchases page: my emergency purchases by status; **“Buy something now”** drawer: items (existing or on-the-spot name), quantity with unit picker, estimated cost, reason, supplier (pick or type a name), live **“Within your KES X limit”** / **“Above your limit — the owner will be asked”** / **“No limit set — the owner will be asked”** indicator from the `limits` endpoint (X is whatever the owner set for this branch; nothing is built in), submit.
 - After buying: mark purchased (payment method, reference, actual amount), invoice status (eTIMS / other / none); **none** reveals reason + reference + required goods photo (camera); then **Received** posts stock. Status chips follow the lifecycle in words (“Waiting for the owner”, “Go ahead and buy”, “Bought — receive the goods”).
-- Mocked Playwright (part 5): auto-authorised path, over-limit path, no-invoice blocked until photo added; phone width (this is the screen used at the till, check thumb reach).
+- Mocked Playwright (part 5): auto-authorised path (limit set in the mock), no-limit-set path, over-limit path, no-invoice blocked until photo added; phone width (this is the screen used at the till, check thumb reach).
 
-**P2-18 Release A: e2e, apply 014–016, merge** · 1.5 d
-- Playwright (real backend on a throwaway seeded database, not the shared one): supplier → price → PO → send → receive 60% → receive rest → invoice → return; branch emergency buy under limit → stock appears; over limit → owner approves → stock appears.
-- Runbook: snapshot shared DB → create Storage bucket `inventory-evidence` (private; 8 MB; jpeg/png/webp/pdf) → move 014–016 to `migrations/` → `npm run db:migrate -- --dry-run` (only those three) → `npm run db:migrate` → census again → switch `inventory_enabled` on for the test business only → smoke test → PR `dev` → `main`.
+**P2-18 Release A: e2e, apply 015–017 and 014, merge** · 1.5 d (runs after P2-34, P2-35 and P2-36 are merged to `dev`)
+- Playwright (real backend on a throwaway seeded database, not the shared one; stubbed AI fetch): supplier → price → PO → send → receive 60% → receive rest → invoice → return; branch emergency buy under limit → stock appears; over limit → owner approves → stock appears.
+- Runbook: snapshot shared DB → create Storage bucket `inventory-evidence` (private; 8 MB; jpeg/png/webp/pdf) → move 015–017 **and `014_ai_gateway.sql`** to `migrations/` → `npm run db:migrate -- --dry-run` (only those four) → `npm run db:migrate` → census again → switch `inventory_enabled` on for the test business only → smoke test → PR `dev` → `main`.
 - Rollback: down files in reverse order; each refuses once data exists (export first).
 - Update KB 01/04 (gap statuses for SUP, PRC, GRN, EMP).
 
+**P2-34 Admin screen: AI usage and limits** · 2 d
+- `routes/admin` (existing admin module): `GET/PUT /api/admin/businesses/:id/ai` (on/off, monthly allowance KES, warn %, model overrides, per-feature switches) and `GET …/ai/usage?months=6`; audited like the inventory switch.
+- `frontend/src/pages/admin/BusinessDetailPage.jsx`: an **AI** section beside the inventory switch: switch, allowance, usage this month (calls, tokens, KES, % of allowance, reset date) and last 6 months by feature. **Usage figures only; no prompt or answer text, no stock data** (admin rule).
+- Mocked Playwright: set an allowance, switch on, usage table; phone width.
+
+**P2-35 Owner screen: Settings → Inventory (limits, thresholds, AI usage)** · 3 d
+- New owner Settings entry **Inventory** (the owner interface has no Settings page today, so this adds the entry with `feature: 'inventory'`). Sections: **Emergency buying limits** — per branch: per purchase, per day, per week, optional per category, with the plain note “Until you set a limit, every emergency buy needs your approval” and the usage so far this week; **Approval thresholds** — wastage, stock adjustments, count variance (Phase 3 subjects appear when their features ship; today the screen explains the safe defaults of D2-16) with a business default and per-branch override; **Purchase order approval** — optional bands, and a read-only line “You are the only approver, so you approve your own orders. These are marked self-approved” (shows who else could approve); **AI** — usage this month, allowance (owner may lower), per-feature switches.
+- Every change confirms, shows “applies from now”, is audited with before/after, and is effective at once (T-EMP-4). Owner only (`inv.settings.edit`); branch managers see their own branch's limits read-only on the Purchases screen.
+- Mocked Playwright: set a limit for one branch, override a threshold, lower the AI allowance; phone width.
+
+**P2-36 Reports group and Receipts (supplier documents)** · 3 d
+- Owner sidebar group **Reports** with **Reports** (placeholder until Phase 3, P3-28; entry hidden until then) and **Receipts** (`reports/receipts`). Branch sidebar gets **Receipts** (own branch only).
+- `backend/src/inventory/receipts.js` + route: one list over **supplier invoices, goods receipts (GRN), emergency-buy receipts/invoices, supplier returns/credit notes** (delivery/dispatch notes are added by P2-37) with `type`, supplier, branch, date, number, amount, **invoice status (eTIMS / other / none)**, attachment count; filters by supplier, branch, date range, type, invoice status; search by number/supplier; open the **attached image or PDF** (5-minute signed URL after the permission check in `evidence.js`), **download**, link to the parent record. Branch managers: own branch only (T-SEC-1 shape). Customer sale receipts are **not** in this list (Q2-7).
+- Screen: filter bar, table that collapses to cards, preview drawer with the image/PDF and the record's key facts; empty state “No receipts yet. They appear when you receive goods or record an emergency purchase.”
+- Tests: each document type appears once; filters; branch isolation; signed URL refused outside the business; mocked Playwright (list, filter, open, phone width).
+
 ### M4 — Distribution engine
 
-**P2-19 Migration 017 — distribution upgrade + 009 backfill** · 3 d (riskiest schema step: touches tables `main` uses live)
-- `017_inventory_distribution.sql` + down, strictly additive:
+**P2-19 Migration 018 — distribution upgrade + 009 backfill** · 3 d (riskiest schema step: touches tables `main` uses live)
+- `018_inventory_distribution.sql` + down, strictly additive:
   - `stock_requests`: widen `status` check to the superset `draft, submitted, approved, partially_approved, rejected, preparing, dispatched, partially_received, received, completed, cancelled`; add `kind` (`stock | return | branch_transfer`, default `stock`), `from_location`, `to_location` (null for old rows; the 009 shape implies Warehouse → branch), `priority`, `needed_by`, `approved_by`, `approved_at`, `needs_attention` bool, `completed_at`.
   - `stock_request_lines`: add `dispatched`, `received` (numeric(18,4) default 0), `entered_unit`; the existing `requested/approved` stay.
   - `stock_reservations` (business, location_id, item_id, request_id, request_line_id, `qty_reserved`, `qty_consumed`, `qty_released`, status `active|consumed|released`, created_by, timestamps; check `qty_consumed + qty_released <= qty_reserved`; one active row per request line).
@@ -224,7 +260,7 @@ Same rules as `08-phase1-workplan.md`; the differences are called out.
   - Unique index `stock_transfers_one_per_request` (009: one non-cancelled transfer per request) becomes **one open transfer per request**, so partial dispatch of the remainder is possible (drop and recreate as a partial index on `status in ('pending_approval','in_transit','partially_received')`).
   - **Backfill step (data, idempotent, in the same migration):** every existing request gets `kind = 'stock'`, `from_location` = the business’s center, `to_location` = the branch’s location; existing transfers get `direction = 'out'`; lines `dispatched = quantity`; for `approved` requests without a transfer, a reservation is created from the Warehouse’s *free* stock — if free stock is short, the reservation is created for what is free and the request gets `needs_attention = true` (D2-15).
 - Down: refuses when any non-default row exists (new statuses, kinds, reservations, discrepancies); otherwise drops the new columns/tables and restores the old checks.
-- Tests: rehearsal on a database seeded from the P2-01 census (counts identical before/after, old `inventory-v2.js` passes with 017 applied — **this is the check that `main`'s 009 code still works**), backfill idempotent when run twice, partial-index behaviour, down refuses and restores.
+- Tests: rehearsal on a database seeded from the P2-01 census (counts identical before/after, old `inventory-v2.js` passes with 018 applied — **this is the check that `main`'s 009 code still works**), backfill idempotent when run twice, partial-index behaviour, down refuses and restores.
 
 **P2-20 Ledger reservations** · 1.5 d
 - `ledger.js` additions (the only writer of `stock_balances.reserved`): `reserve(db, { businessId, locationId, itemId, qty, requestId, requestLineId, actorId, idempotencyKey })` → locks the balance row, refuses with `409 insufficient_available` and **how much is available** when `on_hand − reserved < qty`, inserts the reservation, `reserved += qty`; `release(db, reservationId, { qty?, reason })`; `consume` is done **inside `post()`** via a new input `reservationId` for reason `transfer_dispatch` (put it in `CONSUMES_RESERVATION`): the same lock decrements `on_hand` and `reserved` and bumps `qty_consumed`; a post without a matching reservation id still cannot dip into reserved stock (existing `stock_reserved` error stays).
@@ -293,11 +329,15 @@ Same rules as `08-phase1-workplan.md`; the differences are called out.
 - Playwright on a seeded throwaway database: branch asks → owner approves part → pick → dispatch → branch receives short → discrepancy → owner resolves → stock correct everywhere; return; branch → branch.
 - **Real Postgres (local Docker, not the shared DB):** 30 parallel approvals competing for one Warehouse item (total reserved ≤ on hand; no deadlock); 20 parallel dispatches/receives; reconciliation (on hand **and** reserved) returns zero rows.
 
-**P2-31 Release B: apply 017 and merge** · 1 d
-- Runbook: snapshot → census (record) → move 017 to `migrations/` → `db:migrate --dry-run` → `db:migrate` → census again (request/transfer counts identical; `needs_attention` count reported) → with the module on for the test business: walk the full request flow and a QR receive → PR `dev` → `main`.
+**P2-31 Release B: apply 018 and merge** · 1 d
+- Runbook: snapshot → census (record) → move 018 to `migrations/` → `db:migrate --dry-run` → `db:migrate` → census again (request/transfer counts identical; `needs_attention` count reported) → with the module on for the test business: walk the full request flow and a QR receive → PR `dev` → `main`.
 - Checklist after merge: confirm no business uses the old flow with data, then delete the hidden old pages and `src/stock` request/dispatch code in a follow-up PR.
-- Rollback: `017` down (refuses once new-world rows exist; export first).
+- Rollback: `018` down (refuses once new-world rows exist; export first).
 - Update KB 01 (current system), 04 (gap statuses for REQ, TRF, SUP, PRC, GRN, EMP).
+
+**P2-37 Receipts: delivery notes, dispatch notes with QR, transfer documents** · 1 d
+- Extend `receipts.js` with transfer **delivery/dispatch notes** (number, from/to, QR code link, status, discrepancy flag) and return notes; preview shows the printable note; filters include type “Delivery note”. Branch managers see notes for their own branch (sent or received).
+- Tests: a dispatch appears once, a branch that is neither source nor destination cannot see it, QR link matches the transfer code only for the destination manager. Mocked Playwright: filter to delivery notes; phone width.
 
 ---
 
@@ -332,40 +372,46 @@ Same rules as `08-phase1-workplan.md`; the differences are called out.
 | GRN price 20% above last | Variance alert to the owner (not at 5 %) | P2-08 |
 | **new** Supplier return beyond what that delivery added or what is left | Refused with the figure | P2-08 |
 | **new** Supplier archived with open POs | Refused | P2-04 |
-| Emergency below threshold | Auto-authorised; stock on receipt | P2-11 · T-EMP-1 |
-| Emergency above threshold | Blocked until a different user approves | P2-11 · T-EMP-2 |
+| **new** Emergency buy, no limit set for the branch | Goes to the owner for approval (safe default); form says “No limit set” | P2-10/11 |
+| Emergency below the owner-set limit | Auto-authorised; stock on receipt | P2-11 · T-EMP-1 |
+| Emergency above the owner-set limit | Blocked until a different user approves | P2-11 · T-EMP-2 |
 | Weekly cumulative limit exceeded by small buys | The next one routes to approval (also under concurrency) | P2-10 |
 | No invoice without reason, reference and photo | Rejected (service and DB) | P2-11 · T-EMP-3 |
-| Change a limit in settings | Applies to the next submit, no code change | P2-10/16 · T-EMP-4 |
+| Owner sets / changes a limit in Settings → Inventory | Applies to the next submit, no code change | P2-10/35 · T-EMP-4 |
 | Same item bought in an emergency 3× in a week | Alert to raise par | P2-11 |
-| Approver tries to approve own PO | Denied unless the owner self-approval switch is on (then flagged) | P2-10 · T-SEC-2 |
+| Requester tries to approve own PO while another approver exists | Denied | P2-10 · T-SEC-2 |
+| **new** Sole owner approves own PO | Allowed, logged, flagged `self_approved`, shown in inbox history and the Self-approved report | P2-10/16 · T-SEC-2 |
+| **new** Any AI call (recipe draft) | Metered in `ai_usage` (tokens, cost); blocked with the plain allowance message at the limit; 80 % warning; a failed provider call is not counted | P2-32/33 |
+| **new** Receipts list | Supplier invoices, GRNs, delivery notes, supplier returns in one place; filter by supplier/branch/date/type/invoice status; open the image/PDF; branch manager sees own branch only | P2-36/37 |
 | Branch manager calls another branch’s emergency purchase or attachment | 403 + audit | P2-06/11 · T-SEC-1 |
 | **new** Invoice/goods photo opened by someone outside the business | Signed URL refused | P2-06 |
 | Anything above, replayed (double tap, retry) | One effect (`once()` + idempotency keys) | all |
 
 ## Exit criteria for Phase 2
 
-**T-REQ-1..3, T-PRC-1, T-EMP-1..4, T-SEC-2** automated and green; T-SEC-1/3 re-run on every new endpoint; T-INV-6 extended (on hand and reserved) and the T-INV-7 style race on real Postgres for reservations; full request → receipt and PO → GRN flows in Playwright; reconciliation zero; `inventory-v2.js` green with 012–017 applied; 009 parity test green; old pages retired (or hidden with the delete checklist open).
+**T-REQ-1..3, T-PRC-1, T-EMP-1..4, T-SEC-2** automated and green; T-SEC-1/3 re-run on every new endpoint; T-INV-6 extended (on hand and reserved) and the T-INV-7 style race on real Postgres for reservations; full request → receipt and PO → GRN flows in Playwright; reconciliation zero; `inventory-v2.js` green with 012–018 applied; 009 parity test green; old pages retired (or hidden with the delete checklist open).
 
 ## First week, day by day
 
 | Day | Work |
 | --- | --- |
 | 1 | P2-01 decisions + census + **reservation spike** · start P2-02 |
-| 2 | P2-02 harness, `notify()`, `nextNumber`, settings · start P2-03 migration 014 |
+| 2 | P2-02 harness, `notify()`, `nextNumber`, settings · start P2-03 migration 015 |
 | 3 | P2-03 rehearsal + compat · start P2-04 suppliers service |
 | 4 | P2-04 routes + tests (server-load green) |
-| 5 | P2-05 migration 015 draft + rehearsal |
+| 5 | P2-05 migration 016 draft + rehearsal |
 
 ## Risks to watch in Phase 2
 
 | Risk | Mitigation |
 | --- | --- |
 | Reservations put `stock_balances.reserved` out of step with the ledger | Only `ledger.js` writes it; reconciliation checks it; spike on day 1–2; real-Postgres race in P2-30 |
-| Widening `stock_requests`/`stock_transfers` breaks `main`’s live 009 code on the shared DB | Strictly additive migration; `inventory-v2.js` runs with 017 applied; old statuses keep working; businesses with the module off never see new statuses |
+| Widening `stock_requests`/`stock_transfers` breaks `main`’s live 009 code on the shared DB | Strictly additive migration; `inventory-v2.js` runs with 018 applied; old statuses keep working; businesses with the module off never see new statuses |
 | 009 data carry-over: approved requests that moved no stock, in-transit dispatches | Backfill rehearsed on census-shaped data; “needs attention” instead of silent shortening; same tables, no copy |
 | Approval rules too strict or too loose for a real kitchen | Defaults are editable immediately (T-EMP-4); show usage against the limit on every screen; revisit after the first pilot week |
-| Solo owner cannot approve own PO (maker-checker) | D2-5 switch, audited and flagged `self_approved`; emergency buys always have a different approver |
+| Sole owner blocked by maker-checker, or self-approval abused | D2-5: self-approval only when no other approver exists, always flagged `self_approved` and reported; emergency buys always have a different approver |
+| Owner never sets limits, so every emergency buy waits for approval | Deliberate safe default; the Settings → Inventory screen shows a “Set your limits” prompt and the Approvals inbox links to it; after the pilot week review whether a suggested starting point is wanted (Q2-2) |
+| AI cost or unmetered calls | Gateway is the only door (grep test), usage row per call, hard monthly limit, 80 % warning; see `12-ai-insights.md` §5 |
 | Evidence uploads on poor mobile data | Downscale client-side, retry the upload with the same signed URL, keep the form state; photo is required only for no-invoice buys |
 | Storage bucket misconfigured (public by mistake) | Runbook step creates it private; a test asserts signed URLs expire and the API never returns a public URL |
 | Scope creep into Phase 3 (counts, wastage approvals, batches) | Anything not in this list goes to the Phase 3 backlog; `batch_no`/`expiry_date` are stored, not used |
@@ -374,8 +420,10 @@ Same rules as `08-phase1-workplan.md`; the differences are called out.
 
 ## Open questions (proposed defaults are in place; answer when convenient)
 
-- **Q2-1** May the owner approve their own purchase orders? (default yes, audited; D2-5)
-- **Q2-2** Starting emergency limits: KES 5,000 per transaction / 10,000 per day / 20,000 per week per branch? (D2-6)
+- ~~**Q2-1** May the owner approve their own purchase orders?~~ **Answered 18 Nov: yes for a sole owner, logged and flagged (D2-5).**
+- ~~**Q2-2** Starting emergency limits?~~ **Answered 18 Nov: no built-in amounts; the owner sets them per branch; until then everything needs approval (D2-6).** Still open: would the owner like Cravio to *suggest* a starting limit from the first weeks of spend?
 - **Q2-3** Do returns to the Warehouse need approval? (default no; D2-12)
 - **Q2-4** Over-delivery tolerance 5 %? Price-variance alert at 10 %? (D2-11, D2-13)
 - **Q2-5** Should a supplier be able to deliver straight to a branch (PO “deliver to” = a branch)? (default yes)
+- **Q2-6** AI (see `12-ai-insights.md` §6): who pays for it, which model, and the default monthly allowance per business (Q-AI-1…3).
+- **Q2-7** Should “all receipts” in the Receipts tab also include **customer bills / order receipts**? (Default no: customer sale receipts belong to the later POS/eTIMS module; supplier and stock receipts only.)

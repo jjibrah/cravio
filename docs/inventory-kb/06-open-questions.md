@@ -2,7 +2,7 @@
 
 Each has a **recommended default** so planning can move; confirm or correct in discussion.
 
-**18 Nov 2026 (product owner):** Q-L1 → **one warehouse per business** for now; Q-U1 → base-unit storage **with user-chosen entry/display units**; Q-N1 → **stop at 0, log the shortfall and notify owner + branch manager**; Q-N2/A8 → owner + branch manager edit recipes. See `docs/v2/DECISIONS.md` (INV-A3/A4/A5/A8). The rest stay open until Phase 2.
+**18 Nov 2026 (product owner):** Q-L1 → **one warehouse per business** for now; Q-U1 → base-unit storage **with user-chosen entry/display units**; Q-N1 → **stop at 0, log the shortfall and notify owner + branch manager**; Q-N2/A8 → owner + branch manager edit recipes. See `docs/v2/DECISIONS.md` (INV-A3/A4/A5/A8). **18 Nov 2026 (product owner, second round, INV-P2/P3):** self-approval allowed for a sole owner (flagged); **no built-in limits or thresholds** (emergency-buy limits and wastage/adjustment/count approval thresholds are owner-set, safe defaults until then); AI insights layer with per-business limits; Reports and Receipts tabs; PDFs via browser print first. The rest stay open until Phase 2.
 
 | ID | Question | Recommended default | Why it matters |
 | --- | --- | --- | --- |
@@ -19,8 +19,24 @@ Each has a **recommended default** so planning can move; confirm or correct in d
 | Q-C1 | Cost method | Weighted average first (simple, no batches needed); FIFO/batch cost when batches arrive | Batches are a big chunk; costing shouldn't wait for them |
 | Q-B1 | Batches/expiry/FEFO in the first slice? | No — phase after purchasing; add `batch_id` nullable to ledger now | BAT is P0 in PRD but heavy |
 | Q-V1 | Recipe versioning in the first slice? | Yes, minimal: order lines snapshot `recipe_version_id` | Needed for correct history and costing |
-| Q-P1 | Emergency purchase thresholds: per branch, per category, per period? | Per branch per transaction + per week to start; config table | EMP-1 |
+| Q-P1 | Emergency purchase thresholds: per branch, per category, per period? | **Answered 18 Nov:** owner sets them per branch (per purchase, day, week; optional category) in Settings → Inventory; no built-in amounts; none set = every buy needs approval (D2-6) | EMP-1 |
 | Q-P2 | Purchase evidence uploads (invoice photo) — storage? | Supabase Storage bucket (already used for menu media) | EMP-3, GRN-2 |
 | Q-M1 | What happens to the v3-dev branch? | Keep as reference only; don't merge (it reverts main's real pages to sample data) | |
 | Q-M2 | Remove the legacy 007 preview API (`routes/inventory.js`, `private.stock_*`)? | Yes, in a cleanup step, after confirming its tables are empty | Avoids confusion with 009 |
 | Q-T1 | Which business/branches pilot, and with what real items/recipes? | — | Acceptance (PRD T-* suite) |
+
+## Added 18 Nov 2026 (second round)
+
+**Answered** (see `docs/v2/DECISIONS.md` INV-P2/P3): Q2-1 own-PO approval (yes for a sole owner, flagged `self_approved`); Q2-2 emergency limits (owner-set, none built in); Q3-1 approval thresholds (owner-set, per business with branch override; defaults until set: emergency buys need approval, wastage free, adjustments approved, one approval per count with any variance, D2-16); Q3-3 PDF library (browser Save as PDF first; `pdfkit` only for emailed/scheduled reports, optional P3-39); where Reports and Receipts live (owner sidebar group **Reports**).
+
+| ID | Question | Recommended default | Why it matters |
+| --- | --- | --- | --- |
+| Q-AI-1 | **Who pays for AI?** Cravio absorbs it in the subscription (admin sets a modest allowance per business) or it is a paid add-on / owner buys more? | Absorb at first, small allowance; revisit after the pilot cost soak (P3-44) | Sets the default allowance and whether a "raise my allowance" flow is needed |
+| Q-AI-2 | **Which model?** | `openai/gpt-4o-mini` via OpenRouter (cheap, adequate for restating figures); configurable by env and per feature; bake-off on the golden dataset | Cost and wording quality |
+| Q-AI-3 | **Default monthly allowance** (KES budget as designed, or a token budget)? | Decide after measuring one pilot business for a week; roughly 2× real use | Prevents surprise bills and unusable "used up" messages |
+| Q-AI-4 | Daily insight time and whether the owner can turn the daily run off but keep "Ask" | 06:00 Africa/Nairobi, separate switches | Cost and annoyance |
+| Q-AI-5 | Free-text questions to the AI? | Not in v1 (fixed question list) | Validation, abuse and cost |
+| Q-AI-6 | Counsel sign-off on sending business aggregates to OpenRouter under the Kenya DPA 2019 (no personal data is sent) and the privacy policy wording | Confirm before the first paying business uses AI | Legal |
+| Q-R3 | Should the **Receipts** tab also include **customer bills / sale receipts**? | No: supplier and stock documents only; customer receipts belong to the later POS/eTIMS module | Scope of the Receipts list and storage |
+| Q-L2 | Would the owner like Cravio to **suggest** starting limits/thresholds from the first weeks of real spend, wastage and counts? | Maybe after the pilot; for now only a "Set your limits" prompt | Reduces the burden of setting numbers; must stay the owner's decision |
+
