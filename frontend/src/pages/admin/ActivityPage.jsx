@@ -19,6 +19,7 @@ export function ActivityList({ events, showBusiness = true }) {
       {e.subject && <> for <strong>{e.subject.name}</strong></>}
       {e.role && ROLE[e.role] && <> as {ROLE[e.role]}</>}
       {e.branch && <> at {e.branch.name}</>}
+      {e.note && <> · “{e.note}”</>}
       {showBusiness && e.business && e.business.name !== e.branch?.name && <> in <Link to={`/admin/businesses/${e.business.id}`}>{e.business.name}</Link></>}
     </p>
     <time dateTime={e.at} title={formatDateTime(e.at)}>{timeAgo(e.at)}</time>

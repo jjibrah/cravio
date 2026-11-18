@@ -17,6 +17,7 @@
 .inv-table .is-num { text-align: right; }
 .inv-table .is-muted { color: var(--muted); }
 .inv-table .is-minus { color: var(--danger); }
+.inv-nowrap { white-space: nowrap; }
 .inv-link { padding: 0; min-height: 0; border: 0; border-radius: 0; background: none; color: var(--ink); font: inherit; font-weight: 600; text-align: left; cursor: pointer;
   text-decoration: underline; text-decoration-color: transparent; text-underline-offset: 3px; }
 .inv-link:hover, .inv-link:focus-visible { background: none; text-decoration-color: var(--line-strong); }
@@ -28,7 +29,7 @@
 .inv-badge.is-off { background: var(--selected); color: var(--muted); }
 
 /* What needs attention, above the table. */
-.inv-attention { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+.inv-attention { display: grid; grid-template-columns: repeat(auto-fill, minmax(215px, 1fr)); gap: 12px; }
 .inv-attention-card { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 16px; border-radius: var(--r-card);
   background: var(--surface); box-shadow: 0 0 0 1px var(--line), var(--shadow-card); font-size: 14px; }
 .inv-attention-card strong { display: flex; align-items: center; gap: 8px; }
@@ -87,7 +88,29 @@
 .inv-report ul { margin: 0; padding-left: 16px; }
 .inv-paste { min-height: 96px; font: 13px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; }
 
+/* Touch: 44px targets on tablets and phones for everything on the inventory pages and sheets. */
+@media (max-width: 1024px), (pointer: coarse) {
+  .inv-page .o-btn, .inv-drawer .o-btn { min-height: 44px; }
+  .inv-page .o-input, .inv-page .o-select, .inv-drawer .o-input, .inv-drawer .o-select { min-height: 44px; }
+  .inv-check { min-height: 44px; }
+  .inv-check input { width: 20px; height: 20px; }
+  .inv-link { min-height: 44px; display: inline-flex; align-items: center; }
+  .inv-chip button { width: 32px; height: 32px; }
+}
+
+/* Tables that become cards on narrow screens (the page never scrolls sideways, nor the panel). */
+@media (max-width: 720px) {
+  .inv-cards thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .inv-cards, .inv-cards tbody, .inv-cards tr, .inv-cards th, .inv-cards td { display: block; }
+  .inv-cards tbody tr { padding: 12px 16px; border-top: 1px solid var(--line); }
+  .inv-cards th, .inv-cards td { padding: 2px 0; border: 0; text-align: left; }
+  .inv-cards td.is-num[data-label] { display: flex; align-items: center; justify-content: space-between; gap: 12px; text-align: right; }
+  .inv-cards td[data-label]::before { content: attr(data-label); color: var(--muted); font-size: 13px; text-align: left; }
+}
+
 @media (max-width: 640px) {
+  .page-header:has(.page-actions .o-select):not(:has(.page-actions .o-btn)) { flex-direction: column; align-items: stretch; }
+  .page-header:has(.page-actions .o-select):not(:has(.page-actions .o-btn)) .page-actions > .o-select { width: 100%; }
   .inv-toolbar { padding: 12px; }
   .inv-toolbar > * { flex: 1 1 100%; }
   .inv-toolbar .inv-check { flex: 0 0 auto; }

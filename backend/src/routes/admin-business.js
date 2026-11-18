@@ -7,7 +7,7 @@ import { email as cleanEmail } from '../lib/restaurants.js';
 import { serviceClient } from '../lib/supabase.js';
 import { withDb } from '../lib/db.js';
 import { welcomeUrl } from '../lib/staff-invites.js';
-import { activity, addBranch, businessDetail, grantOwner, listBusinesses, renameBusiness, revokeAccess } from '../lib/admin-business.js';
+import { activity, addBranch, businessDetail, grantOwner, listBusinesses, renameBusiness, revokeAccess, setInventoryEnabled } from '../lib/admin-business.js';
 
 const ID = '[0-9a-fA-F-]{36}';
 const admin = (request) => requireRole(request, 'admin');
@@ -63,6 +63,10 @@ export const routes = [
   { method: 'POST', path: new RegExp(`^/api/admin/businesses/(?<id>${ID})/branches$`), async handler({ request, params, body }) {
     const { user } = await admin(request);
     return withDb((db) => addBranch(db, user.id, params.id, body || {}), { transaction: true });
+  } },
+  { method: 'POST', path: new RegExp(`^/api/admin/businesses/(?<id>${ID})/inventory$`), async handler({ request, params, body }) {
+    const context = await admin(request);
+    return withDb((db) => setInventoryEnabled(db, context, params.id, body?.enabled, { reason: body?.reason }), { transaction: true });
   } },
   // Platform status for admin Settings: applied database updates and which features they switch on. Read-only.
   { method: 'GET', path: '/api/admin/system', async handler({ request }) {

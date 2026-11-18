@@ -1,3 +1,4 @@
+import { formatStockMoney } from '../../lib/inventory';
 // One dish's recipe in the side sheet (P1-16): ingredient lines with the unit people think in, a live "what this means" preview with
 // food cost, "keep selling when out", an optional note, Save (always a new version), Stop tracking, a ✨ AI draft (never saved
 // by itself), the version history (with a read-only look at an old one) and the dish's extras, each with its own small recipe.
@@ -8,7 +9,6 @@ import '../../components/owner/products.css';
 import { SaleSwitch } from '../../components/products/shared';
 import { api } from '../../lib/api';
 import { explain, formatNumber, recipePaths, useInventoryWrite } from '../../lib/inventory';
-import { formatPrice } from '../../lib/format';
 import LineEditor, { emptyLine, isComplete, lineFromView, lineText, problem, toBody } from './LineEditor';
 import { ErrorState, FormError, OIcon, SkeletonRows } from './parts';
 import './recipes.css';
@@ -41,8 +41,8 @@ export function FoodCost({ cost, price, currency }) {
     return <div className="rc-cost is-unknown"><span>Food cost</span><strong>Unknown</strong>
       <small>{cost.unknown?.length ? `No price yet for ${andList(cost.unknown)}. Cravio learns a price from the cost you enter with its stock.` : 'Add an ingredient to see the cost.'}</small></div>;
   }
-  return <div className="rc-cost"><span>Food cost per dish</span><strong>{formatPrice(cost.cost, currency)}</strong>
-    <small>{cost.costPct !== null && cost.costPct !== undefined ? `${percent(cost.costPct)} of the ${formatPrice(price, currency)} price` : `The price is ${formatPrice(price, currency)}`}</small></div>;
+  return <div className="rc-cost"><span>Food cost per dish</span><strong>{formatStockMoney(cost.cost, currency)}</strong>
+    <small>{cost.costPct !== null && cost.costPct !== undefined ? `${percent(cost.costPct)} of the ${formatStockMoney(price, currency)} price` : `The price is ${formatStockMoney(price, currency)}`}</small></div>;
 }
 
 function Sentences({ items }) {
@@ -81,12 +81,12 @@ function ExtraRecipe({ extra, paths, items, loadingItems, canEdit, canSeeCost, o
   return <li className="rc-extra">
     <div className="rc-extra-head">
       <div>
-        <strong>{extra.name}</strong> <small>+{formatPrice(extra.price)}</small>
+        <strong>{extra.name}</strong> <small>+{formatStockMoney(extra.price)}</small>
         {!extra.tracked && <p className="o-field-hint">Adding it doesn’t change stock.</p>}
         <Sentences items={extra.preview} />
         {canSeeCost && extra.tracked && extra.foodCost && <p className="o-field-hint">{extra.foodCost.cost === null
           ? `Cost unknown — no price for ${andList(extra.foodCost.unknown)}`
-          : `Cost ${formatPrice(extra.foodCost.cost)}${extra.foodCost.costPct !== null ? ` · ${percent(extra.foodCost.costPct)} of the price` : ''}`}</p>}
+          : `Cost ${formatStockMoney(extra.foodCost.cost)}${extra.foodCost.costPct !== null ? ` · ${percent(extra.foodCost.costPct)} of the price` : ''}`}</p>}
       </div>
       {canEdit && !editing && <button type="button" className="o-btn is-small" onClick={start} aria-label={`${extra.tracked ? 'Edit' : 'Add'} ingredients for ${extra.name}`}>{extra.tracked ? 'Edit' : 'Add ingredients'}</button>}
     </div>
@@ -222,7 +222,7 @@ function Editor({ view, paths, items, loadingItems, canSeeCost, onSaved, onClose
 
   return <div className="inv-form rc-sheet">
     <div className="rc-head">
-      <span>{dish.category || 'Dish'} · {formatPrice(dish.price, dish.currency)}</span>
+      <span>{dish.category || 'Dish'} · {formatStockMoney(dish.price, dish.currency)}</span>
       {view.version ? <span className="inv-badge is-ok">Version {view.version.version}</span> : view.source === 'link' ? <span className="inv-badge is-low">Uses old link</span> : <span className="inv-badge is-off">Not tracked</span>}
     </div>
     {!canEdit && <p className="inv-explain rc-readonly" role="note"><OIcon name="info" size={14} /> {readOnlyWhy}</p>}

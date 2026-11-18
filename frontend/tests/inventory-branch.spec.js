@@ -156,7 +156,7 @@ test.describe('Record stock', () => {
     await dialog.getByLabel('Item').selectOption(CHICKEN);
     await expect(dialog.getByLabel('Unit for How much is there now?')).toHaveValue('kg');
     await dialog.getByLabel('How much is there now?', { exact: true }).fill('4.8');
-    await expect(dialog.getByText('You counted 4.8 kg; the books say 5 kg → 0.2 kg less.')).toBeVisible();
+    await expect(dialog.getByText('You counted 4.8 kg; the system shows 5 kg → 0.2 kg less.')).toBeVisible();
     await dialog.getByRole('button', { name: 'Save count' }).click();
     await expect(page.getByText('Counted 4.8 kg of Chicken. Stock was 5 kg, so it changed by -200 g.')).toBeVisible();
     expect(posts).toHaveLength(1);

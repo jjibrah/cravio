@@ -6,7 +6,7 @@ import '../../components/owner/overview.css';
 import '../business/business.css';
 
 export default function BranchRecipesPage() {
-  return <div className="biz-stack">
+  return <div className="biz-stack inv-page">
     <PageHeader title="Recipes" description="What goes into each dish, so stock goes down as you serve. Food cost shows when you can see costs." />
     <RecipesPanel />
   </div>;

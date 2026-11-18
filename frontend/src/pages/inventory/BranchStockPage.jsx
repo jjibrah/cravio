@@ -1,3 +1,4 @@
+import { formatStockMoney } from '../../lib/inventory';
 // Branch Stock (/branch/:id/inventory when inventory is on): what this branch has, what is held for open orders and what is
 // still available, with the things that need attention at the top (out, low, count needed, shortfalls). One main action:
 // Record stock (count, add or waste). Tap an item for its sheet. Everything the server says is shown in plain words.
@@ -7,7 +8,6 @@ import { useApi } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import { branchPath } from '../../lib/branch';
 import { branchPaths, formatStamp } from '../../lib/inventory';
-import { formatPrice } from '../../lib/format';
 import BranchRecordDrawer from './BranchRecordDrawer';
 import BranchShortfalls from './BranchShortfalls';
 import { EmptyState, ErrorState, OIcon, PageHeader, Panel, SkeletonRows, TaskDrawer } from './parts';
@@ -23,7 +23,7 @@ function Badges({ item }) {
 }
 
 const used = (item) => (item.dishes ? `Used in ${item.dishes} ${item.dishes === 1 ? 'dish' : 'dishes'}` : 'Not used in a dish yet');
-const money = (value) => (value === null || value === undefined ? '–' : formatPrice(value));
+const money = (value) => (value === null || value === undefined ? '–' : formatStockMoney(value));
 
 function StartGuide({ canAddItems }) {
   return <ol className="inv-guide" aria-label="How to get started">
@@ -102,9 +102,8 @@ function StockBody({ data, refresh, canAddItems, sheet, setSheet }) {
 
     <Panel title="Stock" count={items.length} sub="On hand is what is on the shelf. Available is what is left after what open orders will use.">
       {!items.length ? <>
-        <EmptyState icon="layers" tone="neutral" title="No stock recorded here yet"
-          action={<button type="button" className="o-btn is-primary" onClick={() => setSheet({ type: 'record', kind: 'count' })}><OIcon name="plus" size={15} />Record stock</button>}>
-          Count what you have on the shelf and it will show up here.
+        <EmptyState icon="layers" tone="neutral" title="No stock recorded here yet">
+          Press Record stock (top of the page) and count what you have on the shelf. It will show up here.
         </EmptyState>
         <StartGuide canAddItems={canAddItems} />
       </> : <>
@@ -127,16 +126,16 @@ function StockBody({ data, refresh, canAddItems, sheet, setSheet }) {
             <th scope="row"><button type="button" className="inv-link" onClick={(event) => { event.stopPropagation(); setSheet({ type: 'item', id: item.id }); }}>{item.name}</button>
               <span className="inv-used">{used(item)}</span></th>
             <td className="is-num" data-label="On hand">{item.display.onHand}</td>
-            <td className="is-num" data-label="Held for open orders">{item.display.heldForOrders}</td>
+            <td className={`is-num${Number(item.heldForOrders) > 0 ? '' : ' is-zero'}`} data-label="Held for open orders">{Number(item.heldForOrders) > 0 ? item.display.heldForOrders : <span className="is-muted">–</span>}</td>
             <td className={`is-num${item.state === 'out' ? ' is-minus' : ''}`} data-label="Available"><strong>{item.display.available}</strong></td>
-            <td><Badges item={item} /></td>
+            <td className={`inv-status${item.state === 'ok' && !item.countNeeded ? ' is-zero' : ''}`}><Badges item={item} /></td>
             {seeCost && <td className="is-num" data-label="Value">{money(item.value)}</td>}
           </tr>)}</tbody>
         </table></div>}
         <div className="inv-toolbar" style={{ borderTop: '1px solid var(--line)', borderBottom: 0 }}>
           <span className="inv-unit-text">{rows.length} {rows.length === 1 ? 'item' : 'items'} shown</span>
           <span className="inv-spacer" />
-          {seeCost && summary.value !== undefined && <span className="inv-unit-text">Stock value {formatPrice(summary.value)}{summary.valueComplete === false ? ' (some costs unknown)' : ''}</span>}
+          {seeCost && summary.value !== undefined && <span className="inv-unit-text">Stock value {formatStockMoney(summary.value)}{summary.valueComplete === false ? ' (some costs unknown)' : ''}</span>}
         </div>
       </>}
     </Panel>
@@ -158,7 +157,7 @@ export default function BranchStockPage({ section }) {
   const { data, error, loading, refresh } = useApi(branchPaths.snapshot(), { ttl: 10000 });
   const canAddItems = (account?.businesses || []).length > 0;
   const [sheet, setSheet] = useState(null); // { type: 'item', id } | { type: 'record', kind, itemId } | { type: 'short' }
-  return <div className="biz-stack">
+  return <div className="biz-stack inv-page">
     <PageHeader title={section?.label || 'Stock'} description={section?.description || 'What you have on hand at this branch.'}>
       <button type="button" className="o-btn is-primary" disabled={!data} onClick={() => setSheet({ type: 'record', kind: 'count' })}><OIcon name="plus" size={15} />Record stock</button>
     </PageHeader>

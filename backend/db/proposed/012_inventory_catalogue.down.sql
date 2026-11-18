@@ -97,5 +97,10 @@ drop table if exists public.stock_categories;
 revoke select on public.stock_items from authenticated;
 grant select on public.stock_items to authenticated;
 
+-- Restore 008's list of audit kinds. NOT VALID keeps any existing inventory_enabled/disabled events (the log is append-only).
+alter table public.access_events drop constraint if exists access_events_action_check;
+alter table public.access_events add constraint access_events_action_check check (action in (
+  'business_grant', 'business_revoke', 'branch_assign', 'branch_unassign',
+  'branch_create', 'branch_member_add', 'branch_member_remove', 'mapping_applied')) not valid;
 alter table public.businesses drop column if exists inventory_enabled;
 notify pgrst, 'reload schema';

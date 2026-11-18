@@ -1,9 +1,9 @@
+import { formatStockMoney } from '../../lib/inventory';
 // Recipes (P1-16): every dish of one branch with what it can still make and what it costs, and the recipe sheet to change it.
 // One list for both sides: the owner at /owner/inventory/recipes (a branch picker at the top, remembered) and a branch manager
 // at /branch/:id/recipes (their own branch). The data: GET recipes (list) and the recipe sheet's own calls; see RecipeSheet.jsx.
 import { useEffect, useId, useMemo, useState } from 'react';
 import { useApi } from '../../lib/api';
-import { formatPrice } from '../../lib/format';
 import { branchPaths, recipePaths } from '../../lib/inventory';
 import { pickItemsFromBranch, pickItemsFromOwner } from './LineEditor';
 import RecipeSheet from './RecipeSheet';
@@ -31,7 +31,7 @@ export function costText(dish) {
   const cost = dish.foodCost;
   if (!dish.tracked || !cost) return '';
   if (cost.cost === null || cost.cost === undefined) return cost.unknown?.length ? `Cost unknown — no price for ${andList(cost.unknown)}` : 'Cost unknown';
-  return `${formatPrice(cost.cost)}${cost.costPct !== null && cost.costPct !== undefined ? ` · ${Number(cost.costPct)}% of the price` : ''}`;
+  return `${formatStockMoney(cost.cost)}${cost.costPct !== null && cost.costPct !== undefined ? ` · ${Number(cost.costPct)}% of the price` : ''}`;
 }
 
 function DishRow({ dish, canEdit, canSeeCost, onOpen }) {
@@ -45,7 +45,7 @@ function DishRow({ dish, canEdit, canSeeCost, onOpen }) {
         <span className={`inv-badge ${status.tone}`}>{status.label}</span>
         {dish.soldOut && <span className="inv-badge is-out">Sold out</span>}
       </strong>
-      <span>{formatPrice(dish.price)}{dish.version ? ` · Version ${dish.version}` : ''}{dish.allowWhenOut && dish.tracked ? ' · Keeps selling when out' : ''}</span>
+      <span>{formatStockMoney(dish.price)}{dish.version ? ` · Version ${dish.version}` : ''}{dish.allowWhenOut && dish.tracked ? ' · Keeps selling when out' : ''}</span>
       {portions && <span className="rc-portions">{portions}</span>}
       {cost && <span className={dish.foodCost?.cost === null ? 'rc-warn' : undefined}>{cost}</span>}
       {!dish.tracked && <span>Selling it doesn’t change stock.</span>}

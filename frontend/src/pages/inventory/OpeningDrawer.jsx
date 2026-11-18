@@ -1,3 +1,4 @@
+import { formatStockMoney } from '../../lib/inventory';
 // Opening stock: pick a location, then say how much of each item is there now. Items that already have an opening
 // are shown as done; the rest wait here. The amount can be typed in any unit the item has ("40 crates"), with the
 // live total ("= 400 kg") under the box. Nothing is posted until Save; the server refuses anything unclear in plain words.
@@ -5,7 +6,6 @@ import { useEffect, useId, useMemo, useState } from 'react';
 import { useApi } from '../../lib/api';
 import { convert, formatNumber, ownerPaths, sayAmount, unitChoices, useInventoryWrite } from '../../lib/inventory';
 import { useNotifications } from '../../components/notifications/NotificationProvider';
-import { formatPrice } from '../../lib/format';
 import { EmptyState, FormError, OIcon, QuantityInput, SkeletonRows } from './parts';
 
 const when = (iso) => (iso ? new Date(iso).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric' }) : '');
@@ -24,7 +24,7 @@ function Line({ row, item, units, costView, value, onChange }) {
     {total !== null && <p className="inv-explain" aria-live="polite">= <strong>{sayAmount(Math.round(total * 1000) / 1000, shown, units)}</strong></p>}
     {big && <p className="inv-warn">{formatNumber(total)} {shown} is a lot. Check the amount and the unit.</p>}
     {costView && <QuantityInput id={`${id}-cost`} label={`Cost of ${row.name} per ${value.unit}, in KES`} value={value.cost} onChange={(cost) => onChange({ ...value, cost })}
-      unit={`KES per ${value.unit}`} placeholder="Optional" />}
+      unit={`KES per ${value.unit}`} placeholder="Cost (optional)" />}
   </li>;
 }
 
@@ -109,6 +109,6 @@ export default function OpeningDrawer({ ctx, locationId: initialLocation, onClos
           {busy ? 'Saving…' : filled.length ? `Save opening stock for ${filled.length} ${filled.length === 1 ? 'item' : 'items'}` : 'Save opening stock'}</button>}
       {!results && <button type="button" className="o-btn is-quiet" onClick={onClose} disabled={busy}>Cancel</button>}
     </div>
-    {can.costView && !results && waiting.length > 0 && <p className="o-field-hint"><OIcon name="info" size={13} /> Cost is optional, in KES for the unit you pick ({formatPrice(650)} per kg, for example). It gives you food cost on recipes.</p>}
+    {can.costView && !results && waiting.length > 0 && <p className="o-field-hint"><OIcon name="info" size={13} /> Cost is optional, in KES for the unit you pick ({formatStockMoney(650)} per kg, for example). It gives you food cost on recipes.</p>}
   </form>;
 }

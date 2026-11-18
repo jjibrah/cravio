@@ -1,5 +1,5 @@
 // "Record stock" for a branch: three plain choices (Count, Add, Waste), the item, an amount with its unit, and a live line that says
-// what the amount means ("40 crates = 400 kg"; for a count "You counted 4.8 kg; the books say 5 kg, so 0.2 kg less").
+// what the amount means ("40 crates = 400 kg"; for a count "You counted 4.8 kg; the system shows 5 kg, so 0.2 kg less").
 // The server does the real arithmetic. A very large amount comes back as 409 confirm_large_amount: we show its message with the
 // suggested fix and an "it is right" button. A failed save keeps its command id, so pressing again is a retry, never a double post.
 import { useEffect, useId, useMemo, useState } from 'react';
@@ -38,9 +38,9 @@ export function liveLine({ kind, item, quantity, unitCode }) {
   const onHand = Number(item.onHand) || 0;
   if (kind === 'count') {
     const diff = base - onHand;
-    if (Math.abs(diff) < 1e-6) return `You counted ${asTyped}; the books say ${item.display.onHand}. No change.`;
+    if (Math.abs(diff) < 1e-6) return `You counted ${asTyped}; the system shows ${item.display.onHand}. No change.`;
     const gap = inUsual(item, Math.abs(diff));
-    return `You counted ${asTyped}; the books say ${item.display.onHand} → ${gap.text} ${diff < 0 ? 'less' : 'more'}.`;
+    return `You counted ${asTyped}; the system shows ${item.display.onHand} → ${gap.text} ${diff < 0 ? 'less' : 'more'}.`;
   }
   if (q <= 0) return null;
   const same = entered.code === usualUnit(item);

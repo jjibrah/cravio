@@ -23,12 +23,12 @@ function Movements({ ctx, itemId }) {
   if (error && !data) return <ErrorState error={error} onRetry={refresh} what="this item’s history" />;
   if (loading) return <SkeletonRows rows={5} thumb={false} label="Loading history" />;
   if (!data.movements.length) return <EmptyState icon="clock" tone="neutral" title="No stock changes yet">Set opening stock on the Stock page, then every change shows here.</EmptyState>;
-  return <div className="inv-table-wrap"><table className="inv-table">
+  return <div className="inv-table-wrap"><table className="inv-table inv-cards">
     <thead><tr><th scope="col">When</th><th scope="col">Place</th><th scope="col" className="is-num">Change</th><th scope="col" className="is-num">Left after</th><th scope="col">Why</th></tr></thead>
     <tbody>{data.movements.map((m) => <tr key={m.id}>
-      <td>{when(m.occurredAt)}</td><td>{m.locationName}</td>
-      <td className={`is-num${m.display.delta.startsWith('-') ? ' is-minus' : ''}`}>{m.display.delta}</td>
-      <td className="is-num">{m.display.balanceAfter}</td>
+      <td className="inv-nowrap">{when(m.occurredAt)}</td><td data-label="Place">{m.locationName}</td>
+      <td className={`is-num${m.display.delta.startsWith('-') ? ' is-minus' : ''}`} data-label="Change">{m.display.delta}</td>
+      <td className="is-num" data-label="Left after">{m.display.balanceAfter}</td>
       <td>{REASON_LABEL[m.reason] || m.reason.replace(/_/g, ' ')}{m.entered ? <small>Entered as {m.entered.quantity} {m.entered.unit}</small> : null}{m.note ? <small>{m.note}</small> : null}</td>
     </tr>)}</tbody>
   </table></div>;

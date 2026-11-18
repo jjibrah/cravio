@@ -292,6 +292,13 @@ create index if not exists stock_exceptions_open_idx on public.stock_exceptions 
 -- Off until the owner turns inventory on; main ignores the column.
 alter table public.businesses add column if not exists inventory_enabled boolean not null default false;
 
+-- The platform admin's on/off switch is audited in access_events: widen the allowed kinds additively (008's list + two).
+alter table public.access_events drop constraint if exists access_events_action_check;
+alter table public.access_events add constraint access_events_action_check check (action in (
+  'business_grant', 'business_revoke', 'branch_assign', 'branch_unassign',
+  'branch_create', 'branch_member_add', 'branch_member_remove', 'mapping_applied',
+  'inventory_enabled', 'inventory_disabled'));
+
 -- ---------------------------------------------------------------------------
 -- Triggers
 -- ---------------------------------------------------------------------------

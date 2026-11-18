@@ -6,6 +6,7 @@
 .inv-stock-table tbody tr { cursor: pointer; }
 .inv-stock-table tbody tr:hover { background: var(--hover); }
 .inv-stock-table .inv-link { min-height: 32px; }
+@media (max-width: 1024px), (pointer: coarse) { .inv-stock-table .inv-link { min-height: 44px; } }
 .inv-stock-table .inv-used { display: block; margin-top: 2px; color: var(--muted); font-size: 12px; font-weight: 450; }
 
 /* Item sheet */
@@ -24,6 +25,9 @@
 
 /* Record stock sheet: big touch targets */
 .inv-kinds { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.inv-kinds label { padding: 10px; }
+.inv-kinds small { line-height: 1.3; }
+.inv-stock-table td.is-num { white-space: nowrap; }
 .inv-kinds label { min-height: 72px; justify-content: center; position: relative; }
 .inv-kinds label strong { font-size: 15px; }
 .inv-reasons { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 8px; padding: 0; border: 0; }
@@ -42,8 +46,8 @@
 .inv-short li:first-child { border-top: 0; }
 .inv-short-line { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; }
 .inv-short-line small { color: var(--muted); font-size: 12px; }
-.inv-short-form { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-.inv-short-form .o-input { flex: 1 1 180px; min-width: 0; min-height: 44px; }
+.inv-short-form { display: flex; flex-direction: row; flex-wrap: wrap; gap: 8px; align-items: center; }
+.inv-short-form .o-input { flex: 1 1 180px; min-width: 0; min-height: 44px; height: auto; }
 .inv-short-form .o-btn { min-height: 44px; }
 
 .inv-more { display: flex; justify-content: center; padding: 12px; border-top: 1px solid var(--line); }
@@ -61,6 +65,12 @@
   .inv-history-table tbody tr { padding: 12px 16px; border-top: 1px solid var(--line); }
   .inv-history-table th, .inv-history-table td { padding: 2px 0; border: 0; text-align: left; }
   .inv-history-table td.is-num { text-align: left; }
+  .inv-stock-table tbody tr { display: flex; flex-direction: column; }
+  .inv-stock-table th[scope='row'] { order: 0; }
+  .inv-stock-table td.inv-status { order: 1; padding: 4px 0 8px; }
+  .inv-stock-table td.is-num { order: 2; }
+  .inv-stock-table td.is-zero { display: none; }
+  .inv-history-table td[data-label]::before { content: attr(data-label) ': '; color: var(--muted); font-size: 13px; }
+  .inv-history-table td.is-zero { display: none; }
   .inv-actions { grid-template-columns: minmax(0, 1fr); }
-  .inv-kinds { grid-template-columns: minmax(0, 1fr); }
 }

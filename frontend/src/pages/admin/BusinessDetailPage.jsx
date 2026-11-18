@@ -114,6 +114,34 @@ function RemoveAccess({ business, person, onDone }) {
   </div>;
 }
 
+const INVENTORY_EXPLAINER = 'When on, the owner and branch managers get Stock, Items, Recipes and History. Orders start taking ingredients off stock once recipes are set.';
+
+function SwitchInventory({ business, onDone }) {
+  const ids = useId();
+  const turningOn = !business.inventoryEnabled;
+  const [run, busy, error] = useAction();
+  const [reason, setReason] = useState('');
+  const submit = async (event) => {
+    event.preventDefault();
+    const ok = await run(() => api(`/api/admin/businesses/${business.id}/inventory`, { method: 'POST', body: { enabled: turningOn, ...(reason.trim() ? { reason: reason.trim() } : {}) } }),
+      turningOn ? `Inventory is on for ${business.name}.` : `Inventory is off for ${business.name}.`);
+    if (ok) onDone();
+  };
+  return <form className="ab-form" onSubmit={submit} noValidate>
+    <p className="ab-form-intro">{turningOn
+      ? `${INVENTORY_EXPLAINER} Owners see the change the next time they open or reload Cravio.`
+      : 'Owners and managers will go back to the old Inventory page. Nothing is deleted.'}</p>
+    <label className="o-label" htmlFor={`${ids}-reason`}>Note <span className="o-optional">Optional, shown in the activity log</span></label>
+    <input id={`${ids}-reason`} className="o-input" value={reason} maxLength={280} autoComplete="off" data-autofocus onChange={(event) => setReason(event.target.value)} />
+    <FormError error={error} />
+    <div className="ab-form-actions">
+      <button type="button" className="o-btn" onClick={onDone} disabled={busy}>Cancel</button>
+      <button type="submit" className={`o-btn ${turningOn ? 'is-primary' : 'is-danger-solid'}`} disabled={busy}>
+        {busy ? 'Saving…' : turningOn ? 'Switch Inventory on' : 'Switch Inventory off'}</button>
+    </div>
+  </form>;
+}
+
 export default function BusinessDetailPage() {
   const { id } = useParams();
   const { data: b, error, loading, refresh } = useApi(`/api/admin/businesses/${id}`, { ttl: 15000 });
@@ -133,7 +161,8 @@ export default function BusinessDetailPage() {
     { key: 'b', label: 'Branches', value: formatWhole(b.branches.length), sub: `${b.branches.filter((x) => x.status === 'live').length} live` },
     { key: 's', label: 'Staff', value: formatWhole(totals.staff), sub: `${owners.length} business owner${owners.length === 1 ? '' : 's'}` },
   ];
-  const titles = { owner: 'Add a business owner', branch: 'Add a branch', rename: 'Rename business', remove: task?.person ? `Remove ${task.person.name}?` : 'Remove access' };
+  const titles = { owner: 'Add a business owner', branch: 'Add a branch', rename: 'Rename business', remove: task?.person ? `Remove ${task.person.name}?` : 'Remove access',
+    inventory: b.inventoryEnabled ? 'Switch Inventory off?' : 'Switch Inventory on?' };
 
   return <div className="in-page pl-page ab-page">
     {back}
@@ -149,6 +178,19 @@ export default function BusinessDetailPage() {
     </header>
     {!owners.length && <p className="o-note is-warning ab-note"><OIcon name="alert" size={16} /><span>This business has no owner, so nobody can use the owner platform for it. Add one.</span></p>}
     <KpiTiles tiles={tiles} count={4} label="This business at a glance" />
+
+    <Panel title="Inventory module" sub="Decides whether this business uses the new Inventory. Cravio only switches it; stock records stay with the business.">
+      <div className="ab-body ab-switch">
+        <div className="ab-switch-text">
+          <p><strong>Status</strong> {b.inventoryEnabled === null
+            ? <span className="ab-chip is-off">Not available yet</span>
+            : <span className={`ab-chip${b.inventoryEnabled ? ' is-on' : ' is-off'}`} data-testid="inventory-status">{b.inventoryEnabled ? 'On' : 'Off'}</span>}</p>
+          <p className="ab-sub">{b.inventoryEnabled === null ? 'The inventory update hasn’t been applied to the database yet, so this can’t be switched.' : INVENTORY_EXPLAINER}</p>
+        </div>
+        {b.inventoryEnabled !== null && <button type="button" className={`o-btn${b.inventoryEnabled ? '' : ' is-primary'}`} onClick={() => setTask({ kind: 'inventory' })}>
+          {b.inventoryEnabled ? 'Switch off' : 'Switch on'}</button>}
+      </div>
+    </Panel>
 
     <Panel title="Branches" count={b.branches.length}>
       {b.branches.length ? <div className="pl-table-scroll ab-body-table"><table className="pl-table">
@@ -203,6 +245,7 @@ export default function BusinessDetailPage() {
       {task?.kind === 'owner' && <AddOwner business={b} onDone={close} />}
       {task?.kind === 'branch' && <AddBranch business={b} onDone={close} />}
       {task?.kind === 'rename' && <Rename business={b} onDone={close} />}
+      {task?.kind === 'inventory' && <SwitchInventory business={b} onDone={close} />}
       {task?.kind === 'remove' && <RemoveAccess business={b} person={task.person} onDone={close} />}
     </Modal>
   </div>;

@@ -276,3 +276,11 @@ export function formatStamp(iso) {
   if (!time || Number.isNaN(time.getTime())) return '';
   return `${STAMP.format(time).replace(',', '')} EAT`;
 }
+
+/** Stock money: "Ksh 2,600" for whole amounts, "Ksh 7.80" when there are cents (never "Ksh 7.8"). */
+const stockKes = new Intl.NumberFormat('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const stockKesWhole = new Intl.NumberFormat('en-KE', { maximumFractionDigits: 0 });
+export function formatStockMoney(value) {
+  const n = Number(value) || 0;
+  return `Ksh ${Number.isInteger(Math.round(n * 100) / 100) ? stockKesWhole.format(n) : stockKes.format(n)}`;
+}

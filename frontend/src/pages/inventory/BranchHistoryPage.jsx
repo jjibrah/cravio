@@ -36,9 +36,9 @@ function Rows({ itemId }) {
         <td>{formatStamp(m.occurredAt)}</td>
         <td>{m.reasonLabel}{m.order && <small><Link className="inv-link" to={m.order.link}>Order #{m.order.shortId}</Link></small>}</td>
         <th scope="row">{m.itemName}{m.entered && <small>Entered as {m.entered.quantity} {m.entered.unit}</small>}</th>
-        <td className={`is-num${m.display.delta.startsWith('-') ? ' is-minus' : ''}`}>{m.display.delta}<small>{m.display.balanceAfter} left</small></td>
-        <td>{m.by?.name || <span className="is-muted">System</span>}</td>
-        <td>{m.note || <span className="is-muted">–</span>}</td>
+        <td className={`is-num${m.display.delta.startsWith('-') ? ' is-minus' : ''}`}><span className="inv-nowrap">{m.display.delta}</span><small>{m.display.balanceAfter} left</small></td>
+        <td data-label="By">{m.by?.name || <span className="is-muted">System</span>}</td>
+        <td className={m.note ? undefined : 'is-zero'} data-label="Note">{m.note || <span className="is-muted">–</span>}</td>
       </tr>)}</tbody>
     </table></div>
     <FormError error={error} />
@@ -52,7 +52,7 @@ export default function BranchHistoryPage({ section }) {
   const itemId = params.get('item') || '';
   const items = useApi(branchPaths.snapshot({ all: true }), { ttl: 15000 });
   const choose = (value) => setParams(value ? { item: value } : {}, { replace: true });
-  return <div className="biz-stack">
+  return <div className="biz-stack inv-page">
     <PageHeader title={section?.label || 'History'} description={section?.description || 'Every stock change at this branch, newest first.'} />
     <Panel title="Stock changes" sub="Newest first. Times are East Africa Time.">
       <div className="inv-toolbar">

@@ -78,7 +78,7 @@ export function OwnerFrame({ title, description, actions, children }) {
   const ctx = business && data?.enabled ? { business, businesses, data, can: data.capabilities || {}, paths, refresh } : null;
   const pick = (id) => { setChosen(id); try { sessionStorage.setItem(CHOICE_KEY, id); } catch { /* storage blocked */ } };
 
-  return <div className="biz-stack">
+  return <div className="biz-stack inv-page">
     <PageHeader title={title} description={description}>
       {businesses.length > 1 && <>
         <label className="visually-hidden" htmlFor={pickerId}>Business</label>

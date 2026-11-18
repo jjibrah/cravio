@@ -1,10 +1,10 @@
+import { formatStockMoney } from '../../lib/inventory';
 // Owner Stock (/owner/inventory when inventory is on): one table of items x places (the Warehouse first, then every
 // branch this person sees), with what's low or out at the top, filters, a CSV of what is on screen, and the one main
 // action: record opening stock. The Warehouse can be renamed here (it is always labelled "Warehouse").
 import { useId, useMemo, useState } from 'react';
 import { Link, Navigate, useSearchParams } from 'react-router-dom';
 import { useNotifications } from '../../components/notifications/NotificationProvider';
-import { formatPrice } from '../../lib/format';
 import { ownerPaths, useInventoryWrite } from '../../lib/inventory';
 import OpeningDrawer from './OpeningDrawer';
 import { FormError, NoItems, OIcon, OwnerFrame, Panel, StockBadge, TaskDrawer, downloadText, levelState, toCsv } from './parts';
@@ -54,7 +54,7 @@ function StockTable({ ctx, search, category, place, lowOnly, onClear }) {
   }), [data.items, category, term, lowOnly, places]);
   const entryOf = (item, loc) => item.locations.find((l) => l.locationId === loc.id);
   const valueOf = (item) => (place === 'all' ? item.totals.value : entryOf(item, places[0])?.value);
-  const money = (value) => (value === null || value === undefined ? '–' : formatPrice(value));
+  const money = (value) => (value === null || value === undefined ? '–' : formatStockMoney(value));
 
   function exportCsv() {
     const head = ['Item', 'Category', ...places.map((p) => p.name), ...(can.costView ? ['Value (KES)'] : [])];
@@ -67,7 +67,7 @@ function StockTable({ ctx, search, category, place, lowOnly, onClear }) {
     return <EmptyMatches onClear={onClear} />;
   }
   return <>
-    <div className="inv-table-wrap"><table className="inv-table inv-stock">
+    <div className="inv-table-wrap"><table className="inv-table inv-stock inv-cards">
       <thead><tr>
         <th scope="col">Item</th>
         {places.map((p) => <th scope="col" className="is-num" key={p.id}>{p.name}{p.label === 'Warehouse' && p.name !== 'Warehouse' ? <small>Warehouse</small> : null}</th>)}
@@ -76,8 +76,8 @@ function StockTable({ ctx, search, category, place, lowOnly, onClear }) {
       <tbody>{rows.map((item) => <tr key={item.id}>
         <th scope="row">{can.itemEdit ? <Link className="inv-link" to={`/owner/inventory/items?item=${item.id}`}>{item.name}</Link> : item.name}
           {item.categoryName && <small>{item.categoryName}</small>}</th>
-        {places.map((p) => <td className="is-num" key={p.id}><Cell entry={entryOf(item, p)} /></td>)}
-        {can.costView && <td className="is-num">{money(valueOf(item))}</td>}
+        {places.map((p) => <td className="is-num" key={p.id} data-label={p.name}><Cell entry={entryOf(item, p)} /></td>)}
+        {can.costView && <td className="is-num" data-label="Value">{money(valueOf(item))}</td>}
       </tr>)}</tbody>
     </table></div>
     <div className="inv-toolbar" style={{ borderTop: '1px solid var(--line)', borderBottom: 0 }}>
@@ -152,7 +152,7 @@ export default function OwnerStockPage() {
   // Old links (/owner/inventory?view=history) keep working: history has its own page now.
   if (params.get('view') === 'history') return <Navigate to="/owner/inventory/history" replace />;
   return <OwnerFrame title="Stock" description="What you have on hand in the Warehouse and at every branch."
-    actions={(ctx) => ctx.can.stockRecord && <button type="button" className="o-btn is-primary" onClick={() => setTask('opening')}>
+    actions={(ctx) => ctx.can.stockRecord && ctx.data.items.length > 0 && <button type="button" className="o-btn is-primary" onClick={() => setTask('opening')}>
       <OIcon name="plus" size={15} />Record opening stock</button>}>
     {(ctx) => <StockBody ctx={ctx} task={task} setTask={setTask} />}
   </OwnerFrame>;
