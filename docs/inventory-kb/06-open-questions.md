@@ -2,6 +2,8 @@
 
 Each has a **recommended default** so planning can move; confirm or correct in discussion.
 
+**18 Nov 2026:** Q-L1 (several warehouses), Q-U1 (base units), Q-N1 (floor at 0 + exception) and Q-N2/A8 (owner + branch manager edit recipes) accepted as defaults — see `docs/v2/DECISIONS.md` (INV-A3/A4/A5/A8). The rest stay open until Phase 2.
+
 | ID | Question | Recommended default | Why it matters |
 | --- | --- | --- | --- |
 | Q-S1 | **Scope**: is this the inventory module only (items, units, ledger, warehouses, requests/transfers, suppliers/purchasing, emergency buys, recipes/costing, wastage/counts, reports) — or also the PRD's POS extras, M-Pesa, eTIMS and offline? | Inventory module now; M-Pesa, eTIMS, shifts/KDS and offline as **separate later modules** | The PRD is a whole platform; inventory alone is already large |

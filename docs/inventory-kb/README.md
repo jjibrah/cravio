@@ -10,6 +10,8 @@ Working reference for adding the inventory management module to Cravio. Written 
 | [04-gap-analysis.md](04-gap-analysis.md) | Each PRD module against the code: built, partial or missing, and where the PRD conflicts with decisions already made |
 | [05-navigation-proposal.md](05-navigation-proposal.md) | Draft sidebar with an **Operations** group for the owner, branch manager and admin interfaces |
 | [06-open-questions.md](06-open-questions.md) | What needs deciding before the implementation plan is written |
+| [07-implementation-plan.md](07-implementation-plan.md) | The 3-phase plan: migrations, services, API, UI per role, cases and tests per phase |
+| [08-phase1-workplan.md](08-phase1-workplan.md) | Phase 1 broken into tickets (P1-01…P1-19), milestones, first-week schedule, ways of working |
 
 Source PRD file: `/Users/it-macmini-5/.t3/userdata/attachments/247035ad-0c89-4fd3-be22-f56e01f97d25-64d170dc-07f1-467b-a3bf-c27a37af2ef2-pdf.pdf`
 
