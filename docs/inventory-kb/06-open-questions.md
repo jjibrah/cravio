@@ -27,6 +27,8 @@ Each has a **recommended default** so planning can move; confirm or correct in d
 
 ## Added 18 Nov 2026 (second round)
 
+**Open, with a proposed default recorded (DECISIONS INV-P2D, 18 Nov 2026):** Q2-3 returns to the Warehouse need no approval (D2-12); Q2-4 over-delivery tolerance 5 % and price-variance alert 10 % (D2-11, D2-13); Q2-5 a supplier may deliver straight to a branch (default yes). Work proceeds on these defaults; each is a setting or a one-line change.
+
 **Answered** (see `docs/v2/DECISIONS.md` INV-P2/P3): Q2-1 own-PO approval (yes for a sole owner, flagged `self_approved`); Q2-2 emergency limits (owner-set, none built in); Q3-1 approval thresholds (owner-set, per business with branch override; defaults until set: emergency buys need approval, wastage free, adjustments approved, one approval per count with any variance, D2-16); Q3-3 PDF library (browser Save as PDF first; `pdfkit` only for emailed/scheduled reports, optional P3-39); where Reports and Receipts live (owner sidebar group **Reports**).
 
 | ID | Question | Recommended default | Why it matters |

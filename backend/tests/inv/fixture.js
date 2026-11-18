@@ -1,11 +1,20 @@
-// Shared fixture for the inventory suites: a fresh PGlite database (all committed migrations, plus any `extra`
-// proposed migrations) seeded with one business, one live branch, stock locations, users, a small menu, an extra and a deal.
+// Shared fixture for the inventory suites: a fresh PGlite database (all committed migrations, plus the proposed ones)
+// seeded with one business, one live branch, stock locations, users, a small menu, an extra and a deal.
 // Nothing here touches the shared database.
+//
+// Which proposed migrations are applied (backend/tests/inv/migrations.js holds the ordered list):
+//   inventoryFixture()                    -> ALL of them (the default: tests run against the schema we are about to ship)
+//   inventoryFixture({ extra: [] })       -> none (committed migrations only: migration rehearsal tests start from here)
+//   inventoryFixture({ extra: [paths] })  -> exactly those paths, in that order (e.g. proposedUpTo(13), or [...proposedBefore(16)])
+// rig() (below) is inventoryFixture() plus the people, branch and items most Phase 2 suites need.
 import { createUser, freshDatabase } from '../support/pg.js';
 import { branchLocation, centerLocation } from '../../src/stock/service.js';
+import { setSetting } from '../../src/inventory/policies.js';
+import { PROPOSED_MIGRATIONS } from './migrations.js';
+import { makeItem } from './helpers.js';
 
-export async function inventoryFixture({ extra = [] } = {}) {
-  const db = await freshDatabase({ extra });
+export async function inventoryFixture({ extra } = {}) {
+  const db = await freshDatabase({ extra: extra === undefined ? [...PROPOSED_MIGRATIONS] : extra });
   const one = async (sql, params) => (await db.query(sql, params)).rows[0];
   const tx = (fn) => db.transaction(fn);
 
@@ -42,10 +51,74 @@ export async function inventoryFixture({ extra = [] } = {}) {
     return id;
   });
 
+  let people = 0;
+  /** Another owner of the business (business_members 'owner' + owner of the first branch). Returns the user id. */
+  const addOwner = async (email = `owner${++people}@example.test`) => {
+    const id = await createUser(db, email, { role: 'owner' });
+    await db.query(`insert into public.business_members (business_id, user_id, role) values ($1, $2, 'owner')`, [businessId, id]);
+    await db.query(`insert into public.restaurant_members (restaurant_id, user_id, role) values ($1, $2, 'owner')`, [branch.id, id]);
+    return id;
+  };
+  /** A further live branch with its stock location and (optionally) a manager. Returns { restaurantId, locationId, managerId }. */
+  const addBranch = async (name = `Branch ${people + 2}`, { manager = true } = {}) => {
+    const restaurantId = (await one(`insert into public.restaurants (owner_id, name, status, business_id, owner_primary) values ($1, $2, 'live', $3, false) returning id`, [users.owner, name, businessId])).id;
+    const locationId = await tx((t) => branchLocation(t, restaurantId));
+    let managerId = null;
+    if (manager) {
+      managerId = await createUser(db, `manager${++people}@example.test`, { role: 'owner' });
+      await db.query(`insert into public.restaurant_members (restaurant_id, user_id, role) values ($1, $2, 'manager')`, [restaurantId, managerId]);
+    }
+    return { restaurantId, locationId, managerId };
+  };
+  /** An operations manager overseeing `branchIds`; `canApprove` flips the business setting operations_can_approve. Returns the user id. */
+  const addOperations = async ({ branchIds = [branch.id], canApprove = false, email = `ops${++people}@example.test` } = {}) => {
+    const id = await createUser(db, email, { role: 'owner' });
+    await db.query(`insert into public.business_members (business_id, user_id, role) values ($1, $2, 'operations')`, [businessId, id]);
+    for (const restaurantId of branchIds) await db.query(`insert into public.business_member_branches (business_id, user_id, restaurant_id) values ($1, $2, $3)`, [businessId, id, restaurantId]);
+    if (canApprove) await setSetting(db, { businessId, key: 'operations_can_approve', value: true, actorId: users.owner });
+    return id;
+  };
+  /** What lib/auth.js requireUser() hands back, for permissions.inventoryScope(): memberships [[restaurantId, role]], grants [{ businessId, role, branchIds }]. */
+  const ctx = (userId, { role = 'owner', memberships = [], grants = [] } = {}) => ({
+    user: { id: userId }, profile: { role }, memberships: memberships.map(([rid, r]) => ({ role: r, restaurant: { id: rid } })), grants,
+  });
+
   return {
     db,
     ids: { businessId, branchId: branch.id, centerLocationId, branchLocationId, categoryId, burgerId, friesId, extraId, dealId },
     users,
-    helpers: { tx, one, order },
+    helpers: { tx, one, order, addOwner, addBranch, addOperations, ctx },
   };
+}
+
+/**
+ * The fixture most Phase 2 suites want: inventoryFixture() with the module switched on and, on top of the base data,
+ *   people     owner (first), owner2, manager (branch 1 manager), manager2 (branch 2), ops (operations manager on branch 1;
+ *              flip operations_can_approve with setSetting), waiter
+ *   branches   branch1 (the fixture's), branch2  ({ restaurantId, locationId, managerId })
+ *   items      flour and rice (base g shown as kg, packs: 'sack' = 25 kg / 50 kg), both unstocked
+ *   contexts   what requireUser() would return for each person, ready for inventoryScope()
+ * A supplier helper arrives with migration 015 (P2-03). Same options as inventoryFixture ({ extra }).
+ */
+export async function rig(options = {}) {
+  const f = await inventoryFixture(options);
+  const { ids, users, helpers } = f;
+  await f.db.query('update public.businesses set inventory_enabled = true where id = $1', [ids.businessId]);
+  const owner2 = await helpers.addOwner('owner2@example.test');
+  const branch2 = await helpers.addBranch('Second branch');
+  const ops = await helpers.addOperations({ branchIds: [ids.branchId] });
+  const flour = await makeItem(f.db, ids.businessId, 'Flour', { packs: [{ name: 'sack', factor: 25000 }] });
+  const rice = await makeItem(f.db, ids.businessId, 'Rice', { packs: [{ name: 'sack', factor: 50000 }] });
+  const { ctx } = helpers;
+  const branch1 = { restaurantId: ids.branchId, locationId: ids.branchLocationId, managerId: users.manager };
+  const people = { owner: users.owner, owner2, manager: users.manager, manager2: branch2.managerId, ops, waiter: users.waiter };
+  const contexts = {
+    owner: ctx(users.owner, { memberships: [[ids.branchId, 'owner']], grants: [{ businessId: ids.businessId, role: 'owner', branchIds: null }] }),
+    owner2: ctx(owner2, { memberships: [[ids.branchId, 'owner']], grants: [{ businessId: ids.businessId, role: 'owner', branchIds: null }] }),
+    ops: ctx(ops, { grants: [{ businessId: ids.businessId, role: 'operations', branchIds: [ids.branchId] }] }),
+    manager: ctx(users.manager, { memberships: [[ids.branchId, 'manager']] }),
+    manager2: ctx(branch2.managerId, { memberships: [[branch2.restaurantId, 'manager']] }),
+    waiter: ctx(users.waiter, { role: 'waiter', memberships: [[ids.branchId, 'waiter']] }),
+  };
+  return { ...f, people, branches: { branch1, branch2 }, items: { flour, rice }, contexts };
 }

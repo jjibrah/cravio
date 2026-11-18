@@ -19,7 +19,7 @@ const fails = async (promise, re, m) => {
 // ---------------------------------------------------------------------------------------------------------------
 // 1. Rehearsal: 009 data first, then 012.
 // ---------------------------------------------------------------------------------------------------------------
-const { db, ids, users, helpers } = await inventoryFixture();   // committed migrations only (through 010)
+const { db, ids, users, helpers } = await inventoryFixture({ extra: [] });   // committed migrations only (through 010): the rehearsal starts here
 const { one, tx } = helpers;
 const west = (await one(`insert into public.restaurants (owner_id, name, business_id, owner_primary, status) values ($1, 'West', $2, false, 'live') returning id`, [users.owner, ids.businessId])).id;
 const westLoc = await tx((t) => branchLocation(t, west));
@@ -235,7 +235,7 @@ await db.close();
 // 3. Down migration.
 // ---------------------------------------------------------------------------------------------------------------
 { // 009-style data only → succeeds, 009 checks restored, data intact
-  const f = await inventoryFixture();
+  const f = await inventoryFixture({ extra: [] });
   const { ids: i, users: u, helpers: h } = f;
   const c = { businessId: i.businessId, actorId: u.manager };
   const it = await h.tx((t) => createItem(t, c, { name: 'Buns', lowLevel: 12.5 }));

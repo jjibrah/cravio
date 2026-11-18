@@ -4,6 +4,7 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { createUser, freshDatabase, readSql } from './support/pg.js';
+import { resolveProposed } from './inv/migrations.js';
 import {
   adjust, availability, branchLocation, branchSnapshot, businessSnapshot, cancelDispatch, cancelRequest, centerLocation, correctOrder,
   createItem, dispatch, findByCode, linkMenuItem, once, receive, reviewRequest, submitRequest,
@@ -16,9 +17,12 @@ const fails = async (promise, test, m) => {
   checks++;
 };
 
-// INV_EXTRA_MIGRATIONS=proposed/012_inventory_catalogue.sql runs this same suite with proposed migrations applied on top of
-// 009 (npm run test:inv:compat): proof that the code on `main` keeps working against the widened schema. Default: none.
-const extra = (process.env.INV_EXTRA_MIGRATIONS || '').split(',').map((name) => name.trim()).filter(Boolean);
+// INV_EXTRA_MIGRATIONS runs this same suite with proposed migrations applied on top of 009 (npm run test:inv:compat): proof
+// that the code on `main` keeps working against the widened schema. Default: none.
+//   INV_EXTRA_MIGRATIONS=all                                  every proposed migration, in order (backend/tests/inv/migrations.js)
+//   INV_EXTRA_MIGRATIONS=proposed/012_x.sql,proposed/013_y.sql   an explicit list
+const extra = resolveProposed(process.env.INV_EXTRA_MIGRATIONS);
+if (extra.length) console.log(`inventory-v2: proposed migrations applied: ${extra.join(', ')}`);
 const db = await freshDatabase({ extra });
 const one = async (sql, p) => (await db.query(sql, p)).rows[0];
 const tx = (fn) => db.transaction(fn);
