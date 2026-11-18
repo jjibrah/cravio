@@ -14,7 +14,9 @@ import {
   adjust, availability, branchLocation, branchSnapshot, businessSnapshot, cancelDispatch, cancelRequest, centerLocation,
   correctOrder, createItem, dispatch, findByCode, linkMenuItem, once, receive, reviewRequest, submitRequest, updateItem,
 } from '../stock/service.js';
-import { saveRecipe, suggest, suggestionInput } from '../stock/recipes.js';
+import { saveRecipe, suggestionInput } from '../stock/recipes.js';
+import { suggestLegacy } from '../ai/legacy-recipe.js';
+import { database } from '../lib/pool.js';
 
 const ID = '[0-9a-fA-F-]{36}';
 const stockDb = (fn, transaction = true) => withDb(fn, { transaction, feature: 'stock' });
@@ -76,12 +78,15 @@ export const routes = [
   { method: 'PUT', path: new RegExp(`^/api/stock/recipes/(?<id>${ID})$`), handler: branchWrite('recipe', (db, ctx, params, body) => saveRecipe(db, ctx, params.id, body)) },
   // AI draft of a recipe (OpenRouter). Returns a draft only; nothing is saved. 503 when OPENROUTER_API_KEY isn't set.
   { method: 'POST', path: '/api/stock/recipes/suggest', handler: withBody(async ({ request, body }) => {
-    const { restaurantId } = await branch(request);
+    const { restaurantId, user } = await branch(request);
+    let businessId;
     const input = await stockDb(async (db) => {
       const { rows } = await db.query('select business_id from public.restaurants where id = $1', [restaurantId]);
-      return suggestionInput(db, { businessId: rows[0].business_id, restaurantId }, String(body.menuItemId || ''));
+      businessId = rows[0].business_id;
+      return suggestionInput(db, { businessId, restaurantId }, String(body.menuItemId || ''));
     }, false);
-    return suggest(input);
+    // Metered and limited like every AI call (ai/gateway.js): no allowance row = off.
+    return suggestLegacy(database(), { businessId, actorId: user?.id || null }, input);
   }) },
   { method: 'PUT', path: new RegExp(`^/api/stock/links/(?<id>${ID})$`), handler: branchWrite('link', (db, ctx, params, body) => linkMenuItem(db, ctx, params.id, body)) },
   { method: 'POST', path: new RegExp(`^/api/stock/orders/(?<id>${ID})/correction$`), handler: branchWrite('correction', (db, ctx, params, body) => correctOrder(db, ctx, params.id, body)) },

@@ -8,6 +8,8 @@
 export const PROPOSED_MIGRATIONS = Object.freeze([
   'proposed/012_inventory_catalogue.sql',
   'proposed/013_inventory_recipes.sql',
+  'proposed/014_ai_gateway.sql',
+  'proposed/015_suppliers.sql',
 ]);
 
 /** Migration number of a proposed path ('proposed/013_x.sql' -> 13). */

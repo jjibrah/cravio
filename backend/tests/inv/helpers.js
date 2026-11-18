@@ -42,6 +42,15 @@ export async function makeItem(db, businessId, name, { unit = 'g', displayUnit =
   return id;
 }
 
+/**
+ * Creates a supplier row directly (needs migration 015). Defaults: formal, active, cash, no contact details.
+ * Returns the supplier id. Pass any column in camelCase-free form: { phone: '254712345678', kraPin, type, status, incomplete }.
+ */
+export async function makeSupplier(db, businessId, name, { type = 'formal', phone = null, kraPin = null, status = 'active', incomplete = false } = {}) {
+  return (await db.query(`insert into public.suppliers (business_id, name, type, phone, kra_pin, status, incomplete) values ($1, $2, $3, $4, $5, $6, $7) returning id`,
+    [businessId, name, type, phone, kraPin, status, incomplete])).rows[0].id;
+}
+
 let receiveSeq = 0;
 /** Receives stock through the ledger (one transaction). qty is a base-unit string. Returns ledger.post's result. */
 export function receive(db, { businessId, locationId, itemId, qty, unitCost = null, reason = 'purchase_receipt', actorId = null, key = null, ref = null }) {

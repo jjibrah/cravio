@@ -145,7 +145,7 @@ await db.query('update public.businesses set inventory_enabled = true where id =
 requireCan(await inventoryScope(db, contexts.owner, businessId), 'inv.view', { locationId: L.b1 }); checks++;
 
 // --- Settings ---
-eq(await getSetting(db, businessId, 'count_tolerance_pct'), 3, 'default');
+eq(await getSetting(db, businessId, 'count_tolerance_pct'), null, 'default: not set (D2-16: no built-in 3 %)');
 eq(await getSetting(db, businessId, 'wastage_approval_value_kes'), null, 'null default');
 eq(Object.keys(await getSettings(db, businessId)).sort(), Object.keys(SETTINGS).sort(), 'all keys present');
 await setSetting(db, { businessId, key: 'count_tolerance_pct', value: 5, actorId: users.owner, actorRole: 'owner' });
@@ -169,7 +169,7 @@ eq(await getSetting(db, businessId, 'count_tolerance_pct'), 6, 'refused values c
 await rejects(() => setSetting(db, { businessId, locationId: '22222222-2222-2222-2222-222222222222', key: 'notify_on_zero', value: false }), undefined, undefined, 'unknown location refused by FK');
 const audit = (await db.query(`select * from public.inventory_events where entity = 'setting' and location_id is null and after->>'key' = 'count_tolerance_pct' order by id`)).rows;
 eq(audit.map((r) => r.action), ['create', 'update'], 'setting audit actions');
-eq([audit[0].before, audit[0].after], [{ key: 'count_tolerance_pct', value: 3, inherited: true }, { key: 'count_tolerance_pct', value: 5 }], 'first change before/after');
+eq([audit[0].before, audit[0].after], [{ key: 'count_tolerance_pct', value: null, inherited: true }, { key: 'count_tolerance_pct', value: 5 }], 'first change before/after');
 eq([audit[1].before.value, audit[1].after.value, audit[1].actor_id], [5, 6, users.owner], 'second change before/after');
 eq(audit[0].actor_role, 'owner', 'actor role stored');
 eq(await resetSetting(db, { businessId, locationId: L.b1, key: 'count_tolerance_pct', actorId: users.owner }), true, 'reset override');

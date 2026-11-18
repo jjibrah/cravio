@@ -26,7 +26,7 @@ const refuses = async (promise, status, code, pattern, m) => {
   checks++;
 };
 
-const f = await inventoryFixture({ extra: ['proposed/012_inventory_catalogue.sql', 'proposed/013_inventory_recipes.sql'] });
+const f = await inventoryFixture({ extra: ['proposed/012_inventory_catalogue.sql', 'proposed/013_inventory_recipes.sql', 'proposed/014_ai_gateway.sql'] });
 const { db, ids, users } = f;
 const { businessId, branchId, branchLocationId, burgerId, friesId, extraId, categoryId } = ids;
 const tx = (fn) => db.transaction(fn);
@@ -306,8 +306,14 @@ const sdish = await dish('AI burger', 100);
 await refuses(api('owner', 'POST', `${base}/recipes/${sdish}/suggest`, {}), 503, 'ai_not_configured', null, 'no key -> 503');
 eq(calls, 0, 'no network call without a key');
 process.env.OPENROUTER_API_KEY = 'test-key';
+// P2-33: the draft goes through the AI gateway, so the business needs an allowance (no row = AI off, not unmetered).
+await refuses(api('owner', 'POST', `${base}/recipes/${sdish}/suggest`, {}), 403, 'ai_off', /AI suggestions are off/, 'no allowance -> AI off');
+eq(calls, 0, 'and still no network call');
+await db.query(`insert into public.ai_business_settings (business_id, enabled) values ($1, true)`, [businessId]);
+await db.query(`insert into public.ai_limits (business_id, monthly_budget_kes) values ($1, 1000)`, [businessId]);
 const suggestion = await api('owner', 'POST', `${base}/recipes/${sdish}/suggest`, {});
 eq(calls, 1, 'one stubbed call');
+eq((await all(`select feature, status from public.ai_usage`)).map((r) => [r.feature, r.status]), [['recipe_draft', 'ok']], 'the draft was metered');
 eq(suggestion.draft, true, 'marked as a draft');
 eq(suggestion.lines[0], { itemId: chicken.id, name: 'Chicken', quantity: 180, unit: 'g', newItem: false }, 'matched to the existing item with a valid unit code');
 eq(suggestion.lines[1].newItem, true, 'unknown ingredient flagged as a new item');
@@ -320,7 +326,12 @@ eq(saved.lines.length, 2, 'the manager can save the reviewed draft as it is (uni
 await refuses(api('manager2', 'POST', `${base}/recipes/${sdish}/suggest`, {}), 403, 'forbidden', null, 'suggest needs recipe.edit at that branch');
 await refuses(api('ops', 'POST', `${base}/recipes/${sdish}/suggest`, {}), 403, 'forbidden', null, 'operations can’t suggest');
 globalThis.fetch = async () => ({ ok: true, json: async () => ({ choices: [{ message: { content: 'not json' } }] }) });
-await refuses(api('owner', 'POST', `${base}/recipes/${sdish}/suggest`, {}), 502, 'ai_bad_answer', null, 'unusable answer -> 502');
+// A different dish: the gateway answers an identical request from its cache (no second charge), so reusing sdish would not reach the stub.
+const sdish2 = await dish('AI burger 2', 100);
+await refuses(api('owner', 'POST', `${base}/recipes/${sdish2}/suggest`, {}), 502, 'ai_bad_answer', null, 'unusable answer -> 502');
+eq((await all(`select status from public.ai_usage order by created_at`)).map((r) => r.status), ['ok', 'rejected'], 'an unusable answer is metered as rejected');
+const cachedAgain = await api('owner', 'POST', `${base}/recipes/${sdish}/suggest`, {});
+eq(cachedAgain.lines.length, suggestion.lines.length, 'asking again for the same dish is answered from the gateway cache');
 globalThis.fetch = realFetch;
 if (savedKey === undefined) delete process.env.OPENROUTER_API_KEY; else process.env.OPENROUTER_API_KEY = savedKey;
 

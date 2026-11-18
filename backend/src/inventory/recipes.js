@@ -15,7 +15,7 @@
 // Services take (db, scope, ...) like catalogue.js: `db` is a transaction for writes; routes authorize before opening it.
 import { HttpError } from '../lib/http.js';
 import { isId } from '../lib/business.js';
-import { aiConfigured, chatJson, matchItem, recipePrompt } from '../lib/ai.js';
+import { call as aiCall, matchItem, recipePrompt } from '../ai/gateway.js';
 import { COST, MONEY, QTY, add, cmp, dec, div, isZero, mul, rescale } from './decimal.js';
 import { compatibleUnits, display, fromBase, normaliseUnit, toBase } from './units.js';
 import { can, requireCan } from './permissions.js';
@@ -532,20 +532,25 @@ export function normaliseDraft(raw, items, units) {
 }
 
 /**
- * A DRAFT recipe for one dish from the AI (lib/ai.js, OpenRouter). Never saves. Sends only the dish's name/description/category
- * and the business's active stock item names and units: no people, prices, orders or costs.
- * 503 { code: 'ai_not_configured' } without OPENROUTER_API_KEY. `options` { env, fetchImpl } exist for tests.
+ * A DRAFT recipe for one dish from the AI, through the metered gateway (ai/gateway.js, feature 'recipe_draft'). Never saves.
+ * Sends only the dish's name/description/category and the business's active stock item names and units: no people, prices, orders or costs.
+ * 503 ai_not_configured without OPENROUTER_API_KEY; 403 ai_off when the business has no allowance or the switch is off;
+ * 429 ai_allowance_used at the limit (plain message). `options` { env, fetchImpl, now, sleep } exist for tests.
  */
 export async function suggest(db, scope, menuItemId, options = {}) {
   const dish = await loadDish(db, scope, menuItemId, options);
   requireCan(scope, 'inv.recipe.edit', { locationId: dish.locationId });
-  const env = options.env || process.env;
-  if (!aiConfigured(env)) await chatJson({ system: '', user: '', env }); // throws the standard 503 ai_not_configured
   const units = await loadUnits(db);
   const rows = (await db.query(`select id from public.stock_items where business_id = $1 and active and archived_at is null order by name limit 150`, [scope.businessId])).rows;
   const map = await loadItems(db, scope, rows.map((r) => r.id));
   const items = rows.map((r) => map.get(r.id)).filter(Boolean).map((i) => ({ id: i.id, name: i.name, unit: i.baseUnit, baseUnit: i.baseUnit, unitItem: i.unitItem }));
-  const { data, model } = await chatJson({ system: SYSTEM(units.map((u) => u.code)), user: recipePrompt({ name: dish.name, description: dish.description || '', category: dish.category || '' }, items),
-    env, ...(options.fetchImpl ? { fetchImpl: options.fetchImpl } : {}) });
-  return { draft: true, menuItemId: dish.id, model, ...normaliseDraft(data, items, units) };
+  const { env, fetchImpl, now, sleep } = options;
+  const result = await aiCall(db, {
+    businessId: scope.businessId, feature: 'recipe_draft', actorId: scope.userId,
+    system: SYSTEM(units.map((u) => u.code)), user: recipePrompt({ name: dish.name, description: dish.description || '', category: dish.category || '' }, items),
+    parse: (data) => normaliseDraft(data, items, units), maxTokens: 800,
+    ...(env ? { env } : {}), ...(fetchImpl ? { fetchImpl } : {}), ...(now ? { now } : {}), ...(sleep ? { sleep } : {}),
+  });
+  return { draft: true, menuItemId: dish.id, model: result.model, ...result.data,
+    ...(result.allowance.warning ? { allowanceWarning: `You have used ${Math.floor(result.allowance.percent)}% of this month’s AI allowance.` } : {}) };
 }

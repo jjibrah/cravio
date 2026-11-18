@@ -27,11 +27,25 @@ export const SETTINGS = {
   branch_can_add_items: { default: true, type: 'boolean', validate: bool('Branch managers adding items') },
   operations_can_approve: { default: false, type: 'boolean', validate: bool('Operations managers approving') },
   large_amount_warning_factor: { default: 10, type: 'number', validate: number('The large-amount warning', { min: 1, max: 1000 }) },
+  // Legacy approval thresholds: NOT set until the owner sets them (D2-16). Phase 3 moves them to approval rules. Unset = the safe
+  // behaviour: wastage recorded without approval, any count variance and every manual adjustment needing an approval.
   wastage_approval_value_kes: { default: null, type: 'number|null', validate: number('The wastage approval value', { min: 0, max: 1e9, nullable: true }) },
-  count_tolerance_pct: { default: 3, type: 'number', validate: number('The count tolerance', { min: 0, max: 100 }) },
+  count_tolerance_pct: { default: null, type: 'number|null', validate: number('The count tolerance', { min: 0, max: 100, nullable: true }) },
   cost_method: { default: 'weighted_average', type: 'enum', validate: choice('The cost method', ['weighted_average']) },
   notify_on_zero: { default: true, type: 'boolean', validate: bool('Alerts when an item hits zero') },
   notify_on_exception: { default: true, type: 'boolean', validate: bool('Alerts on stock exceptions') },
+
+  // ---- Phase 2 (purchasing and distribution, 09 P2-02). No money amounts are built in: emergency-buy limits and PO bands live in
+  // approval rules the owner sets (D2-6, D2-7); until a limit is set every emergency buy goes to the owner (D2-6).
+  operations_can_purchase: { default: false, type: 'boolean', validate: bool('Operations managers creating purchase orders') },
+  price_variance_alert_pct: { default: 10, type: 'number', validate: number('The price-increase alert', { min: 0, max: 1000 }) },
+  transfer_over_tolerance_pct: { default: 5, type: 'number', validate: number('The extra-delivery allowance on transfers', { min: 0, max: 100 }) },
+  returns_need_approval: { default: false, type: 'boolean', validate: bool('Approval for returns to the warehouse') },
+  branch_to_branch_enabled: { default: true, type: 'boolean', validate: bool('Transfers between branches') },
+  emergency_repeat_alert_count: { default: 3, type: 'number', validate: number('The repeated emergency-buy count', { min: 1, max: 50, integer: true }) },
+  emergency_repeat_alert_days: { default: 7, type: 'number', validate: number('The repeated emergency-buy window in days', { min: 1, max: 90, integer: true }) },
+  // KES per US dollar for the AI usage meter. Set by the Cravio admin; null until set (AI cost is then shown in dollars only).
+  ai_usd_to_kes: { default: null, type: 'number|null', validate: number('The dollar-to-shilling rate', { min: 1, max: 10000, nullable: true }) },
 };
 
 const known = (key) => {
