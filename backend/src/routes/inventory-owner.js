@@ -17,6 +17,8 @@ import {
   setLevels, updateCategory, updateItem,
 } from '../inventory/catalogue.js';
 import { getWarehouse, listLocations, renameWarehouse } from '../inventory/locations.js';
+import { openingStatus, setOpening } from '../inventory/opening.js';
+import { TEMPLATE_CSV, TEMPLATE_FILENAME, commit as commitImport, dryRun as dryRunImport } from '../inventory/import.js';
 
 const ID = '[0-9a-fA-F-]{36}';
 const base = `/api/owner/inventory/(?<businessId>${ID})`;
@@ -119,6 +121,43 @@ export function createRoutes({ authenticate = requireUser, pool = () => database
         }
       },
     }) },
+
+    // ----- Opening stock (P1-11): the first balance of an item at a location -----
+    // GET ?location=<id>: every item with whether its opening is set there. POST { locationId, lines: [{ itemId, quantity, unit?, unitCost? }], commandId? }.
+    // unitCost is KES per the ENTERED unit ("650" with unit kg = KES 650 per kg); the ledger stores it per base unit.
+    { method: 'GET', path: path('/opening'), async handler({ request, params, url }) {
+      const { db, scope } = await open(request, params);
+      const locationId = String(url?.searchParams?.get('location') || '').toLowerCase();
+      if (!locationId) throw new HttpError(400, 'Choose a location to see its opening stock.', { code: 'location_required' });
+      await safely(() => authorize(db, scope, 'inv.view', { locationId, entity: 'inventory_opening' }));
+      return safely(() => openingStatus(db, scope, locationId));
+    } },
+    { method: 'POST', path: path('/opening'), handler: write('inv_opening', 'inv.stock.record', (db, scope, _p, body) => setOpening(db, scope, { locationId: body.locationId, lines: body.lines, commandId: body.commandId }), {
+      async check(db, scope, _params, body) {
+        const locationId = typeof body.locationId === 'string' ? body.locationId.toLowerCase() : null;
+        if (locationId && scope.locations.some((l) => l.id === locationId)) await authorize(db, scope, 'inv.stock.record', { locationId, entity: 'inv_opening' });
+      },
+    }) },
+
+    // ----- CSV import (P1-11) -----
+    // GET template: text/csv download (or { filename, csv } JSON with ?format=json). POST import/dry-run { csv }: row-by-row report, writes nothing.
+    // POST import { csv, commandId }: all or nothing, 409 import_has_errors with details.report when any row has an error.
+    { method: 'GET', path: path('/import/template'), async handler({ request, response, params, url }) {
+      const { db, scope } = await open(request, params);
+      await safely(() => authorize(db, scope, 'inv.item.edit', { entity: 'inv_import' }));
+      if (!response || url?.searchParams?.get('format') === 'json') return { filename: TEMPLATE_FILENAME, csv: TEMPLATE_CSV };
+      response.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      response.setHeader('Content-Disposition', `attachment; filename="${TEMPLATE_FILENAME}"`);
+      response.writeHead(200);
+      response.end(TEMPLATE_CSV);
+      return undefined; // the server sees the response already ended and sends nothing more
+    } },
+    { method: 'POST', path: path('/import/dry-run'), handler: withBody(async ({ request, params, body }) => {
+      const { db, scope } = await open(request, params);
+      await safely(() => authorize(db, scope, 'inv.item.edit', { entity: 'inv_import' }));
+      return safely(() => dryRunImport(db, scope, body.csv));
+    }) },
+    { method: 'POST', path: path('/import'), handler: write('inv_import', 'inv.item.edit', (db, scope, _p, body) => commitImport(db, scope, body.csv, { commandId: body.commandId })) },
 
     // ----- Categories -----
     { method: 'GET', path: path('/categories'), handler: read('inv.view', async (db, scope) => ({ categories: await listCategories(db, scope) })) },

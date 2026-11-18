@@ -121,7 +121,8 @@ Suggested **de-risk spike on day 2**: a throwaway PGlite script proving the orde
 - Playwright: create item in kg with a crate unit, set levels, opening stock 40 crates → shows 400 kg.
 
 **P1-15 Branch screens** · 2 d
-- Stock (on hand / held / available / low, count/add/waste drawers with unit dropdown + converted total), History, Exceptions banner + resolve. Remove old `pages/stock/*` and `src/stock/` once parity is reached.
+- Stock (on hand / held / available / low, count/add/waste drawers with unit dropdown + converted total), History, Exceptions banner + resolve.
+- History rows link to orders as `/branch/:id/orders?order=<shortId>` (from P1-12): make OrdersPage open that order from the query string. Remove old `pages/stock/*` and `src/stock/` once parity is reached.
 
 **P1-16 Recipe editor with food cost** · 1.5 d
 - Port the v3-dev layout (`docs/inventory-kb/v3-prototype/`) onto the real API: lines with entered units, yield note, live preview, food cost + % / “unknown”, keep-selling switch, version history, ✨ AI draft. Used by owner (choose branch) and branch manager.
