@@ -121,6 +121,21 @@ export const branchPaths = {
   extraRecipe: (extraId) => `/api/inventory/extras/${extraId}/recipe`,
 };
 
+/**
+ * Recipe endpoints for one side: pass a business id for the owner side, nothing for the branch side (the branch travels in
+ * X-Cravio-Branch). Same shape either way, so the recipe screens work for both. (P1-16)
+ */
+export function recipePaths(businessId) {
+  if (businessId) {
+    const base = `/api/owner/inventory/${businessId}`;
+    const one = (id) => `${base}/recipes/${id}`;
+    return { list: (branchId) => ownerPaths(businessId).recipes(branchId), recipe: one, preview: (id) => `${one(id)}/preview`, suggest: (id) => `${one(id)}/suggest`,
+      version: (id, versionId) => `${one(id)}/versions/${versionId}`, extra: (extraId) => `${base}/extras/${extraId}/recipe` };
+  }
+  return { list: () => branchPaths.recipes, recipe: branchPaths.recipe, preview: branchPaths.recipePreview, suggest: branchPaths.recipeSuggest,
+    version: branchPaths.recipeVersion, extra: branchPaths.extraRecipe };
+}
+
 export const notificationPaths = { list: '/api/notifications', unread: '/api/notifications/unread-count', read: '/api/notifications/read' };
 
 /* ---------- calls (each returns the server's answer; writes take an optional commandId) ---------- */
@@ -251,3 +266,13 @@ export function unitChoices(item, units) {
 
 /** Readable measure names for a base unit ("g" -> "Weight"). */
 export const MEASURED_LABEL = { weight: 'Weight', volume: 'Volume', count: 'Count', servings: 'Servings', serving: 'Servings' };
+
+/* ---------- times (P1-15) ---------- */
+
+const STAMP = new Intl.DateTimeFormat('en-GB', { timeZone: 'Africa/Nairobi', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false });
+/** "18/11/2026 14:05 EAT" (East Africa Time, whatever the device's clock says). */
+export function formatStamp(iso) {
+  const time = iso ? new Date(iso) : null;
+  if (!time || Number.isNaN(time.getTime())) return '';
+  return `${STAMP.format(time).replace(',', '')} EAT`;
+}

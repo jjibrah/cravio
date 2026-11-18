@@ -73,8 +73,10 @@ const OwnerInventoryPage = page(chunks.ownerInventory);
 const OwnerStockPage = page(chunks.ownerStock);
 const OwnerItemsPage = page(chunks.ownerItems);
 const OwnerRecipesPage = page(chunks.ownerRecipes);
+const BranchStockPage = page(chunks.branchStock);
+const BranchHistoryPage = page(chunks.branchHistory);
+const BranchRecipesPage = page(chunks.branchRecipes);
 const OwnerHistoryPage = page(chunks.ownerHistory);
-const ComingNextPage = page(chunks.inventoryComingNext);
 const ReceiveCodePage = page(chunks.receiveCode);
 const TermsPage = page(chunks.terms);
 const TermsAcceptPage = page(chunks.termsAccept);
@@ -101,9 +103,9 @@ const INVENTORY_PAGES = {
     'inventory/history': { on: OwnerHistoryPage },
   },
   branch: {
-    inventory: { on: ComingNextPage, off: BranchInventoryPage },
-    'inventory/history': { on: ComingNextPage },
-    recipes: { on: ComingNextPage },
+    inventory: { on: BranchStockPage, off: BranchInventoryPage },
+    'inventory/history': { on: BranchHistoryPage },
+    recipes: { on: BranchRecipesPage },
   },
 };
 

@@ -56,8 +56,10 @@ export const chunks = {
   ownerStock: once(() => import('../pages/inventory/OwnerStockPage')),
   ownerItems: once(() => import('../pages/inventory/OwnerItemsPage')),
   ownerRecipes: once(() => import('../pages/inventory/OwnerRecipesPage')),
+  branchStock: once(() => import('../pages/inventory/BranchStockPage')),
+  branchHistory: once(() => import('../pages/inventory/BranchHistoryPage')),
+  branchRecipes: once(() => import('../pages/inventory/BranchRecipesPage')),
   ownerHistory: once(() => import('../pages/inventory/OwnerHistoryPage')),
-  inventoryComingNext: once(() => import('../pages/inventory/ComingNextPage')),
   receiveCode: once(() => import('../pages/stock/ReceiveCodePage')),
   terms: once(() => import('../components/legal/TermsPage')),
   termsAccept: once(() => import('../components/legal/TermsAcceptPage')),
@@ -97,8 +99,8 @@ export function chunksFor(pathname) {
       // /branch/<id>/<section>/<detail>
       const [section = '', sub] = [detail, parts[3]];
       const key = section === 'tables' && sub ? 'tableDetail' : BRANCH_PAGES[section] || 'pageFrame';
-      // Branch Recipes / History (and Stock when inventory is on) are "coming next" pages until P1-15/16.
-      return [...signedIn, 'dashboard', key, ...(section === 'recipes' || section === 'inventory' ? ['inventoryComingNext'] : [])];
+      // With inventory on, branch Stock/History/Recipes use the new pages (also warm them).
+      return [...signedIn, 'dashboard', key, ...({ recipes: ['branchRecipes'], inventory: ['branchStock', 'branchHistory'] }[section] || [])];
     }
     case 'admin': return [...signedIn, 'dashboard', page === 'businesses' && detail ? 'adminBusiness' : ADMIN_PAGES[page] || 'pageFrame'];
     case 'waiter': return [...signedIn, 'waiter', WAITER_PAGES[page] || 'waiterTables'];

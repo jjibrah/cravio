@@ -108,7 +108,7 @@ test.describe('inventory on: navigation', () => {
     await expect(page).toHaveURL(/\/owner\/inventory\/items$/);
     await expect(sidebar(page).getByRole('link', { name: 'Stock', exact: true })).not.toHaveClass(/is-active/);
     await sidebar(page).getByRole('link', { name: 'Recipes', exact: true }).click();
-    await expect(page.getByText('Recipes are coming next')).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: 'Recipes' })).toBeVisible();
     await page.goto('/owner/inventory?view=history');
     await expect(page).toHaveURL(/\/owner\/inventory\/history$/);
     await expect(page.getByRole('heading', { level: 1, name: 'History' })).toBeVisible();
@@ -121,10 +121,10 @@ test.describe('inventory on: navigation', () => {
     await expect(nav.getByText('Operations', { exact: true })).toBeVisible();
     for (const name of ['Stock', 'History', 'Recipes']) await expect(nav.getByRole('link', { name, exact: true })).toBeVisible();
     await expect(nav.getByRole('link', { name: 'Inventory', exact: true })).toHaveCount(0);
-    await expect(page.getByText('Recipes is coming next')).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: 'Recipes' })).toBeVisible();
     await nav.getByRole('link', { name: 'History', exact: true }).click();
     await expect(page).toHaveURL(new RegExp(`/branch/${BRANCH}/inventory/history$`));
-    await expect(page.getByText('History is coming next')).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: 'History' })).toBeVisible();
   });
 
   test('branch with inventory off keeps the single Inventory entry', async ({ page }) => {

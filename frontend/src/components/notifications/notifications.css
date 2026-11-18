@@ -80,3 +80,12 @@
 .notification-sheet .notification-history li { padding: 16px 44px 16px 24px; }
 .notification-sheet .notification-history li.is-unread::after { top: 22px; right: 24px; }
 @media (prefers-reduced-motion: reduce) { .notification-panel { animation: none; } }
+
+/* Stored stock alerts in the bell (P1-15) */
+.notification-alerts h3 { margin: 0; padding: 10px 16px 0; color: var(--muted); font-size: 12px; font-weight: 600; }
+.notification-alerts + .notification-history, .notification-alerts + .notification-empty { border-top: 1px solid var(--line); }
+.notification-alert { display: flex; flex-direction: column; gap: 2px; min-height: 44px; width: 100%; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.notification-alert:hover .notification-alert-title { text-decoration: underline; text-underline-offset: 3px; }
+.notification-alert-title { font-size: 14px; line-height: 1.4; font-weight: 600; overflow-wrap: anywhere; }
+.notification-alert-body { color: var(--ink-2); font-size: 13px; line-height: 1.4; overflow-wrap: anywhere; }
+.notification-alert time { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
