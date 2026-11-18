@@ -82,6 +82,8 @@ const OwnerPurchaseOrdersPage = page(chunks.ownerPurchaseOrders);
 const OwnerReceivePage = page(chunks.ownerReceive);
 const OwnerApprovalsPage = page(chunks.ownerApprovals);
 const BranchPurchasesPage = page(chunks.branchPurchases);
+const OwnerRequestsPage = page(chunks.ownerRequests);
+const BranchRequestsPage = page(chunks.branchRequests);
 const ReceiveCodePage = page(chunks.receiveCode);
 const TermsPage = page(chunks.terms);
 const TermsAcceptPage = page(chunks.termsAccept);
@@ -110,17 +112,20 @@ const INVENTORY_PAGES = {
     'inventory/purchase-orders': { on: OwnerPurchaseOrdersPage },
     'inventory/receive': { on: OwnerReceivePage },
     'inventory/approvals': { on: OwnerApprovalsPage },
+    'inventory/requests': { on: OwnerRequestsPage },
   },
   branch: {
     inventory: { on: BranchStockPage, off: BranchInventoryPage },
     'inventory/history': { on: BranchHistoryPage },
     'inventory/purchases': { on: BranchPurchasesPage },
+    'inventory/requests': { on: BranchRequestsPage },
     recipes: { on: BranchRecipesPage },
   },
 };
 
 function InventoryRoute({ area, section }) {
   const { branchId } = useParams();
+  const { search } = useLocation();
   const { enabled, loading } = useInventoryEnabled(area);
   const entry = INVENTORY_PAGES[area][section.path];
   // The page shown for a path is the new section's (its label and description), not the old "Inventory" one.
@@ -129,7 +134,7 @@ function InventoryRoute({ area, section }) {
   if (needsSwitch && loading) return <PageSkeleton />;
   if (!needsSwitch || enabled) { const On = entry.on; return <On section={shown} area={area} />; }
   if (entry.off) { const Off = entry.off; return <Off section={section} area={area} />; }
-  return <Navigate to={`/branch/${branchId}/inventory`} replace />;
+  return <Navigate to={`/branch/${branchId}/inventory${search}`} replace />;
 }
 
 function DashboardPage({ section, area }) {

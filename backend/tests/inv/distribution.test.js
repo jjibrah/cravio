@@ -484,6 +484,24 @@ function kgToG(n) { return `${(n * 1000).toFixed(4)}`; }
   await reconciled('after adopting legacy requests');
 }
 
+// ---- GET /api/inventory/branches: the destinations a branch can send to ----
+{
+  const { createUser } = await import('../support/pg.js');
+  const rivalOwner = await createUser(db, 'rival-branches@example.test', { role: 'owner' });
+  const rival = (await one(`insert into public.restaurants (owner_id, name, status) values ($1, 'Rival branch', 'live') returning id`, [rivalOwner]));
+  await helpers.tx((t) => legacy.branchLocation(t, rival.id));
+  const list = await mgr('manager', 'GET', '/branches');
+  eq(list.branches.map((b) => [b.id, b.locationId, b.name]), [[branches.branch2.restaurantId, B2, 'Second branch']], 'a manager sees the other branches of their own business: names and ids only');
+  eq(Object.keys(list.branches[0]).sort(), ['id', 'locationId', 'name'], 'no stock or cost data');
+  eq((await mgr('manager2', 'GET', '/branches')).branches.map((b) => b.id), [ids.branchId], 'the other branch sees the first one, never itself');
+  await refuses(mgr('waiter', 'GET', '/branches'), 403, 'forbidden', null, 'a waiter is refused');
+  await db.query(`update public.stock_locations set status = 'archived', archived_at = now() where id = $1`, [B2]).catch(async () => db.query('update public.stock_locations set archived_at = now() where id = $1', [B2]));
+  eq((await mgr('manager', 'GET', '/branches')).branches, [], 'an archived branch is not offered');
+  await db.query(`update public.stock_locations set status = 'active', archived_at = null where id = $1`, [B2]);
+  // the branch-side discrepancy list is GET /api/inventory/discrepancies (status=open|resolved|all)
+  eq(Array.isArray((await mgr('manager', 'GET', '/discrepancies', undefined, '?status=all')).discrepancies), true, 'the branch discrepancy list is GET /api/inventory/discrepancies');
+}
+
 // ---- audit and validation ----
 {
   eq((await q(`select distinct action from public.inventory_events where entity = 'stock_request' order by action`)).map((x) => x.action).filter((a) => ['submit', 'approve_partial', 'cancel', 'adopt_legacy', 'prepare'].includes(a)), ['adopt_legacy', 'approve_partial', 'cancel', 'prepare', 'submit'], 'request actions are audited');

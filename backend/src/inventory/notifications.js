@@ -3,7 +3,29 @@
 import { HttpError } from '../lib/http.js';
 import { isId } from '../lib/business.js';
 
-const shape = (r) => ({ id: r.id, kind: r.kind, title: r.title, body: r.body, link: r.link, entityType: r.entity_type, entityId: r.entity_id,
+/**
+ * Event catalogue (P2-24): kind -> label (what the badge says), icon (an Icon name the frontend knows) and who it goes to. Titles and links are written
+ * where the event happens (distribution.js, discrepancies.js, ...); the table lets the frontend show every kind consistently, and unknown kinds fall back to a plain bell.
+ */
+export const EVENT_KINDS = Object.freeze({
+  request_submitted: { label: 'Stock request', icon: 'info', to: 'owners' },
+  request_approved: { label: 'Request approved', icon: 'success', to: 'branch managers' },
+  request_partially_approved: { label: 'Request partly approved', icon: 'info', to: 'branch managers' },
+  request_rejected: { label: 'Request rejected', icon: 'info', to: 'branch managers' },
+  request_cancelled: { label: 'Request cancelled', icon: 'info', to: 'branch managers' },
+  delivery_incoming: { label: 'Delivery on its way', icon: 'info', to: 'receiving branch managers' },
+  delivery_cancelled: { label: 'Delivery cancelled', icon: 'info', to: 'receiving branch managers' },
+  delivery_received: { label: 'Delivery received', icon: 'success', to: 'owners and sending branch' },
+  discrepancy_opened: { label: 'Delivery difference', icon: 'info', to: 'owners and both branches' },
+  discrepancy_resolved: { label: 'Difference resolved', icon: 'success', to: 'owners and both branches' },
+  branch_transfer_requested: { label: 'Branch transfer', icon: 'info', to: 'owners' },
+  transfer_approved: { label: 'Transfer approved', icon: 'success', to: 'sending branch managers' },
+  reservation_attention: { label: 'Needs attention', icon: 'info', to: 'owners' },
+  approval_needed: { label: 'Approval needed', icon: 'info', to: 'owners' },
+  approval_decided: { label: 'Approval decided', icon: 'info', to: 'requester' },
+});
+
+const shape = (r) => ({ id: r.id, kind: r.kind, label: EVENT_KINDS[r.kind]?.label ?? null, icon: EVENT_KINDS[r.kind]?.icon ?? null, title: r.title, body: r.body, link: r.link, entityType: r.entity_type, entityId: r.entity_id,
   businessId: r.business_id, locationId: r.location_id, read: r.read_at !== null, readAt: r.read_at, createdAt: r.created_at });
 
 export async function unreadCount(db, userId) {

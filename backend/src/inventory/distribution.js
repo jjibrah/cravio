@@ -79,7 +79,7 @@ export function branchLocationOf(scope, restaurantId) {
   return loc;
 }
 
-async function loadItems(db, businessId, ids) {
+export async function loadItems(db, businessId, ids) {
   const list = [...new Set(ids)];
   const out = new Map();
   if (!list.length) return out;
@@ -97,7 +97,7 @@ const needItem = (items, id) => {
   if (!it) throw fail(404, 'That stock item isn’t in this business. Pick it from the stock list.', 'item_not_found');
   return it;
 };
-const show = (it, base, units) => display(dec(base).toString(QTY), it, units);
+export const show = (it, base, units) => display(dec(base).toString(QTY), it, units);
 
 /** A typed amount in any unit of the item -> base units (4 dp). Blank = 0 when allowZero. */
 function amount(value, unit, it, units, { label, allowZero = false } = {}) {
@@ -139,6 +139,11 @@ export const requestRef = (number, at = new Date()) => formatNumber('REQ', yearO
 export const transferRef = (number, at = new Date()) => formatNumber('TRF', yearOf(at), number);
 
 const tell = (db, scope, args) => notify(db, { businessId: scope.businessId, ...args });
+
+/** Where a notification opens (P2-24). These match the frontend routes: owners at /owner/inventory/requests, a branch at /branch/<restaurantId>/inventory/requests. */
+export const OWNER_REQUESTS_LINK = '/owner/inventory/requests';
+export const OWNER_PROBLEMS_LINK = '/owner/inventory/requests?tab=problems';
+export const branchRequestsLink = (restaurantId, query = '') => `/branch/${restaurantId}/inventory/requests${query}`;
 
 /* ---------- requests: reading ---------- */
 
@@ -313,7 +318,7 @@ async function insertLines(db, requestId, lines) {
 }
 
 const notifySubmitted = (db, scope, r, now) => tell(db, scope, { recipients: 'owners', kind: 'request_submitted', title: `${r.branchName} asked for stock`,
-  body: `${requestRef(r.number, now)}: ${r.lines} item${r.lines === 1 ? '' : 's'}${r.priority === 'urgent' ? ' (urgent)' : ''}.`, link: '/owner/inventory/requests', entity: { type: 'stock_request', id: r.id }, dedupeKey: `request_submitted:${r.id}` });
+  body: `${requestRef(r.number, now)}: ${r.lines} item${r.lines === 1 ? '' : 's'}${r.priority === 'urgent' ? ' (urgent)' : ''}.`, link: OWNER_REQUESTS_LINK, entity: { type: 'stock_request', id: r.id }, dedupeKey: `request_submitted:${r.id}` });
 
 /** Change a draft (lines, note, priority, neededBy). */
 export async function editDraft(db, scope, requestId, input = {}) {
@@ -372,7 +377,7 @@ export async function cancel(db, scope, requestId, { reason = null } = {}) {
     before: { status: q.status }, after: { status, released, reason: text || null } });
   if (!mayBranch || scope.roles.includes('owner')) {
     await tell(db, scope, { recipients: [`branch_managers:${q.restaurant_id}`], exclude: [scope.userId], kind: 'request_cancelled', title: `${requestRef(q.number, q.created_at)} was cancelled`, body: text || null,
-      link: '/inventory/requests', entity: { type: 'stock_request', id: q.id }, dedupeKey: `request_cancelled:${q.id}` });
+      link: branchRequestsLink(q.restaurant_id), entity: { type: 'stock_request', id: q.id }, dedupeKey: `request_cancelled:${q.id}` });
   }
   return { ...(await getRequest(db, scope, q.id)), released };
 }
@@ -409,7 +414,7 @@ export async function review(db, scope, requestId, input = {}, { now = new Date(
     if (!text) throw fail(400, 'Give the branch a reason for rejecting.', 'reason_required');
     await db.query(`update public.stock_requests set status = 'rejected', reviewed_by = $2, reviewed_at = $3, review_note = $4, updated_at = now() where id = $1`, [q.id, scope.userId, now, text]);
     await audit(db, { businessId: scope.businessId, locationId: q.to_location, actorId: scope.userId, actorRole: scope.role, entity: 'stock_request', entityId: q.id, action: 'reject', before: { status: q.status }, after: { status: 'rejected', note: text } });
-    await tell(db, scope, { recipients: [`branch_managers:${q.restaurant_id}`], kind: 'request_rejected', title: `${ref} was rejected`, body: text, link: '/inventory/requests', entity: { type: 'stock_request', id: q.id }, dedupeKey: `request_rejected:${q.id}` });
+    await tell(db, scope, { recipients: [`branch_managers:${q.restaurant_id}`], kind: 'request_rejected', title: `${ref} was rejected`, body: text, link: branchRequestsLink(q.restaurant_id), entity: { type: 'stock_request', id: q.id }, dedupeKey: `request_rejected:${q.id}` });
     return getRequest(db, scope, q.id);
   }
   if (input.decision !== 'approve') throw fail(400, 'Choose approve or reject.', 'bad_decision');
@@ -446,7 +451,7 @@ export async function review(db, scope, requestId, input = {}, { now = new Date(
   await tell(db, scope, { recipients: [`branch_managers:${q.restaurant_id}`], kind: full ? 'request_approved' : 'request_partially_approved',
     title: full ? `${ref} was approved` : `${ref} was partly approved`,
     body: plan.filter((p) => cmp(p.approved, p.requested) < 0).map((p) => `${p.it.name}: ${show(p.it, p.approved, units)} of ${show(p.it, p.requested, units)}`).join('; ') || (text || null),
-    link: '/inventory/requests', entity: { type: 'stock_request', id: q.id }, dedupeKey: `request_approved:${q.id}` });
+    link: branchRequestsLink(q.restaurant_id), entity: { type: 'stock_request', id: q.id }, dedupeKey: `request_approved:${q.id}` });
   return getRequest(db, scope, q.id);
 }
 
@@ -662,7 +667,7 @@ function deliveryMeta(input) {
 
 const notifyIncoming = (db, scope, t, from, to, now) => tell(db, scope, {
   recipients: to.restaurantId ? [`branch_managers:${to.restaurantId}`] : 'owners', kind: 'delivery_incoming',
-  title: `A delivery from ${from.name} is on its way`, body: `${transferRef(t.number, now)}, code ${t.code}.`, link: '/inventory/requests', entity: { type: 'transfer', id: t.id }, dedupeKey: `delivery_incoming:${t.id}` });
+  title: `A delivery from ${from.name} is on its way`, body: `${transferRef(t.number, now)}, code ${t.code}.`, link: to.restaurantId ? branchRequestsLink(to.restaurantId, `?receive=${t.id}`) : OWNER_REQUESTS_LINK, entity: { type: 'transfer', id: t.id }, dedupeKey: `delivery_incoming:${t.id}` });
 
 /**
  * The owner sends stock from the Warehouse to a branch, either for a request or directly.
@@ -754,7 +759,7 @@ export async function cancelDispatch(db, scope, transferId, { now = new Date() }
   await audit(db, { businessId: scope.businessId, locationId: t.from_location, actorId: scope.userId, actorRole: scope.role, entity: 'transfer', entityId: t.id, action: 'cancel_dispatch',
     before: { status: 'in_transit' }, after: { status: 'cancelled', rereserved } });
   await tell(db, scope, { recipients: t.to_restaurant ? [`branch_managers:${t.to_restaurant}`] : 'owners', exclude: [scope.userId], kind: 'delivery_cancelled',
-    title: `${transferRef(t.number, t.dispatched_at)} was cancelled`, body: 'The goods did not leave. Do not receive them.', link: '/inventory/requests', entity: { type: 'transfer', id: t.id }, dedupeKey: `delivery_cancelled:${t.id}` });
+    title: `${transferRef(t.number, t.dispatched_at)} was cancelled`, body: 'The goods did not leave. Do not receive them.', link: t.to_restaurant ? branchRequestsLink(t.to_restaurant) : OWNER_REQUESTS_LINK, entity: { type: 'transfer', id: t.id }, dedupeKey: `delivery_cancelled:${t.id}` });
   return getTransfer(db, scope, t.id);
 }
 
@@ -887,11 +892,11 @@ export async function receive(db, scope, transferId, input = {}, { now = new Dat
   const sides = ['owners', ...(t.from_restaurant ? [`branch_managers:${t.from_restaurant}`] : []), ...(t.to_restaurant ? [`branch_managers:${t.to_restaurant}`] : [])];
   if (created.length) {
     await tell(db, scope, { recipients: sides, exclude: [scope.userId], kind: 'discrepancy_opened', title: `${ref} arrived with differences`,
-      body: `${created.map((d) => `${d.kind} ${d.display} of ${d.name}`).join('; ')}. ${text}`.slice(0, 900), link: '/owner/inventory/discrepancies', entity: { type: 'transfer', id: t.id }, dedupeKey: `discrepancy_opened:${t.id}:r${round}` });
+      body: `${created.map((d) => `${d.kind} ${d.display} of ${d.name}`).join('; ')}. ${text}`.slice(0, 900), link: OWNER_PROBLEMS_LINK, entity: { type: 'transfer', id: t.id }, dedupeKey: `discrepancy_opened:${t.id}:r${round}` });
   }
   await tell(db, scope, { recipients: ['owners', ...(t.from_restaurant ? [`branch_managers:${t.from_restaurant}`] : [])], exclude: [scope.userId], kind: 'delivery_received',
     title: `${ref} ${closed ? 'was received' : 'was partly received'} at ${t.to_name}`, body: created.length ? 'There were differences; see the discrepancy.' : `${from.name} to ${t.to_name}.`,
-    link: '/owner/inventory/requests', entity: { type: 'transfer', id: t.id }, dedupeKey: `delivery_received:${t.id}:r${round}` });
+    link: OWNER_REQUESTS_LINK, entity: { type: 'transfer', id: t.id }, dedupeKey: `delivery_received:${t.id}:r${round}` });
   const out = await getTransfer(db, scope, t.id);
   return { ...out, discrepanciesOpened: created, closed, request: t.request_id ? (await getRequest(db, scope, t.request_id)).request : null };
 }
@@ -1053,7 +1058,7 @@ export async function applyTransferDecision(db, approval, { scope }) {
     await audit(db, { businessId: t.business_id, locationId: t.from_location, actorId: scope.userId, actorRole: scope.role, entity: 'transfer', entityId: t.id, action: approval.selfApproved ? 'approve_self' : 'approve',
       before: { status: 'pending_approval' }, after: { approvalId: approval.id, selfApproved: approval.selfApproved } });
     await notify(db, { businessId: t.business_id, recipients: t.from_restaurant ? [`branch_managers:${t.from_restaurant}`] : 'owners', exclude: [scope.userId], kind: 'transfer_approved', title: `${ref} was approved`,
-      body: `${t.from_name} can now send it to ${t.to_name}.`, link: '/inventory/requests', entity: { type: 'transfer', id: t.id }, dedupeKey: `transfer_approved:${t.id}` });
+      body: `${t.from_name} can now send it to ${t.to_name}.`, link: t.from_restaurant ? branchRequestsLink(t.from_restaurant) : OWNER_REQUESTS_LINK, entity: { type: 'transfer', id: t.id }, dedupeKey: `transfer_approved:${t.id}` });
   } else if (approval.status === 'rejected') {
     await db.query(`update public.stock_transfers set status = 'cancelled', cancelled_by = $2, cancelled_at = $3 where id = $1`, [t.id, approval.decidedBy, at]);
     await audit(db, { businessId: t.business_id, locationId: t.from_location, actorId: scope.userId, actorRole: scope.role, entity: 'transfer', entityId: t.id, action: 'reject',
@@ -1073,17 +1078,29 @@ ensureDistributionApprovals();
 
 /* ---------- suggestions ---------- */
 
+/** Days of cover suggested for an item with no par level, from its recent use (P2-24). */
+export const SUGGEST_COVER_DAYS = 7;
+/** How many days of pos_consumption the average daily use looks at (P2-24). */
+export const SUGGEST_USE_DAYS = 14;
+
 /**
- * What a branch should ask for: items with a par level at the branch (stock_item_levels.par) where par - available - incoming > 0, rounded UP to the item's
- * main pack (its first own unit). available = on hand - held for open orders; incoming = on its way + approved-but-unsent + submitted requests.
- * Each row also carries the 7-day average daily use (pos_consumption).
+ * What a branch should ask for. Target = the branch's par level (stock_item_levels.par); an item with NO par level falls back to SUGGEST_COVER_DAYS (7) days of its
+ * average daily use over the last SUGGEST_USE_DAYS (14) days (pos_consumption), so a branch that never had par levels still gets sensible suggestions.
+ *   need = target - available - incoming,   available = on hand - held for open orders,
+ *   incoming = on its way (sent, not yet counted) + what open requests still expect (submitted, or approved and not yet sent).
+ * need > 0 is rounded UP to the item's main pack (its first own unit). Each row says its `basis` ('par' or 'use'), the figures behind it and the average daily use.
  */
 export async function suggestRequest(db, scope, locationId) {
   const loc = branchPlace(scope, locationId);
   requireCan(scope, 'inv.request.create', { locationId: loc.id });
   const levels = (await db.query(`select item_id, par::text as par from public.stock_item_levels where location_id = $1 and par is not null and par > 0`, [loc.id])).rows;
-  if (!levels.length) return { suggestions: [], message: 'No par levels are set for this branch yet, so there is nothing to suggest. The owner sets them on each item.' };
-  const ids = levels.map((l) => l.item_id);
+  const use = new Map((await db.query(`select item_id, (-sum(delta) / ${SUGGEST_USE_DAYS})::text as q from public.stock_movements where location_id = $1 and reason = 'pos_consumption' and occurred_at > now() - interval '${SUGGEST_USE_DAYS} days' group by item_id having sum(delta) < 0`, [loc.id])).rows.map((r) => [r.item_id, r.q]));
+  const targets = new Map(levels.map((l) => [l.item_id, { target: l.par, basis: 'par' }]));
+  for (const [itemId, daily] of use) {
+    if (!targets.has(itemId)) targets.set(itemId, { target: mul(daily, SUGGEST_COVER_DAYS, QTY).toString(QTY), basis: 'use' });
+  }
+  if (!targets.size) return { suggestions: [], message: 'No par levels are set for this branch yet and nothing has been used recently, so there is nothing to suggest. The owner sets par levels on each item.' };
+  const ids = [...targets.keys()];
   const items = await loadItems(db, scope.businessId, ids);
   const units = await loadUnits(db);
   const bal = new Map((await db.query('select item_id, on_hand::text as on_hand from public.stock_balances where location_id = $1 and item_id = any($2::uuid[])', [loc.id, ids])).rows.map((r) => [r.item_id, r.on_hand]));
@@ -1093,14 +1110,13 @@ export async function suggestRequest(db, scope, locationId) {
   const asked = new Map((await db.query(`select l.item_id, sum(case when q.status = 'submitted' then l.requested else greatest(coalesce(l.approved, 0) - l.dispatched, 0) end)::text as q
     from public.stock_request_lines l join public.stock_requests q on q.id = l.request_id where q.restaurant_id = $1 and q.status in ('submitted', 'approved', 'partially_approved', 'preparing', 'dispatched', 'partially_received')
     group by l.item_id`, [loc.restaurantId])).rows.map((r) => [r.item_id, r.q]));
-  const use = new Map((await db.query(`select item_id, (-sum(delta) / 7)::text as q from public.stock_movements where location_id = $1 and reason = 'pos_consumption' and occurred_at > now() - interval '7 days' group by item_id`, [loc.id])).rows.map((r) => [r.item_id, r.q]));
   const out = [];
-  for (const l of levels) {
-    const it = items.get(l.item_id);
+  for (const [itemId, t] of targets) {
+    const it = items.get(itemId);
     if (!it || it.archived) continue;
-    const available = sub(bal.get(l.item_id) ?? '0', held.get(l.item_id) ?? '0');
-    const incoming = add(transit.get(l.item_id) ?? '0', asked.get(l.item_id) ?? '0');
-    let need = sub(sub(l.par, available), incoming);
+    const available = sub(bal.get(itemId) ?? '0', held.get(itemId) ?? '0');
+    const incoming = add(transit.get(itemId) ?? '0', asked.get(itemId) ?? '0');
+    let need = sub(sub(t.target, available), incoming);
     if (cmp(need, 0) <= 0) continue;
     const pack = it.units[0];
     if (pack && cmp(pack.factor, 0) > 0) {
@@ -1108,9 +1124,9 @@ export async function suggestRequest(db, scope, locationId) {
       if (cmp(mul(n, pack.factor, QTY), need) < 0) n = add(n, 1);
       need = mul(n, pack.factor, QTY);
     }
-    const daily = use.get(l.item_id) ?? null;
-    out.push({ itemId: l.item_id, name: it.name, unit: it.baseUnit, par: q4(l.par), onHand: q4(bal.get(l.item_id) ?? '0'), held: q4(held.get(l.item_id) ?? '0'), available: q4(available), incoming: q4(incoming),
-      suggested: need.toString(QTY), suggestedDisplay: show(it, need.toString(QTY), units), pack: pack ? { name: pack.name, factor: pack.factor } : null,
+    const daily = use.get(itemId) ?? null;
+    out.push({ itemId, name: it.name, unit: it.baseUnit, basis: t.basis, par: t.basis === 'par' ? q4(t.target) : null, target: q4(t.target), onHand: q4(bal.get(itemId) ?? '0'), held: q4(held.get(itemId) ?? '0'),
+      available: q4(available), incoming: q4(incoming), suggested: need.toString(QTY), suggestedDisplay: show(it, need.toString(QTY), units), pack: pack ? { name: pack.name, factor: pack.factor } : null,
       avgDailyUse: daily === null ? null : q4(daily), daysCover: daily !== null && cmp(daily, 0) > 0 ? div(available, daily, 1, 'half-up').toString(1) : null });
   }
   out.sort((a, b) => a.name.localeCompare(b.name));
@@ -1162,7 +1178,7 @@ export async function adoptLegacy(db, scope, { now = new Date() } = {}) {
       await db.query('update public.stock_requests set needs_attention = true, updated_at = now() where id = $1', [c.id]);
       await tell(db, scope, { recipients: 'owners', kind: 'reservation_attention', title: `${requestRef(c.number, c.created_at)} needs attention`,
         body: `It was approved before the new stock system. The Warehouse can’t cover: ${short.map((s) => `${s.name} (${show(items.get(s.itemId), s.free, units)} free of ${show(items.get(s.itemId), s.wanted, units)})`).join('; ')}.`,
-        link: '/owner/inventory/requests', entity: { type: 'stock_request', id: c.id }, dedupeKey: `reservation_attention:${c.id}` });
+        link: OWNER_REQUESTS_LINK, entity: { type: 'stock_request', id: c.id }, dedupeKey: `reservation_attention:${c.id}` });
     }
     await audit(db, { businessId: scope.businessId, locationId: scope.centerLocationId, actorId: scope.userId, actorRole: scope.role, entity: 'stock_request', entityId: c.id, action: 'adopt_legacy',
       after: { held, short } });

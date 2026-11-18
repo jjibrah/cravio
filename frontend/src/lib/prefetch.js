@@ -65,6 +65,8 @@ export const chunks = {
   ownerReceive: once(() => import('../pages/inventory/OwnerReceivePage')),
   ownerApprovals: once(() => import('../pages/inventory/OwnerApprovalsPage')),
   branchPurchases: once(() => import('../pages/inventory/BranchPurchasesPage')),
+  ownerRequests: once(() => import('../pages/inventory/OwnerRequestsPage')),
+  branchRequests: once(() => import('../pages/inventory/BranchRequestsPage')),
   receiveCode: once(() => import('../pages/stock/ReceiveCodePage')),
   terms: once(() => import('../components/legal/TermsPage')),
   termsAccept: once(() => import('../components/legal/TermsAcceptPage')),
@@ -95,7 +97,7 @@ export function chunksFor(pathname) {
     case 'receive': return [...signedIn, 'receiveCode'];
     case 'owner': {
       // Inventory: today's page while the feature is off, the new screen when on (App.jsx InventoryRoute).
-      if (page === 'inventory') return [...signedIn, 'dashboard', 'ownerInventory', { items: 'ownerItems', recipes: 'ownerRecipes', history: 'ownerHistory', suppliers: 'ownerSuppliers', 'purchase-orders': 'ownerPurchaseOrders', receive: 'ownerReceive', approvals: 'ownerApprovals' }[detail] || 'ownerStock'];
+      if (page === 'inventory') return [...signedIn, 'dashboard', 'ownerInventory', { items: 'ownerItems', recipes: 'ownerRecipes', history: 'ownerHistory', suppliers: 'ownerSuppliers', 'purchase-orders': 'ownerPurchaseOrders', receive: 'ownerReceive', approvals: 'ownerApprovals', requests: 'ownerRequests' }[detail] || 'ownerStock'];
       if (BRANCH_PAGES[page] && page) return [...signedIn, 'branchChooser']; // legacy link, redirected to a branch
       return [...signedIn, 'dashboard', OWNER_PAGES[page] || 'pageFrame'];
     }
@@ -105,7 +107,7 @@ export function chunksFor(pathname) {
       const [section = '', sub] = [detail, parts[3]];
       const key = section === 'tables' && sub ? 'tableDetail' : BRANCH_PAGES[section] || 'pageFrame';
       // With inventory on, branch Stock/History/Recipes use the new pages (also warm them).
-      return [...signedIn, 'dashboard', key, ...({ recipes: ['branchRecipes'], inventory: sub === 'purchases' ? ['branchPurchases'] : ['branchStock', 'branchHistory'] }[section] || [])];
+      return [...signedIn, 'dashboard', key, ...({ recipes: ['branchRecipes'], inventory: sub === 'purchases' ? ['branchPurchases'] : sub === 'requests' ? ['branchRequests'] : ['branchStock', 'branchHistory'] }[section] || [])];
     }
     case 'admin': return [...signedIn, 'dashboard', page === 'businesses' && detail ? 'adminBusiness' : ADMIN_PAGES[page] || 'pageFrame'];
     case 'waiter': return [...signedIn, 'waiter', WAITER_PAGES[page] || 'waiterTables'];

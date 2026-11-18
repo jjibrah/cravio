@@ -28,6 +28,9 @@
 //     POST /dispatches/:id/receive same body as the branch receive (the Warehouse side receiving a return)
 //     POST /dispatches/:id/send    send an approved branch -> branch transfer / return on the branch's behalf
 //     POST /returns { branchId, lines, reason }    POST /branch-transfers { fromBranchId, toBranchId, lines, note? }
+//     GET  /api/inventory/branches                  the OTHER active branches of this business a transfer can go to: [{ id (restaurant id), locationId, name }] (names only)
+//   DISCREPANCIES (P2-23)  GET /discrepancies?status=open|resolved|all&branchId=&from=&to=&kind=   GET /discrepancies/:id   (owner base and branch base; the branch sees its own deliveries, read only)
+//     POST /api/owner/inventory/:businessId/discrepancies/:id/resolve  { bearer: 'carrier'|'source'|'destination', resolution: 'write_off'|'arrived_later'|'returned_to_source'|'source_deducts', note, quantity? }
 //   Approving or rejecting a branch -> branch transfer happens in the Approvals inbox (/approvals/:id/decide); the engine calls distribution.applyTransferDecision.
 // createRoutes() takes its dependencies so tests run the real handlers.
 import { requireUser } from '../lib/auth.js';
@@ -38,8 +41,9 @@ import { withBody } from '../lib/operations.js';
 import { database } from '../lib/pool.js';
 import { requestedBranch, selectMembership, STAFF_ROLES } from '../lib/access.js';
 import { once } from '../inventory/commands.js';
-import { authorize, denyAndAudit, inventoryScope } from '../inventory/permissions.js';
+import { authorize, can, denyAndAudit, inventoryScope } from '../inventory/permissions.js';
 import * as dist from '../inventory/distribution.js';
+import * as disc from '../inventory/discrepancies.js';
 
 const ID = '[0-9a-fA-F-]{36}';
 const MISSING_SCHEMA = new HttpError(503, 'Distribution needs database updates 012 to 018, which haven’t been applied yet.', { code: 'inventory_schema_missing' });
@@ -145,6 +149,11 @@ export function createRoutes({ authenticate = requireUser, pool = () => database
   const atRequest = async (db, scope, params) => (await dist.requestLocation(db, scope.businessId, params.id)).locationId;
   const atTransferFrom = async (db, scope, params) => (await dist.transferLocations(db, scope.businessId, params.id)).fromLocationId;
   const atTransferTo = async (db, scope, params) => (await dist.transferLocations(db, scope.businessId, params.id)).toLocationId;
+  /** The sending place, or the receiving one when that is where the caller may approve (operations managers approve at branches, not at the Warehouse). */
+  const atDiscrepancy = async (db, scope, params) => {
+    const l = await disc.locationsOf(db, scope.businessId, params.id);
+    return can(scope, 'inv.adjust.approve', { locationId: l.fromLocationId }) ? l.fromLocationId : l.toLocationId;
+  };
   const atBranch = async (_db, scope, _p, body) => dist.branchLocationOf(scope, body.branchId ?? body.fromBranchId).id;
 
   return [
@@ -187,6 +196,12 @@ export function createRoutes({ authenticate = requireUser, pool = () => database
     }) },
 
     // ----- Branch: returns and branch -> branch -----
+    { method: 'GET', path: branch('/branches'), handler: branchRead('inv.request.create', async (ctx) => {
+      const ids = ctx.scope.locations.filter((l) => l.kind === 'branch' && l.id !== ctx.location.id).map((l) => l.id);
+      const rows = ids.length ? (await ctx.db.query(`select l.id, l.restaurant_id, coalesce(r.name, l.name) as name from public.stock_locations l left join public.restaurants r on r.id = l.restaurant_id
+        where l.business_id = $1 and l.id = any($2::uuid[]) and l.status = 'active' and l.archived_at is null order by 3`, [ctx.businessId, ids])).rows : [];
+      return { branches: rows.map((x) => ({ id: x.restaurant_id, locationId: x.id, name: x.name })) };
+    }) },
     { method: 'POST', path: branch('/returns'), handler: branchWrite('return_start', 'inv.request.create', null, (tx, ctx, _p, body) => dist.startReturn(tx, ctx.scope, { ...body, locationId: ctx.location.id }, { now: now() })) },
     { method: 'POST', path: branch('/branch-transfers'), handler: branchWrite('branch_transfer_request', 'inv.request.create', null, (tx, ctx, _p, body) => {
       const from = body.fromBranchId ?? ctx.restaurantId;
@@ -194,6 +209,15 @@ export function createRoutes({ authenticate = requireUser, pool = () => database
       if (from !== ctx.restaurantId && to !== ctx.restaurantId) throw new HttpError(403, 'A transfer has to start or end at your own branch.', { code: 'branch_forbidden' });
       return dist.requestBranchTransfer(tx, ctx.scope, { ...body, fromLocationId: dist.branchLocationOf(ctx.scope, from).id, toLocationId: dist.branchLocationOf(ctx.scope, to).id }, { now: now() });
     }) },
+
+    // ----- Branch: discrepancies on this branch's deliveries (read only) -----
+    { method: 'GET', path: branch('/discrepancies'), handler: branchRead('inv.view', (ctx, _p, q) => disc.list(ctx.db, ctx.scope, { status: q.get('status') || undefined, from: q.get('from'), to: q.get('to'), kind: q.get('kind'), branchId: ctx.restaurantId })) },
+    { method: 'GET', path: branch(`/discrepancies/(?<id>${ID})`), handler: async ({ request, params }) => {
+      const ctx = await openBranch(request);
+      const info = await safely(() => disc.locationsOf(ctx.db, ctx.businessId, params.id));
+      if (![info.fromLocationId, info.toLocationId].includes(ctx.location.id)) throw await denyAndAudit(ctx.db, ctx.scope, 'inv.view', { locationId: ctx.location.id, entity: 'discrepancy', entityId: params.id, error: NO_BRANCH() });
+      return safely(() => disc.get(ctx.db, ctx.scope, params.id));
+    } },
 
     // ----- Owner / operations -----
     { method: 'GET', path: owner('/requests'), handler: ownerRead((db, scope, _p, q) => dist.listRequests(db, scope, { ...listArgs(q), locationId: q.get('branchId') ? dist.branchLocationOf(scope, q.get('branchId')).id : undefined })) },
@@ -222,6 +246,9 @@ export function createRoutes({ authenticate = requireUser, pool = () => database
       const { db, scope } = await openOwner(request, params);
       return safely(() => dist.findByCode(db, scope, params.code));
     } },
+    { method: 'GET', path: owner('/discrepancies'), handler: ownerRead((db, scope, _p, q) => disc.list(db, scope, { status: q.get('status') || undefined, branchId: q.get('branchId') || undefined, from: q.get('from'), to: q.get('to'), kind: q.get('kind') || undefined, limit: q.get('limit') || undefined })) },
+    { method: 'GET', path: owner(`/discrepancies/(?<id>${ID})`), handler: ownerRead((db, scope, params) => disc.get(db, scope, params.id)) },
+    { method: 'POST', path: owner(`/discrepancies/(?<id>${ID})/resolve`), handler: ownerWrite('discrepancy_resolve', 'inv.adjust.approve', atDiscrepancy, (tx, scope, params, body) => disc.resolve(tx, scope, params.id, body, { now: now() })) },
     { method: 'POST', path: owner('/returns'), handler: ownerWrite('return_start', 'inv.request.create', atBranch, (tx, scope, _p, body) => dist.startReturn(tx, scope, { ...body, locationId: dist.branchLocationOf(scope, body.branchId).id }, { now: now() })) },
     { method: 'POST', path: owner('/branch-transfers'), handler: ownerWrite('branch_transfer_request', 'inv.request.create', (_d, scope, _p, body) => dist.branchLocationOf(scope, body.fromBranchId).id,
       (tx, scope, _p, body) => dist.requestBranchTransfer(tx, scope, { ...body, fromLocationId: dist.branchLocationOf(scope, body.fromBranchId).id, toLocationId: dist.branchLocationOf(scope, body.toBranchId).id }, { now: now() })) },

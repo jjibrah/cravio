@@ -14,6 +14,7 @@ import { routes as inventoryEmergency } from './inventory-emergency.js';
 import { routes as inventoryWastage } from './inventory-wastage.js';
 import { routes as inventoryDistribution } from './inventory-distribution.js';
 import { routes as inventoryAdjustments } from './inventory-adjustments.js';
+import { routes as inventoryCounts } from './inventory-counts.js';
 import { routes as legal } from './legal.js';
 import { routes as restaurant } from './restaurant.js';
 import { routes as menuMerch } from './menu-merch.js';
@@ -27,4 +28,4 @@ import { routes as adminPlatform } from './admin-platform.js';
 import { routes as adminBusiness } from './admin-business.js';
 import { routes as settings } from './settings.js';
 
-export const routes = [...me, ...legal, ...owner, ...stock, ...inventoryOwner, ...inventoryRecipes, ...inventoryBranch, ...notifications, ...inventorySuppliers, ...ai, ...inventoryAttachments, ...inventoryPurchasing, ...inventoryApprovals, ...inventoryEmergency, ...inventoryWastage, ...inventoryDistribution, ...inventoryAdjustments, ...settings, ...menuMerch, ...restaurant, ...adminBusiness, ...adminPlatform, ...adminUsers, ...publicMenu, ...publicGuest, ...publicTable, ...operations, ...support];
+export const routes = [...me, ...legal, ...owner, ...stock, ...inventoryOwner, ...inventoryRecipes, ...inventoryBranch, ...notifications, ...inventorySuppliers, ...ai, ...inventoryAttachments, ...inventoryPurchasing, ...inventoryApprovals, ...inventoryEmergency, ...inventoryWastage, ...inventoryDistribution, ...inventoryAdjustments, ...inventoryCounts, ...settings, ...menuMerch, ...restaurant, ...adminBusiness, ...adminPlatform, ...adminUsers, ...publicMenu, ...publicGuest, ...publicTable, ...operations, ...support];

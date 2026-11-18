@@ -151,6 +151,7 @@ export default function OwnerStockPage() {
   const [task, setTask] = useState(null);
   // Old links (/owner/inventory?view=history) keep working: history has its own page now.
   if (params.get('view') === 'history') return <Navigate to="/owner/inventory/history" replace />;
+  if (['requests', 'dispatches'].includes(params.get('view'))) return <Navigate to="/owner/inventory/requests" replace />;
   return <OwnerFrame title="Stock" description="What you have on hand in the Warehouse and at every branch."
     actions={(ctx) => ctx.can.stockRecord && ctx.data.items.length > 0 && <button type="button" className="o-btn is-primary" onClick={() => setTask('opening')}>
       <OIcon name="plus" size={15} />Record opening stock</button>}>

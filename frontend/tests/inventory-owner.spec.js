@@ -93,11 +93,15 @@ test.describe('inventory off', () => {
 });
 
 test.describe('inventory on: navigation', () => {
-  test('owner sidebar shows an Operations group; old ?view= links still land on Stock', async ({ page }) => {
+  test('owner sidebar shows an Operations group; old ?view= links land on the page that replaced them', async ({ page }) => {
     await setup(page);
+    // The old requests view now lives on Requests & transfers (P2-26).
     await page.goto('/owner/inventory?view=requests');
+    await expect(page).toHaveURL(/\/owner\/inventory\/requests$/);
+    await expect(page.getByRole('heading', { level: 1, name: 'Requests & transfers' })).toBeVisible();
+    await page.goto('/owner/inventory');
     await expect(sidebar(page).getByText('Operations', { exact: true })).toBeVisible();
-    for (const name of ['Stock', 'Items', 'Recipes', 'History']) await expect(sidebar(page).getByRole('link', { name, exact: true })).toBeVisible();
+    for (const name of ['Stock', 'Items', 'Recipes', 'Requests & transfers', 'History']) await expect(sidebar(page).getByRole('link', { name, exact: true })).toBeVisible();
     await expect(sidebar(page).getByRole('link', { name: 'Inventory', exact: true })).toHaveCount(0);
     await expect(sidebar(page).getByText('Business', { exact: true })).toBeVisible();
     await expect(sidebar(page).getByRole('link', { name: 'Locations' })).toBeVisible();

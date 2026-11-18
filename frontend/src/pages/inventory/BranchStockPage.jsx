@@ -3,7 +3,7 @@ import { formatStockMoney } from '../../lib/inventory';
 // still available, with the things that need attention at the top (out, low, count needed, shortfalls). One main action:
 // Record stock (count, add or waste). Tap an item for its sheet. Everything the server says is shown in plain words.
 import { useId, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, Navigate, useParams, useSearchParams } from 'react-router-dom';
 import { useApi } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import { branchPath } from '../../lib/branch';
@@ -157,9 +157,15 @@ function StockBody({ data, refresh, canAddItems, sheet, setSheet }) {
 
 export default function BranchStockPage({ section }) {
   const { account } = useAuth() || {};
+  const { branchId } = useParams();
+  const [query] = useSearchParams();
   const { data, error, loading, refresh } = useApi(branchPaths.snapshot(), { ttl: 10000 });
   const canAddItems = (account?.businesses || []).length > 0;
   const [sheet, setSheet] = useState(null); // { type: 'item', id } | { type: 'record', kind, itemId } | { type: 'short' }
+  // Old links (?view=requests, ?view=deliveries, ?receive=<delivery>) now open Requests & deliveries.
+  if (['requests', 'deliveries'].includes(query.get('view')) || query.get('receive')) {
+    return <Navigate to={`/branch/${branchId}/inventory/requests${query.get('receive') ? `?receive=${encodeURIComponent(query.get('receive'))}` : ''}`} replace />;
+  }
   return <div className="biz-stack inv-page">
     <PageHeader title={section?.label || 'Stock'} description={section?.description || 'What you have on hand at this branch.'}>
       <button type="button" className="o-btn is-primary" disabled={!data} onClick={() => setSheet({ type: 'record', kind: 'count' })}><OIcon name="plus" size={15} />Record stock</button>

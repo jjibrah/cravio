@@ -131,6 +131,18 @@ export const ownerPaths = (businessId) => {
     emergency: ({ status, location, limit } = {}) => `${base}/emergency${query({ status, locationId: location, limit })}`,
     emergencyOne: (id) => `${base}/emergency/${id}`,
     emergencyReview: (id) => `${base}/emergency/${id}/review`,
+    // Requests, deliveries and returns (P2-26)
+    requestsInbox: `${base}/requests/inbox`,
+    requests: ({ status, branchId, limit, before } = {}) => `${base}/requests${query({ status, branchId, limit, before })}`,
+    request: (id) => `${base}/requests/${id}`,
+    requestAction: (id, action) => `${base}/requests/${id}/${action}`, // review | prepare | dispatch | cancel
+    pickList: (id) => `${base}/requests/${id}/pick-list`,
+    dispatches: ({ direction, status, locationId } = {}) => `${base}/dispatches${query({ direction, status, locationId })}`,
+    dispatch: (id) => `${base}/dispatches/${id}`,
+    dispatchAction: (id, action) => `${base}/dispatches/${id}/${action}`, // cancel | receive | send
+    directDispatch: `${base}/dispatches`,
+    // Not built on the server yet (see the P2-26 gap list): POST { bearer: carrier|source|destination|found, note, foundQty? }
+    discrepancyResolve: (id) => `${base}/discrepancies/${id}/resolve`,
   };
 };
 
@@ -160,6 +172,19 @@ export const branchPaths = {
   emergencySuppliers: (search) => `/api/inventory/emergency/suppliers${query({ search })}`,
   emergencyOne: (id) => `/api/inventory/emergency/${id}`,
   emergencyAction: (id, action) => `/api/inventory/emergency/${id}/${action}`, // submit | purchased | receive | cancel | evidence
+  // Asking the Warehouse, deliveries, returns and branch -> branch transfers (P2-27)
+  requests: ({ status, limit, before } = {}) => `/api/inventory/requests${query({ status, limit, before })}`,
+  requestSuggestions: '/api/inventory/requests/suggestions',
+  request: (id) => `/api/inventory/requests/${id}`,
+  requestAction: (id, action) => `/api/inventory/requests/${id}/${action}`, // submit | cancel
+  transfers: ({ direction, status, limit } = {}) => `/api/inventory/transfers${query({ direction, status, limit })}`,
+  transfer: (id) => `/api/inventory/transfers/${id}`,
+  transferAction: (id, action) => `/api/inventory/transfers/${id}/${action}`, // receive | dispatch | cancel
+  receiveCode: (code) => `/api/inventory/receive/${encodeURIComponent(code)}`,
+  returns: '/api/inventory/returns',
+  branchTransfers: '/api/inventory/branch-transfers',
+  // Not built yet: the other branches of this business, to choose where stock goes (see the P2-27 gap list)
+  siblings: '/api/inventory/branches',
 };
 
 /**
@@ -490,4 +515,68 @@ export function percentMore(now, before) {
   const a = Number(now); const b = Number(before);
   if (!(a > 0) || !(b > 0)) return null;
   return Math.round(((a - b) / b) * 1000) / 10;
+}
+
+/* ---------- requests, deliveries and returns (P2-26, P2-27) ---------- */
+
+export const REQUEST_STATUS = {
+  draft: { label: 'Not sent', tone: 'off', next: 'Not sent yet. Send it when you are ready.' },
+  submitted: { label: 'Waiting for the owner', tone: 'low', next: 'The owner will look at it soon.' },
+  pending_approval: { label: 'Waiting for the owner', tone: 'low', next: 'The owner will look at it soon.' },
+  approved: { label: 'Approved', tone: 'ok', next: 'Approved. The Warehouse is getting it ready.' },
+  partially_approved: { label: 'Partly approved', tone: 'low', next: 'The owner approved less than you asked for.' },
+  rejected: { label: 'Not approved', tone: 'out', next: 'The owner said no. See the reason.' },
+  preparing: { label: 'Being packed', tone: 'ok', next: 'The Warehouse is packing it.' },
+  dispatched: { label: 'On its way', tone: 'ok', next: 'On its way. Receive it when it arrives.' },
+  partially_received: { label: 'Partly received', tone: 'low', next: 'Part has arrived. The rest is still coming.' },
+  received: { label: 'Received', tone: 'ok', next: 'Done.' },
+  completed: { label: 'Done', tone: 'ok', next: 'Done.' },
+  cancelled: { label: 'Cancelled', tone: 'off', next: 'Cancelled.' },
+};
+export const TRANSFER_STATUS = {
+  pending_approval: { label: 'Waiting for the owner', tone: 'low' },
+  in_transit: { label: 'On the way', tone: 'ok' },
+  partially_received: { label: 'Partly received', tone: 'low' },
+  received: { label: 'Received', tone: 'ok' },
+  cancelled: { label: 'Cancelled', tone: 'off' },
+};
+export const DIRECTION_LABEL = { out: 'From the Warehouse', return: 'Returned to the Warehouse', branch_to_branch: 'Between branches' };
+
+/** Who carries the loss when goods are really gone, in plain words. The server's `bearer` values (`from` names the sender: the Warehouse or a branch). */
+export const bearerChoices = (from, to) => [
+  { value: 'carrier', label: 'Carrier', hint: 'The transporter pays.' },
+  { value: 'source', label: from === 'Warehouse' ? 'Warehouse' : from, hint: from === 'Warehouse' ? 'We absorb it at the Warehouse.' : `${from} absorbs it.` },
+  { value: 'destination', label: to === 'Warehouse' ? 'Warehouse' : 'Branch', hint: to === 'Warehouse' ? 'We absorb it at the Warehouse.' : `The branch (${to}) absorbs it.` },
+];
+export const BEARER_LABEL = { carrier: 'The carrier pays', source: 'The sender absorbed it', destination: 'The receiving branch absorbed it' };
+/** What each way of settling a difference means, by kind of difference (the server's `resolution` values). */
+export const resolutionChoices = (kind, from, to) => ({
+  short: [{ value: 'write_off', label: 'It is really lost', hint: 'Write it off and say who pays.' },
+    { value: 'arrived_later', label: 'Found it: the goods turned up', hint: `They are added to ${to}’s stock.` },
+    { value: 'returned_to_source', label: `It never left ${from}`, hint: `It is put back on ${from}’s stock.` }],
+  damaged: [{ value: 'write_off', label: 'Write it off as damaged', hint: 'Say who pays.' }],
+  over: [{ value: 'write_off', label: `${to} keeps the extra`, hint: 'Nothing is corrected.' },
+    { value: 'source_deducts', label: `Take it off ${from}’s stock`, hint: `It really did come out of ${from}.` },
+    { value: 'returned_to_source', label: `Take the extra back from ${to}`, hint: `${to} sends it back.` }],
+}[kind] || []);
+export const DISCREPANCY_LABEL = { short: 'Short', damaged: 'Damaged', over: 'Extra' };
+
+/**
+ * Every way an amount for this item can be typed, as [{ value, label, factor }] (factor = base units in one). Works for the owner's
+ * items (units: [{ name, factor }] beside the standard `units`) and the branch's (units: [{ code, label, plural, factor }]).
+ */
+export function unitOptions(item, units = []) {
+  if (!item) return [];
+  const own = item.units || [];
+  if (own.some((u) => u.code !== undefined)) return own.map((u) => ({ value: u.code, label: u.plural || u.label || u.code, factor: Number(u.factor) }));
+  return unitChoices(item, units).map((choice) => ({ ...choice, factor: factorOf(choice.value, item, units) }));
+}
+
+/** The unit an item is usually counted in: its display unit, else its base unit. */
+export const usualUnitOf = (item) => item?.displayUnit || item?.baseUnit || '';
+
+/** A quantity in base units -> the same in `unit` (a value from unitOptions), rounded to 3 places, as text. */
+export function inUnit(base, unit, options) {
+  const factor = options.find((o) => o.value === unit)?.factor || 1;
+  return String(Math.round((Number(base) / factor) * 1000) / 1000);
 }

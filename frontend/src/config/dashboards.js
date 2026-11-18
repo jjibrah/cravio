@@ -31,6 +31,7 @@ export const dashboards = {
       { path: 'recipes', group: 'Menu', label: 'Recipes', icon: 'utensils', kind: 'inventory', feature: 'inventory', description: 'What goes into each dish, and what it costs you to make.' },
       { path: 'inventory', group: 'Operations', label: 'Inventory', icon: 'products', kind: 'inventory', featureOff: 'inventory', description: 'Servings on hand, requests to the main center and deliveries.' },
       { path: 'inventory', group: 'Operations', label: 'Stock', icon: 'products', kind: 'inventory', feature: 'inventory', description: 'What you have on hand at this branch.' },
+      { path: 'inventory/requests', group: 'Operations', label: 'Requests & deliveries', icon: 'services', kind: 'inventory', feature: 'inventory', description: 'Ask the Warehouse for stock, receive deliveries, and send stock back or to another branch.' },
       { path: 'inventory/purchases', group: 'Operations', label: 'Purchases', icon: 'orders', kind: 'inventory', feature: 'inventory', description: 'Emergency buys, with the receipt, when you can’t wait for the warehouse.' },
       { path: 'inventory/history', group: 'Operations', label: 'History', icon: 'performance', kind: 'inventory', feature: 'inventory', description: 'Every stock change at this branch, newest first.' },
       { path: 'insights', group: 'Analytics', label: 'Insights', icon: 'insights', kind: 'insights', description: 'Sales and service trends over time.' },
@@ -48,6 +49,7 @@ export const dashboards = {
       { path: 'inventory', group: 'Operations', label: 'Stock', icon: 'products', kind: 'inventory', feature: 'inventory', description: 'What you have on hand in the warehouse and at every branch.' },
       { path: 'inventory/items', group: 'Operations', label: 'Items', icon: 'layers', kind: 'inventory', feature: 'inventory', description: 'Everything you buy or make: how it is measured and the packs it comes in.' },
       { path: 'inventory/recipes', group: 'Operations', label: 'Recipes', icon: 'utensils', kind: 'inventory', feature: 'inventory', description: 'What goes into each dish, and what it costs you to make.' },
+      { path: 'inventory/requests', group: 'Operations', label: 'Requests & transfers', icon: 'services', kind: 'inventory', feature: 'inventory', description: 'What the branches asked the Warehouse for, what is on the way, and what arrived.' },
       { path: 'inventory/history', group: 'Operations', label: 'History', icon: 'performance', kind: 'inventory', feature: 'inventory', description: 'Every stock change for an item, newest first.' },
       // Purchasing (Phase 2): suppliers, orders, receiving and the approvals inbox. `badge` names a count shown beside the label (Sidebar).
       { path: 'inventory/suppliers', group: 'Purchasing', label: 'Suppliers', icon: 'restaurants', kind: 'inventory', feature: 'inventory', description: 'Who you buy from, what they sell and what they charge.' },

@@ -239,7 +239,7 @@ async function typicalAmount(db, locationId, itemId) {
  * Refuses (409 confirm_large_amount) an amount far above what is normal for this item here, unless confirmed.
  * Normal = the larger of the item's reorder/par level and its 30-day average movement here. Limit = factor x normal.
  */
-async function checkLargeAmount(db, scope, loc, { itemRow, item, units, baseQty, enteredQuantity, enteredUnit, confirm }) {
+export async function checkLargeAmount(db, scope, loc, { itemRow, item, units, baseQty, enteredQuantity, enteredUnit, confirm }) {
   if (confirm) return;
   const typical = await typicalAmount(db, loc.id, itemRow.id);
   if (typical === null) return;
